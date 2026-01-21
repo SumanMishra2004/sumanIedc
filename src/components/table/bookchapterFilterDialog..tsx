@@ -3,7 +3,6 @@
 import * as React from "react"
 import { FilterIcon, X, Plus, Trash2 } from "lucide-react"
 
-import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -25,220 +24,128 @@ import {
 } from "@/components/ui/drawer"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { BookChapterFilters } from "@/types/book-chapter"
+import { ResearchStatus } from "@prisma/client"
 
-export interface FilterValues {
-  // Basic Filters
-  status?: string
-  isPublic?: boolean
-  title?: string
-  isbnIssn?: string
-  
-  // Numeric Range Filters
-  minFees?: number
-  maxFees?: number
-  
-  // Date Range Filters
-  createdAfter?: string
-  createdBefore?: string
-  updatedAfter?: string
-  updatedBefore?: string
-  
-  // Author Filters
-  teacherName?: string[]
-  
-  // Pagination & Sorting (handled separately, not in dialog)
-  page?: number
-  limit?: number
-  sortBy?: string
-  sortOrder?: 'asc' | 'desc'
-}
+export interface FilterValues extends Omit<BookChapterFilters, 'page' | 'limit' | 'sortBy' | 'sortOrder'> {}
 
 interface FilterDialogProps {
-  filters: FilterValues
-  onFiltersChange: (filters: Partial<FilterValues>) => void
+  filters: BookChapterFilters
+  onFiltersChange: (filters: Partial<BookChapterFilters>) => void
   onClearFilters: () => void
-  statusOptions?: { value: string; label: string }[]
   triggerButton?: React.ReactNode
 }
-
-const defaultStatusOptions = [
-  { value: "ACCEPTED", label: "Accepted" },
-  { value: "COMMUNICATED", label: "Communicated" },
-  { value: "PUBLISHED", label: "Published" },
-]
 
 export function FilterDialog({
   filters,
   onFiltersChange,
   onClearFilters,
-  statusOptions = defaultStatusOptions,
   triggerButton,
 }: FilterDialogProps) {
   const isMobile = useIsMobile()
   const [open, setOpen] = React.useState(false)
-  const [localFilters, setLocalFilters] = React.useState<FilterValues>(filters)
-  const [teacherInput, setTeacherInput] = React.useState("")
-  const [titleInput, setTitleInput] = React.useState("")
-  const [isbnInput, setIsbnInput] = React.useState("")
+  const [localFilters, setLocalFilters] = React.useState<Partial<BookChapterFilters>>(filters)
 
   // Sync local filters with external filters when dialog opens
   React.useEffect(() => {
     if (open) {
       setLocalFilters(filters)
-      setTitleInput(filters.title || "")
-      setIsbnInput(filters.isbnIssn || "")
     }
   }, [open, filters])
 
-  // Debounce title input
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setLocalFilters((prev) => ({
-        ...prev,
-        title: titleInput || undefined,
-      }))
-    }, 500)
-
-    return () => clearTimeout(timer)
-  }, [titleInput])
-
-  // Debounce ISBN/ISSN input
-  React.useEffect(() => {
-    const timer = setTimeout(() => {
-      setLocalFilters((prev) => ({
-        ...prev,
-        isbnIssn: isbnInput || undefined,
-      }))
-    }, 500)
-
-    return () => clearTimeout(timer)
-  }, [isbnInput])
-
-  // Date handlers
-  const handleCreatedDateFromChange = (value: string) => {
+  // Date handlers - using API field names
+  const handleCreatedFromChange = (value: string) => {
     setLocalFilters((prev) => ({
       ...prev,
-      createdAfter: value || undefined,
+      createdFrom: value || undefined,
     }))
   }
 
-  const handleCreatedDateToChange = (value: string) => {
+  const handleCreatedToChange = (value: string) => {
     setLocalFilters((prev) => ({
       ...prev,
-      createdBefore: value || undefined,
+      createdTo: value || undefined,
     }))
   }
 
-  const handleUpdatedDateFromChange = (value: string) => {
+  const handlePublishedFromChange = (value: string) => {
     setLocalFilters((prev) => ({
       ...prev,
-      updatedAfter: value || undefined,
+      publishedFrom: value || undefined,
     }))
   }
 
-  const handleUpdatedDateToChange = (value: string) => {
+  const handlePublishedToChange = (value: string) => {
     setLocalFilters((prev) => ({
       ...prev,
-      updatedBefore: value || undefined,
+      publishedTo: value || undefined,
     }))
   }
 
   const clearCreatedDateRange = () => {
     setLocalFilters((prev) => ({
       ...prev,
-      createdAfter: undefined,
-      createdBefore: undefined,
+      createdFrom: undefined,
+      createdTo: undefined,
     }))
   }
 
-  const clearUpdatedDateRange = () => {
+  const clearPublishedDateRange = () => {
     setLocalFilters((prev) => ({
       ...prev,
-      updatedAfter: undefined,
-      updatedBefore: undefined,
+      publishedFrom: undefined,
+      publishedTo: undefined,
     }))
   }
 
-  // Basic filter handlers
-  const handleStatusChange = (value: string) => {
-    setLocalFilters((prev) => ({
-      ...prev,
-      status: value === "all" ? undefined : value,
-    }))
-  }
-
-  const handleVisibilityChange = (value: string) => {
-    setLocalFilters((prev) => ({
-      ...prev,
-      isPublic: value === "all" ? undefined : value === "public",
-    }))
-  }
-
-  const handleTitleChange = (value: string) => {
-    setTitleInput(value)
-  }
-
-  const handleIsbnIssnChange = (value: string) => {
-    setIsbnInput(value)
-  }
-
-  // Fee range handlers
+  // Fee range handlers - using API field names
   const handleMinFeesChange = (value: string) => {
     setLocalFilters((prev) => ({
       ...prev,
-      minFees: value ? Number(value) : undefined,
+      minRegistrationFees: value ? Number(value) : undefined,
     }))
   }
 
   const handleMaxFeesChange = (value: string) => {
     setLocalFilters((prev) => ({
       ...prev,
-      maxFees: value ? Number(value) : undefined,
+      maxRegistrationFees: value ? Number(value) : undefined,
     }))
   }
 
-  // Teacher filter handlers
-  const handleAddTeacher = () => {
-    if (teacherInput.trim()) {
-      setLocalFilters((prev) => {
-        const currentTeachers = prev.teacherName || []
-        if (!currentTeachers.includes(teacherInput.trim())) {
-          return {
-            ...prev,
-            teacherName: [...currentTeachers, teacherInput.trim()],
-          }
-        }
-        return prev
-      })
-      setTeacherInput("")
-    }
-  }
-
-  const handleRemoveTeacher = (teacherName: string) => {
+  const handleMinReimbursementChange = (value: string) => {
     setLocalFilters((prev) => ({
       ...prev,
-      teacherName: prev.teacherName?.filter((name) => name !== teacherName),
+      minReimbursement: value ? Number(value) : undefined,
     }))
   }
 
-  const clearAllTeachers = () => {
+  const handleMaxReimbursementChange = (value: string) => {
     setLocalFilters((prev) => ({
       ...prev,
-      teacherName: undefined,
+      maxReimbursement: value ? Number(value) : undefined,
     }))
-    setTeacherInput("")
+  }
+
+  // Publisher filter
+  const handlePublisherChange = (value: string) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      publisher: value || undefined,
+    }))
+  }
+
+  // Keyword filter
+  const handleKeywordChange = (value: string) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      keyword: value || undefined,
+    }))
   }
 
   const handleApplyFilters = () => {
@@ -247,18 +154,20 @@ export function FilterDialog({
   }
 
   const handleClearFilters = () => {
-    const clearedFilters: FilterValues = {
+    const clearedFilters: Partial<BookChapterFilters> = {
       status: undefined,
       isPublic: undefined,
-      title: undefined,
-      isbnIssn: undefined,
-      minFees: undefined,
-      maxFees: undefined,
-      createdAfter: undefined,
-      createdBefore: undefined,
-      updatedAfter: undefined,
-      updatedBefore: undefined,
-      teacherName: undefined,
+      keyword: undefined,
+      publisher: undefined,
+      search: undefined,
+      minRegistrationFees: undefined,
+      maxRegistrationFees: undefined,
+      minReimbursement: undefined,
+      maxReimbursement: undefined,
+      createdFrom: undefined,
+      createdTo: undefined,
+      publishedFrom: undefined,
+      publishedTo: undefined,
     }
     setLocalFilters(clearedFilters)
     onClearFilters()
@@ -269,44 +178,23 @@ export function FilterDialog({
     let count = 0
     if (filters.status) count++
     if (filters.isPublic !== undefined) count++
-    if (filters.title) count++
-    if (filters.isbnIssn) count++
-    if (filters.minFees !== undefined) count++
-    if (filters.maxFees !== undefined) count++
-    if (filters.createdAfter || filters.createdBefore) count++
-    if (filters.updatedAfter || filters.updatedBefore) count++
-    if (filters.teacherName && filters.teacherName.length > 0) count++
+    if (filters.keyword) count++
+    if (filters.publisher) count++
+    if (filters.minRegistrationFees !== undefined) count++
+    if (filters.maxRegistrationFees !== undefined) count++
+    if (filters.minReimbursement !== undefined) count++
+    if (filters.maxReimbursement !== undefined) count++
+    if (filters.createdFrom || filters.createdTo) count++
+    if (filters.publishedFrom || filters.publishedTo) count++
     return count
   }, [filters])
-
-  const triggerButtonContent = triggerButton || (
-    <Button variant="outline" className="gap-2 relative bg-accent hover:bg-accent/80">
-      <FilterIcon className="h-4 w-4" />
-      <span className="hidden lg:inline">Advanced Filters</span>
-      {activeFilterCount > 0 && (
-        <Badge
-          variant="default"
-          className="rounded-full px-2 py-0.5 text-xs absolute -top-2 -right-2"
-          style={{
-            background: "linear-gradient(to right, var(--first-color), var(--second-color))",
-            color: "white",
-          }}
-        >
-          {activeFilterCount}
-        </Badge>
-      )}
-    </Button>
-  )
-
   const filterContent = (
-    <Tabs defaultValue="basic" className="w-full flex-1 flex flex-col overflow-hidden">
+    <Tabs defaultValue="dates" className="w-full flex-1 flex flex-col overflow-hidden">
       <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="dates">Dates</TabsTrigger>
         <TabsTrigger value="fees">Fees</TabsTrigger>
-        <TabsTrigger value="authors">Authors</TabsTrigger>
+        <TabsTrigger value="other">Other</TabsTrigger>
       </TabsList>
-
-  
 
       <TabsContent value="dates" className="space-y-4 mt-4 flex-1 overflow-hidden">
         <ScrollArea className="h-full pr-4">
@@ -319,8 +207,8 @@ export function FilterDialog({
                   <Label className="text-xs text-muted-foreground">From</Label>
                   <Input
                     type="date"
-                    value={localFilters.createdAfter || ""}
-                    onChange={(e) => handleCreatedDateFromChange(e.target.value)}
+                    value={localFilters.createdFrom || ""}
+                    onChange={(e) => handleCreatedFromChange(e.target.value)}
                     className="w-full"
                   />
                 </div>
@@ -329,13 +217,13 @@ export function FilterDialog({
                   <Label className="text-xs text-muted-foreground">To</Label>
                   <Input
                     type="date"
-                    value={localFilters.createdBefore || ""}
-                    onChange={(e) => handleCreatedDateToChange(e.target.value)}
+                    value={localFilters.createdTo || ""}
+                    onChange={(e) => handleCreatedToChange(e.target.value)}
                     className="w-full"
                   />
                 </div>
               </div>
-              {(localFilters.createdAfter || localFilters.createdBefore) && (
+              {(localFilters.createdFrom || localFilters.createdTo) && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -351,16 +239,16 @@ export function FilterDialog({
 
             <Separator />
 
-            {/* Updated Date Range */}
+            {/* Published Date Range */}
             <div className="space-y-3">
-              <Label className="text-sm font-semibold">Updated Date Range</Label>
+              <Label className="text-sm font-semibold">Published Date Range</Label>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">From</Label>
                   <Input
                     type="date"
-                    value={localFilters.updatedAfter || ""}
-                    onChange={(e) => handleUpdatedDateFromChange(e.target.value)}
+                    value={localFilters.publishedFrom || ""}
+                    onChange={(e) => handlePublishedFromChange(e.target.value)}
                     className="w-full"
                   />
                 </div>
@@ -369,22 +257,22 @@ export function FilterDialog({
                   <Label className="text-xs text-muted-foreground">To</Label>
                   <Input
                     type="date"
-                    value={localFilters.updatedBefore || ""}
-                    onChange={(e) => handleUpdatedDateToChange(e.target.value)}
+                    value={localFilters.publishedTo || ""}
+                    onChange={(e) => handlePublishedToChange(e.target.value)}
                     className="w-full"
                   />
                 </div>
               </div>
-              {(localFilters.updatedAfter || localFilters.updatedBefore) && (
+              {(localFilters.publishedFrom || localFilters.publishedTo) && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  onClick={clearUpdatedDateRange}
+                  onClick={clearPublishedDateRange}
                   className="w-fit h-7"
                 >
                   <X className="mr-1 h-3 w-3" />
-                  Clear updated date range
+                  Clear published date range
                 </Button>
               )}
             </div>
@@ -395,19 +283,19 @@ export function FilterDialog({
       <TabsContent value="fees" className="space-y-4 mt-4 flex-1 overflow-hidden">
         <ScrollArea className="h-full pr-4">
           <div className="space-y-6 pb-4">
-            {/* Fee Range Filter */}
+            {/* Registration Fee Range Filter */}
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Registration Fees Range</Label>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="minFees" className="text-xs text-muted-foreground">
-                    Minimum (₹)
+                    Minimum ($)
                   </Label>
                   <Input
                     id="minFees"
                     type="number"
                     placeholder="0"
-                    value={localFilters.minFees || ""}
+                    value={localFilters.minRegistrationFees || ""}
                     onChange={(e) => handleMinFeesChange(e.target.value)}
                     className="w-full"
                     min="0"
@@ -416,13 +304,13 @@ export function FilterDialog({
 
                 <div className="space-y-2">
                   <Label htmlFor="maxFees" className="text-xs text-muted-foreground">
-                    Maximum (₹)
+                    Maximum ($)
                   </Label>
                   <Input
                     id="maxFees"
                     type="number"
                     placeholder="100000"
-                    value={localFilters.maxFees || ""}
+                    value={localFilters.maxRegistrationFees || ""}
                     onChange={(e) => handleMaxFeesChange(e.target.value)}
                     className="w-full"
                     min="0"
@@ -430,13 +318,13 @@ export function FilterDialog({
                 </div>
               </div>
 
-              {(localFilters.minFees !== undefined ||
-                localFilters.maxFees !== undefined) && (
+              {(localFilters.minRegistrationFees !== undefined ||
+                localFilters.maxRegistrationFees !== undefined) && (
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <span className="text-sm">
-                    Range: ₹
-                    {localFilters.minFees || 0} - ₹
-                    {localFilters.maxFees || "∞"}
+                    Range: $
+                    {localFilters.minRegistrationFees || 0} - $
+                    {localFilters.maxRegistrationFees || "∞"}
                   </span>
                   <Button
                     type="button"
@@ -445,6 +333,68 @@ export function FilterDialog({
                     onClick={() => {
                       handleMinFeesChange("")
                       handleMaxFeesChange("")
+                    }}
+                    className="h-7"
+                  >
+                    <X className="mr-1 h-3 w-3" />
+                    Clear
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Reimbursement Range Filter */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Reimbursement Range</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="minReimbursement" className="text-xs text-muted-foreground">
+                    Minimum ($)
+                  </Label>
+                  <Input
+                    id="minReimbursement"
+                    type="number"
+                    placeholder="0"
+                    value={localFilters.minReimbursement || ""}
+                    onChange={(e) => handleMinReimbursementChange(e.target.value)}
+                    className="w-full"
+                    min="0"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="maxReimbursement" className="text-xs text-muted-foreground">
+                    Maximum ($)
+                  </Label>
+                  <Input
+                    id="maxReimbursement"
+                    type="number"
+                    placeholder="100000"
+                    value={localFilters.maxReimbursement || ""}
+                    onChange={(e) => handleMaxReimbursementChange(e.target.value)}
+                    className="w-full"
+                    min="0"
+                  />
+                </div>
+              </div>
+
+              {(localFilters.minReimbursement !== undefined ||
+                localFilters.maxReimbursement !== undefined) && (
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="text-sm">
+                    Range: $
+                    {localFilters.minReimbursement || 0} - $
+                    {localFilters.maxReimbursement || "∞"}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      handleMinReimbursementChange("")
+                      handleMaxReimbursementChange("")
                     }}
                     className="h-7"
                   >
@@ -470,7 +420,7 @@ export function FilterDialog({
                     handleMaxFeesChange("5000")
                   }}
                 >
-                  ₹0 - ₹5,000
+                  $0 - $5,000
                 </Button>
                 <Button
                   type="button"
@@ -481,7 +431,7 @@ export function FilterDialog({
                     handleMaxFeesChange("10000")
                   }}
                 >
-                  ₹5,000 - ₹10,000
+                  $5,000 - $10,000
                 </Button>
                 <Button
                   type="button"
@@ -492,7 +442,7 @@ export function FilterDialog({
                     handleMaxFeesChange("20000")
                   }}
                 >
-                  ₹10,000 - ₹20,000
+                  $10,000 - $20,000
                 </Button>
                 <Button
                   type="button"
@@ -503,7 +453,7 @@ export function FilterDialog({
                     handleMaxFeesChange("")
                   }}
                 >
-                  ₹20,000+
+                  $20,000+
                 </Button>
               </div>
             </div>
@@ -511,87 +461,58 @@ export function FilterDialog({
         </ScrollArea>
       </TabsContent>
 
-      <TabsContent value="authors" className="space-y-4 mt-4 flex-1 overflow-hidden">
+      <TabsContent value="other" className="space-y-4 mt-4 flex-1 overflow-hidden">
         <ScrollArea className="h-full pr-4">
           <div className="space-y-6 pb-4">
-            {/* Teacher Name Input */}
+            {/* Publisher Filter */}
             <div className="space-y-3">
-              <Label className="text-sm font-semibold">Filter by Author Names</Label>
-              <div className="text-xs text-muted-foreground mb-2">
-                Add teacher names to filter. Backend will match partial names.
-              </div>
-              
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Enter teacher name..."
-                  value={teacherInput}
-                  onChange={(e) => setTeacherInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault()
-                      handleAddTeacher()
-                    }
-                  }}
-                  className="flex-1"
-                />
-                <Button
-                  type="button"
-                  onClick={handleAddTeacher}
-                  disabled={!teacherInput.trim()}
-                  size="sm"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add
-                </Button>
-              </div>
+              <Label className="text-sm font-semibold">Publisher</Label>
+              <Input
+                placeholder="Enter publisher name..."
+                value={localFilters.publisher || ""}
+                onChange={(e) => handlePublisherChange(e.target.value)}
+                className="w-full"
+              />
+            </div>
 
-              {/* Selected Teachers */}
-              {localFilters.teacherName && localFilters.teacherName.length > 0 && (
-                <div className="space-y-2 mt-4">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs text-muted-foreground">
-                      Selected Teachers ({localFilters.teacherName.length})
-                    </Label>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearAllTeachers}
-                      className="h-6 text-xs"
-                    >
-                      <Trash2 className="mr-1 h-3 w-3" />
-                      Clear all
-                    </Button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-lg">
-                    {localFilters.teacherName.map((name) => (
-                      <Badge
-                        key={name}
-                        variant="secondary"
-                        className="gap-1 pr-1"
-                      >
-                        {name}
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-4 w-4 p-0 hover:bg-transparent"
-                          onClick={() => handleRemoveTeacher(name)}
-                        >
-                          <X className="h-3 w-3" />
-                        </Button>
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <Separator />
 
-              {/* Info Note */}
+            {/* Keyword Filter */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Keyword</Label>
+              <Input
+                placeholder="Enter keyword..."
+                value={localFilters.keyword || ""}
+                onChange={(e) => handleKeywordChange(e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Search by specific keywords associated with book chapters
+              </p>
             </div>
           </div>
         </ScrollArea>
       </TabsContent>
     </Tabs>
+  )
+
+  const triggerButtonContent = triggerButton || (
+    <Button variant="outline" className="gap-2 relative bg-accent hover:bg-accent/80">
+      <FilterIcon className="h-4 w-4" />
+      <span className="hidden lg:inline">Advanced Filters</span>
+      {activeFilterCount > 0 && (
+        <Badge
+          variant="default"
+          className="rounded-full px-2 py-0.5 text-xs absolute -top-2 -right-2"
+          style={{
+            background: "linear-gradient(to right, var(--first-color), var(--second-color))",
+            color: "white",
+          }}
+        >
+          {activeFilterCount}
+        </Badge>
+      )}
+    </Button>
   )
 
   const footerContent = (

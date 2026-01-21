@@ -63,176 +63,44 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Download } from "../animate-ui/icons/download";
 import { FilterDialog } from "./bookchapterFilterDialog.";
+import { BookChapter, BookChapterFilters } from "@/types/book-chapter";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import BookChapterAddForm from "./bookChapterAddForm";
+import { ResearchStatus } from "@prisma/client";
+import { toast } from "sonner";
+import {
+  getBookChapters,
+  deleteBookChapter,
+  bulkDeleteBookChapters,
+  exportBookChaptersToCSV,
+} from "@/lib/bookChapterApi";
 
 // --- Types & Data ---
 
-type PublicationStatus = "DRAFT" | "SUBMITTED" | "PUBLISHED" | "REJECTED";
+type PublicationStatus = ResearchStatus;
 
-type BookChapter = {
-  id: string;
-  title: string;
-  abstract: string | null;
-  imageUrl: string | null;
-  documentUrl: string | null;
-  status: PublicationStatus;
-  isbnIssn: string | null;
-  registrationFees: number | null;
-  reimbursement: number | null;
-  isPublic: boolean;
-  createdAt: Date;
-  updatedAt: Date;
-  studentAuthors: Array<{ id: string; name: string; orderIndex: number }>;
-  teacherAuthors: Array<{ id: string; name: string; orderIndex: number }>;
-};
-
-const data: BookChapter[] = [
-  {
-    id: "ch1",
-    title: "Introduction to Machine Learning",
-    abstract: "A comprehensive guide to ML fundamentals and core concepts.",
-    imageUrl: null,
-    documentUrl: "/docs/ml-intro.pdf",
-    status: "PUBLISHED",
-    isbnIssn: "978-3-16-148410-0",
-    registrationFees: 150.0,
-    reimbursement: 100,
-    isPublic: true,
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date("2024-03-20"),
-    studentAuthors: [
-      { id: "s1", name: "Alice Johnson", orderIndex: 0 },
-      { id: "s2", name: "Bob Smith", orderIndex: 1 },
-    ],
-    teacherAuthors: [{ id: "t1", name: "Dr. Sarah Wilson", orderIndex: 0 }],
-  },
-  {
-    id: "ch2",
-    title: "Advanced Neural Networks",
-    abstract: "Deep dive into neural network architectures.",
-    imageUrl: null,
-    documentUrl: null,
-    status: "SUBMITTED",
-    isbnIssn: "978-3-16-148411-7",
-    registrationFees: 200.0,
-    reimbursement: 150,
-    isPublic: false,
-    createdAt: new Date("2024-02-10"),
-    updatedAt: new Date("2024-04-15"),
-    studentAuthors: [{ id: "s3", name: "Charlie Brown", orderIndex: 0 }],
-    teacherAuthors: [{ id: "t2", name: "Prof. Michael Chen", orderIndex: 0 }],
-  },
-  {
-    id: "ch3",
-    title: "Quantum Computing Basics",
-    abstract: null,
-    imageUrl: null,
-    documentUrl: null,
-    status: "DRAFT",
-    isbnIssn: null,
-    registrationFees: null,
-    reimbursement: null,
-    isPublic: false,
-    createdAt: new Date("2024-03-05"),
-    updatedAt: new Date("2024-03-10"),
-    studentAuthors: [
-      { id: "s4", name: "Diana Prince", orderIndex: 0 },
-      { id: "s5", name: "Ethan Hunt", orderIndex: 1 },
-    ],
-    teacherAuthors: [{ id: "t3", name: "Dr. Lisa Anderson", orderIndex: 0 }],
-  },
-  {
-    id: "ch4",
-    title: "Data Structures and Algorithms",
-    abstract: "Essential algorithms for competitive programming.",
-    imageUrl: null,
-    documentUrl: "/docs/dsa.pdf",
-    status: "PUBLISHED",
-    isbnIssn: "978-3-16-148412-4",
-    registrationFees: 120.0,
-    reimbursement: 80,
-    isPublic: true,
-    createdAt: new Date("2023-11-20"),
-    updatedAt: new Date("2024-01-25"),
-    studentAuthors: [{ id: "s6", name: "Frank Miller", orderIndex: 0 }],
-    teacherAuthors: [{ id: "t4", name: "Prof. Robert Taylor", orderIndex: 0 }],
-  },
-  {
-    id: "ch5",
-    title: "Blockchain Technology",
-    abstract: "Understanding distributed ledger technology.",
-    imageUrl: null,
-    documentUrl: null,
-    status: "REJECTED",
-    isbnIssn: "978-3-16-148413-1",
-    registrationFees: 180.0,
-    reimbursement: 0,
-    isPublic: false,
-    createdAt: new Date("2024-01-30"),
-    updatedAt: new Date("2024-02-28"),
-    studentAuthors: [{ id: "s7", name: "Grace Lee", orderIndex: 0 }],
-    teacherAuthors: [{ id: "t5", name: "Dr. James Rodriguez", orderIndex: 0 }],
-  },
-  {
-    id: "ch5",
-    title: "Blockchain Technology",
-    abstract: "Understanding distributed ledger technology.",
-    imageUrl: null,
-    documentUrl: null,
-    status: "REJECTED",
-    isbnIssn: "978-3-16-148413-1",
-    registrationFees: 180.0,
-    reimbursement: 0,
-    isPublic: false,
-    createdAt: new Date("2024-01-30"),
-    updatedAt: new Date("2024-02-28"),
-    studentAuthors: [{ id: "s7", name: "Grace Lee", orderIndex: 0 }],
-    teacherAuthors: [{ id: "t5", name: "Dr. James Rodriguez", orderIndex: 0 }],
-  },
-  {
-    id: "ch5",
-    title: "Blockchain Technology",
-    abstract: "Understanding distributed ledger technology.",
-    imageUrl: null,
-    documentUrl: null,
-    status: "REJECTED",
-    isbnIssn: "978-3-16-148413-1",
-    registrationFees: 180.0,
-    reimbursement: 0,
-    isPublic: false,
-    createdAt: new Date("2024-01-30"),
-    updatedAt: new Date("2024-02-28"),
-    studentAuthors: [{ id: "s7", name: "Grace Lee", orderIndex: 0 }],
-    teacherAuthors: [{ id: "t5", name: "Dr. James Rodriguez", orderIndex: 0 }],
-  },
-  {
-    id: "ch5",
-    title: "Blockchain Technology",
-    abstract: "Understanding distributed ledger technology.",
-    imageUrl: null,
-    documentUrl: null,
-    status: "REJECTED",
-    isbnIssn: "978-3-16-148413-1",
-    registrationFees: 180.0,
-    reimbursement: 0,
-    isPublic: false,
-    createdAt: new Date("2024-01-30"),
-    updatedAt: new Date("2024-02-28"),
-    studentAuthors: [{ id: "s7", name: "Grace Lee", orderIndex: 0 }],
-    teacherAuthors: [{ id: "t5", name: "Dr. James Rodriguez", orderIndex: 0 }],
-  },
-];
 
 // Helper for status styling
 const getStatusBadgeVariant = (status: PublicationStatus) => {
   switch (status) {
     case "PUBLISHED":
-      return "default"; // Usually black/primary
+      return "default";
     case "SUBMITTED":
-      return "secondary"; // Gray/Blueish
+    case "UNDER_REVIEW":
+    case "REVISION":
+    case "APPROVED":
+      return "secondary";
     case "DRAFT":
-      return "outline"; // White/Border
+      return "outline";
     case "REJECTED":
-      return "destructive"; // Red
+      return "destructive";
     default:
       return "secondary";
   }
@@ -241,9 +109,13 @@ const getStatusBadgeVariant = (status: PublicationStatus) => {
 const getStatusColorClass = (status: PublicationStatus) => {
   switch (status) {
     case "PUBLISHED":
+    case "APPROVED":
       return "bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/25 border-emerald-200";
     case "SUBMITTED":
+    case "UNDER_REVIEW":
       return "bg-blue-500/15 text-blue-700 hover:bg-blue-500/25 border-blue-200";
+    case "REVISION":
+      return "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 border-amber-200";
     case "DRAFT":
       return "bg-slate-100 text-slate-600 hover:bg-slate-200 border-slate-200";
     case "REJECTED":
@@ -254,7 +126,14 @@ const getStatusColorClass = (status: PublicationStatus) => {
 };
 
 // --- Actions Component ---
-const ChapterActions = ({ chapter }: { chapter: BookChapter }) => (
+interface ChapterActionsProps {
+  chapter: BookChapter;
+  onDelete: (id: string) => void;
+  onEdit?: (id: string) => void;
+  onView?: (id: string) => void;
+}
+
+const ChapterActions = ({ chapter, onDelete, onEdit, onView }: ChapterActionsProps) => (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted">
@@ -270,16 +149,19 @@ const ChapterActions = ({ chapter }: { chapter: BookChapter }) => (
         Copy ID
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <DropdownMenuItem>
+      <DropdownMenuItem onClick={() => onView?.(chapter.id)}>
         <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
         View details
       </DropdownMenuItem>
-      <DropdownMenuItem>
+      <DropdownMenuItem onClick={() => onEdit?.(chapter.id)}>
         <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
         Edit chapter
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50">
+      <DropdownMenuItem
+        className="text-red-600 focus:text-red-600 focus:bg-red-50"
+        onClick={() => onDelete(chapter.id)}
+      >
         <Trash className="mr-2 h-4 w-4" />
         Delete
       </DropdownMenuItem>
@@ -289,7 +171,13 @@ const ChapterActions = ({ chapter }: { chapter: BookChapter }) => (
 
 // --- Table Columns ---
 
-export const columns: ColumnDef<BookChapter>[] = [
+interface ColumnProps {
+  onDelete: (id: string) => void;
+  onEdit?: (id: string) => void;
+  onView?: (id: string) => void;
+}
+
+export const createColumns = ({ onDelete, onEdit, onView }: ColumnProps): ColumnDef<BookChapter>[] => [
   {
     id: "select",
     header: ({ table }) => (
@@ -350,7 +238,7 @@ export const columns: ColumnDef<BookChapter>[] = [
           variant="outline"
           className={`font-medium border ${getStatusColorClass(status)}`}
         >
-          {status}
+          {status.replace(/_/g, " ")}
         </Badge>
       );
     },
@@ -362,8 +250,8 @@ export const columns: ColumnDef<BookChapter>[] = [
     accessorKey: "studentAuthors",
     header: "Authors",
     cell: ({ row }) => {
-      const students = row.original.studentAuthors;
-      const teachers = row.original.teacherAuthors;
+      const students = row.original.studentAuthors || [];
+      const teachers = row.original.facultyAuthors || [];
       const count = students.length + teachers.length;
       return (
         <div className="flex items-center gap-2">
@@ -405,93 +293,178 @@ export const columns: ColumnDef<BookChapter>[] = [
       );
     },
     cell: ({ row }) => {
-      const date = row.getValue("updatedAt") as Date;
+      const date = new Date(row.getValue("updatedAt"));
       return <div className="text-sm text-muted-foreground">{date.toLocaleDateString()}</div>;
     },
   },
   {
     id: "actions",
-    cell: ({ row }) => <ChapterActions chapter={row.original} />,
+    cell: ({ row }) => <ChapterActions chapter={row.original} onDelete={onDelete} onEdit={onEdit} onView={onView} />,
   },
 ];
 
 // --- Main Component ---
 
-export default function BookChapterTable() {
+interface BookChapterTableProps {
+  initialData?: BookChapter[];
+  initialTotal?: number;
+  onRefresh?: () => void;
+}
+
+export default function BookChapterTable({ 
+  initialData = [], 
+  initialTotal = 0,
+  onRefresh
+}: BookChapterTableProps) {
+  const [data, setData] = React.useState<BookChapter[]>(initialData);
+  const [totalRecords, setTotalRecords] = React.useState(initialTotal);
+  const [isLoading, setIsLoading] = React.useState(false);
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-    []
-  );
-  const [columnVisibility, setColumnVisibility] =
-    React.useState<VisibilityState>({});
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
   const [viewMode, setViewMode] = React.useState<"table" | "card">("table");
   const [isExportHovered, setIsExportHovered] = React.useState(false);
-const [filters, setFilters] = React.useState<{
-    status?: string;
-    isPublic?: boolean;
-    title?: string;
-    isbnIssn?: string;
-    minFees?: number;
-    maxFees?: number;
-    createdAfter?: string;
-    createdBefore?: string;
-    updatedAfter?: string;
-    updatedBefore?: string;
-    teacherName?: string[];
-    page?: number;
-    limit?: number;
-    sortBy?: string;
-    sortOrder?: "asc" | "desc";
-    all?: boolean;
-  }>({
+  const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
+  const [searchTerm, setSearchTerm] = React.useState("");
+  
+  const [filters, setFilters] = React.useState<BookChapterFilters>({
     page: 1,
     limit: 10,
     sortBy: "createdAt",
     sortOrder: "desc",
   });
-  
+
+  // Fetch data from API
+  const fetchData = React.useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await getBookChapters(filters);
+      if (response.data) {
+        setData(response.data.bookChapters);
+        setTotalRecords(response.data.pagination.total);
+      } else if (response.error) {
+        toast.error("Failed to load book chapters", {
+          description: response.error
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching book chapters:", error);
+      toast.error("Failed to load book chapters");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [filters]);
+
+  // Fetch data on filter changes
+  React.useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Update filter with search term
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm) {
+        updateFilter("search", searchTerm);
+      } else {
+        const { search, ...rest } = filters;
+        setFilters(rest);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Filter management functions
   const updateFilter = (key: string, value: any) => {
-    const updates: any = {
-      ...{ [key]: value },
-    };
-
-    // When changing page, don't reset to page 1
-    if (key === "page" || key === "limit") {
-      // If changing page/limit, disable "all" mode
-      if (key === "page") {
-        updates.all = false;
-      }
-    } else {
-      // For other filters, reset to page 1
-      updates.page = 1;
-    }
-
     setFilters((prev) => ({
       ...prev,
-      ...updates,
+      [key]: value,
+      page: key === "page" || key === "limit" ? prev.page : 1,
     }));
   };
 
-  const updateFilters = (newFilters: Partial<typeof filters>) => {
+  const updateFilters = (newFilters: Partial<BookChapterFilters>) => {
     setFilters((prev) => ({
       ...prev,
       ...newFilters,
       page: 1,
-      all: false, // Disable "all" when applying filters
     }));
   };
 
   const clearFilters = () => {
- setFilters({
+    setFilters({
       page: 1,
       limit: filters.limit || 10,
       sortBy: "createdAt",
       sortOrder: "desc",
-      all: false,
     });
+    setSearchTerm("");
   };
+
+  // Handle delete
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this book chapter?")) return;
+    
+    try {
+      const response = await deleteBookChapter(id);
+      if (response.data) {
+        toast.success("Book chapter deleted successfully");
+        fetchData();
+        onRefresh?.();
+      } else if (response.error) {
+        toast.error("Failed to delete book chapter", {
+          description: response.error
+        });
+      }
+    } catch (error) {
+      console.error("Error deleting book chapter:", error);
+      toast.error("Failed to delete book chapter");
+    }
+  };
+
+  // Handle bulk delete
+  const handleBulkDelete = async () => {
+    const selectedIds = Object.keys(rowSelection);
+    if (selectedIds.length === 0) {
+      toast.error("Please select chapters to delete");
+      return;
+    }
+
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} book chapter(s)?`)) return;
+
+    try {
+      const response = await bulkDeleteBookChapters(selectedIds);
+      if (response.data) {
+        toast.success(`Successfully deleted ${response.data.count} book chapter(s)`);
+        setRowSelection({});
+        fetchData();
+        onRefresh?.();
+      } else if (response.error) {
+        toast.error("Failed to delete book chapters", {
+          description: response.error
+        });
+      }
+    } catch (error) {
+      console.error("Error bulk deleting book chapters:", error);
+      toast.error("Failed to delete book chapters");
+    }
+  };
+
+  // Create columns with handlers
+  const columns = React.useMemo(
+    () => createColumns({ 
+      onDelete: handleDelete,
+      onEdit: (id) => {
+        toast.info("Edit functionality coming soon");
+      },
+      onView: (id) => {
+        toast.info("View functionality coming soon");
+      }
+    }),
+    []
+  );
+
   const table = useReactTable({
     data,
     columns,
@@ -509,42 +482,36 @@ const [filters, setFilters] = React.useState<{
       columnVisibility,
       rowSelection,
     },
-    initialState: {
-      pagination: { pageSize: 5 },
-    },
+    manualPagination: true,
+    pageCount: Math.ceil(totalRecords / (filters.limit || 10)),
   });
 
   // Export CSV Function
-  const exportCSV = () => {
-    const headers = [
-      "ID",
-      "Title",
-      "Status",
-      "Student Authors",
-      "Updated At",
-    ];
-    const rows = table.getFilteredRowModel().rows.map((row) => [
-      row.original.id,
-      `"${row.original.title.replace(/"/g, '""')}"`,
-      row.original.status,
-      `"${row.original.studentAuthors.map((a) => a.name).join(", ")}"`,
-      row.original.updatedAt.toLocaleDateString(),
-    ]);
-
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      headers.join(",") +
-      "\n" +
-      rows.map((e) => e.join(",")).join("\n");
-
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "book_chapters.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const exportCSV = async () => {
+    try {
+      await exportBookChaptersToCSV(filters);
+      toast.success("CSV export started");
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+      toast.error("Failed to export CSV");
+    }
   };
+
+  // Handle pagination
+  const handlePageChange = (newPage: number) => {
+    updateFilter("page", newPage);
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setFilters((prev) => ({
+      ...prev,
+      limit: newSize,
+      page: 1,
+    }));
+  };
+
+  const totalPages = Math.ceil(totalRecords / (filters.limit || 10));
+  const currentPage = filters.page || 1;
 
   return (
     <div className="w-full space-y-6 p-1">
@@ -555,10 +522,20 @@ const [filters, setFilters] = React.useState<{
             Book Chapters
           </h2>
           <p className="text-sm text-muted-foreground">
-            Manage your publication entries, authors, and statuses.
+            Manage your publication entries, authors, and statuses. Total: {totalRecords}
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {Object.keys(rowSelection).length > 0 && (
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              className="h-9" 
+              onClick={handleBulkDelete}
+            >
+              <Trash className="mr-2 h-4 w-4" /> Delete Selected ({Object.keys(rowSelection).length})
+            </Button>
+          )}
           <Button 
             variant="outline" 
             size="sm" 
@@ -566,12 +543,33 @@ const [filters, setFilters] = React.useState<{
             onClick={exportCSV}
             onMouseEnter={() => setIsExportHovered(true)}
             onMouseLeave={() => setIsExportHovered(false)}
+            disabled={isLoading}
           >
             <Download animate={isExportHovered} animation="default-loop" className="mr-2 h-4 w-4" /> Export
           </Button>
-          <Button size="sm" className="h-9 bg-chart-3 duration-800 cursor-pointer transition-all  hover:bg-accent border-green-600 hover:text-primary-foreground hover:border-accent/80 active:bg-accent/80 active:text-primary-foreground">
-            <Plus className="mr-2 h-4 w-4" /> Add Chapter
-          </Button>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="h-9 bg-chart-3 duration-800 cursor-pointer transition-all  hover:bg-accent border-green-600 hover:text-primary-foreground hover:border-accent/80 active:bg-accent/80 active:text-primary-foreground">
+                <Plus className="mr-2 h-4 w-4" /> Add Chapter
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create New Book Chapter</DialogTitle>
+                <DialogDescription>
+                  Fill in the details to create a new book chapter entry.
+                </DialogDescription>
+              </DialogHeader>
+              <BookChapterAddForm 
+                onSuccess={() => {
+                  setIsAddDialogOpen(false);
+                  fetchData();
+                  onRefresh?.();
+                }}
+                onCancel={() => setIsAddDialogOpen(false)}
+              />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -582,11 +580,10 @@ const [filters, setFilters] = React.useState<{
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search titles..."
-              value={(table.getColumn("title")?.getFilterValue() as string) ?? ""}
-              onChange={(event) =>
-                table.getColumn("title")?.setFilterValue(event.target.value)
-              }
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
               className="h-9 pl-9 w-full bg-background"
+              disabled={isLoading}
             />
           </div>
           <Separator orientation="vertical" className="hidden h-6 md:block" />
@@ -594,24 +591,27 @@ const [filters, setFilters] = React.useState<{
           {/* Status Filter */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 border-dashed bg-accent hover:bg-accent/80">
+              <Button variant="outline" size="sm" className="h-9 border-dashed bg-accent hover:bg-accent/80" disabled={isLoading}>
                 <ChevronDown className="mr-2 h-4 w-4" />
-                Status
+                Status {filters.status && `(${filters.status})`}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-[180px]">
               <DropdownMenuLabel>Filter by Status</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => table.getColumn("status")?.setFilterValue("")}>
+              <DropdownMenuItem onClick={() => {
+                const { status, ...rest } = filters;
+                setFilters(rest);
+              }}>
                 All Statuses
               </DropdownMenuItem>
-              {["DRAFT", "SUBMITTED", "PUBLISHED", "REJECTED"].map((status) => (
+              {["DRAFT", "SUBMITTED", "UNDER_REVIEW", "REVISION", "APPROVED", "PUBLISHED", "REJECTED"].map((status) => (
                 <DropdownMenuItem
                   key={status}
-                  onClick={() => table.getColumn("status")?.setFilterValue(status)}
+                  onClick={() => updateFilter("status", status)}
                 >
                   <Badge variant="outline" className={`mr-2 h-2 w-2 rounded-full p-0 border-0 ${getStatusColorClass(status as PublicationStatus).replace("text-", "bg-")}`} />
-                  <span className="capitalize">{status.toLowerCase()}</span>
+                  <span className="capitalize">{status.replace(/_/g, " ").toLowerCase()}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -620,10 +620,10 @@ const [filters, setFilters] = React.useState<{
 
         <div className="flex items-center gap-2">
           <FilterDialog
-              filters={filters}
-              onFiltersChange={updateFilters}
-              onClearFilters={clearFilters}
-            />
+            filters={filters}
+            onFiltersChange={updateFilters}
+            onClearFilters={clearFilters}
+          />
            {/* View Toggle */}
            <div className="flex items-center rounded-md border bg-background p-0.5 shadow-sm">
             <Button
@@ -673,7 +673,11 @@ const [filters, setFilters] = React.useState<{
 
       {/* Content Area */}
       <div className="min-h-[300px]">
-        {viewMode === "table" ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-muted-foreground">Loading...</div>
+          </div>
+        ) : viewMode === "table" ? (
           <div className="rounded-md border bg-card shadow-sm overflow-x-auto scroll-m-1 scrollbar-gradient">
             <Table>
               <TableHeader>
@@ -729,13 +733,20 @@ const [filters, setFilters] = React.useState<{
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {table.getRowModel().rows.map((row) => {
               const chapter = row.original;
+              const students = chapter.studentAuthors || [];
+              const teachers = chapter.facultyAuthors || [];
               return (
                 <div
                   key={row.id}
                   className="group relative flex flex-col justify-between overflow-hidden rounded-xl border bg-muted  p-5 shadow-sm transition-all hover:shadow-2xl hover:border-primary/20 hover:scale-105 duration-400"
                 >
                   <div className="absolute right-3 top-3 opacity-0 transition-opacity group-hover:opacity-100">
-                    <ChapterActions chapter={chapter} />
+                    <ChapterActions 
+                      chapter={chapter} 
+                      onDelete={handleDelete}
+                      onEdit={(id) => toast.info("Edit functionality coming soon")}
+                      onView={(id) => toast.info("View functionality coming soon")}
+                    />
                   </div>
                   
                   <div className="space-y-4">
@@ -744,7 +755,7 @@ const [filters, setFilters] = React.useState<{
                           variant="outline"
                           className={`font-medium border ${getStatusColorClass(chapter.status)}`}
                         >
-                          {chapter.status}
+                          {chapter.status.replace(/_/g, " ")}
                         </Badge>
                     </div>
 
@@ -760,11 +771,11 @@ const [filters, setFilters] = React.useState<{
                     <div className="grid grid-cols-2 gap-2 text-sm">
                         <div className="flex items-center gap-1.5 text-muted-foreground">
                             <Users className="h-3.5 w-3.5" />
-                            <span>{(chapter.studentAuthors.length + chapter.teacherAuthors.length)} Authors</span>
+                            <span>{students.length + teachers.length} Authors</span>
                         </div>
                         <div className="flex items-center gap-1.5 text-muted-foreground">
                             <Calendar className="h-3.5 w-3.5" />
-                            <span>{chapter.updatedAt.toLocaleDateString()}</span>
+                            <span>{new Date(chapter.updatedAt).toLocaleDateString()}</span>
                         </div>
                     </div>
                   </div>
@@ -791,7 +802,10 @@ const [filters, setFilters] = React.useState<{
       <div className="flex flex-col-reverse items-center justify-between gap-4 border-t pt-4 sm:flex-row">
         <div className="flex items-center space-x-2 text-sm text-muted-foreground">
             <span>
-                {table.getFilteredSelectedRowModel().rows.length} of {table.getFilteredRowModel().rows.length} row(s) selected
+                {Object.keys(rowSelection).length} of {data.length} row(s) selected
+            </span>
+            <span className="text-xs">
+              (Showing {((currentPage - 1) * (filters.limit || 10)) + 1} to {Math.min(currentPage * (filters.limit || 10), totalRecords)} of {totalRecords})
             </span>
         </div>
         
@@ -799,16 +813,15 @@ const [filters, setFilters] = React.useState<{
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-muted-foreground hidden sm:block">Rows per page</p>
             <Select
-              value={`${table.getState().pagination.pageSize}`}
-              onValueChange={(value) => {
-                table.setPageSize(Number(value));
-              }}
+              value={`${filters.limit || 10}`}
+              onValueChange={(value) => handlePageSizeChange(Number(value))}
+              disabled={isLoading}
             >
               <SelectTrigger className="h-8 w-14 bg-accent text-black ">
-                <SelectValue placeholder={table.getState().pagination.pageSize} />
+                <SelectValue placeholder={filters.limit || 10} />
               </SelectTrigger>
               <SelectContent side="top">
-                {[5, 10, 20, 30].map((pageSize) => (
+                {[5, 10, 20, 30, 50].map((pageSize) => (
                   <SelectItem key={pageSize} value={`${pageSize}`} className="text-black!">
                     {pageSize}
                   </SelectItem>
@@ -822,21 +835,23 @@ const [filters, setFilters] = React.useState<{
               variant="outline"
               size="sm"
               className="h-8 w-8 p-0 bg-accent"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage <= 1 || isLoading}
             >
               <span className="sr-only">Go to previous page</span>
               <ChevronDown className="h-4 w-4 rotate-90 " />
             </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
             <Button
               variant="outline"
               size="sm"
               className="h-8 w-8 p-0 bg-accent"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              <span className="sr-only">Go to next page</span>
-              <ChevronDown className="h-4 w-4 -rotate-90" />
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage >= totalPages || isLoading}
+              >
+                <ChevronDown className="h-4 w-4 -rotate-90" />
             </Button>
           </div>
         </div>

@@ -1,12 +1,15 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
-  runtime  = "vercel-edge"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "cockroachdb"
 }
+
+enum crdb_internal_region {
+  aws_ap_south_1 @map("aws-ap-south-1")
+}
+
 
 
 model Account {
@@ -15,12 +18,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?
+  access_token      String?
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -39,24 +42,15 @@ model Session {
   @@map("sessions")
 }
 
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime? @map("email_verified")
-  image         String?
-  password      String?
-  role          String    @default("STUDENT")
-  accounts      Account[]
-  sessions      Session[]
-
-  @@map("users")
+enum UserRole {
+  STUDENT
+  ADMIN
+  FACULTY
 }
-
 model SpecialUser {
   id    String @id @default(cuid())
   email String @unique
-  role  String @default("STUDENT")
+  role  UserRole @default(FACULTY)
 
   @@map("special_users")
 }
@@ -68,4 +62,167 @@ model VerificationToken {
 
   @@unique([identifier, token])
   @@map("verification_tokens")
+}
+
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime? @map("email_verified")
+  image         String?
+  password      String?
+  role          UserRole @default(STUDENT)
+  accounts      Account[]
+  sessions      Session[]
+  studentBookChapters BookChapterStudentAuthor[] @relation("studentAuthors")
+  facultyBookChapters BookChapterTeacherAuthor[] @relation("facultyAuthors")
+  studentCopyrights   CopyrightStudentAuthor[]   @relation("studentCopyrightAuthors")
+  facultyCopyrights   CopyrightTeacherAuthor[]   @relation("facultyCopyrightAuthors")
+  studentJournals     JournalStudentAuthor[]     @relation("studentJournalAuthors")
+  facultyJournals     JournalTeacherAuthor[]     @relation("facultyJournalAuthors")
+
+  @@map("users")
+}
+
+enum ResearchStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  REVISION
+  APPROVED
+  PUBLISHED
+  REJECTED
+}
+
+
+model BookChapter {
+  id               String                       @id @default(cuid())
+  title            String
+  abstract         String?
+  imageUrl         String?
+  documentUrl      String?
+  status           ResearchStatus               @default(DRAFT)
+  isbnIssn         String?
+  registrationFees Float?
+  reimbursement    Float?
+  isPublic         Boolean                      @default(false)
+  keywords         String[]                    // new
+  doi              String?                      // new
+  publicationDate  DateTime?                    // new
+  publisher        String?                      // new
+  createdAt        DateTime                     @default(now()) @map("created_at")
+  updatedAt        DateTime                     @updatedAt @map("updated_at")
+  studentAuthors   BookChapterStudentAuthor[]   @relation("studentAuthors")
+  facultyAuthors   BookChapterTeacherAuthor[]   @relation("facultyAuthors")
+}
+
+
+model BookChapterStudentAuthor {
+  id          String      @id @default(cuid())
+  bookChapter BookChapter @relation("studentAuthors", fields: [bookChapterId], references: [id], onDelete: Cascade)
+  bookChapterId String    @map("book_chapter_id")
+  user        User        @relation("studentAuthors", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String      @map("user_id")
+}
+
+model BookChapterTeacherAuthor {
+  id          String      @id @default(cuid())
+  bookChapter BookChapter @relation("facultyAuthors", fields: [bookChapterId], references: [id], onDelete: Cascade)
+  bookChapterId String    @map("book_chapter_id")
+  user        User        @relation("facultyAuthors", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String      @map("user_id")
+}
+
+model Copyright {
+  id               String           @id @default(cuid())
+  serialNo         String
+  title            String
+  abstract         String?
+  imageUrl         String?
+  documentUrl      String?
+  dateOfFiling     DateTime?
+  dateOfSubmission DateTime?
+  dateOfPublished  DateTime?
+  dateOfGrant      DateTime?
+   registrationFees Float?
+  reimbursement    Float?
+  status           ResearchStatus  @default(DRAFT)
+  isPublic         Boolean          @default(false)
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  studentAuthors   CopyrightStudentAuthor[] @relation("studentCopyrightAuthors")
+  facultyAuthors   CopyrightTeacherAuthor[] @relation("facultyCopyrightAuthors")
+}
+model CopyrightStudentAuthor {
+  id          String      @id @default(cuid())
+  copyright   Copyright   @relation("studentCopyrightAuthors", fields: [copyrightId], references: [id], onDelete: Cascade)
+  copyrightId String      @map("copyright_id")
+  user        User        @relation("studentCopyrightAuthors", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String      @map("user_id")
+}
+
+model CopyrightTeacherAuthor {
+  id          String      @id @default(cuid())
+  copyright   Copyright   @relation("facultyCopyrightAuthors", fields: [copyrightId], references: [id], onDelete: Cascade)
+  copyrightId String      @map("copyright_id")
+  user        User        @relation("facultyCopyrightAuthors", fields: [userId], references: [id], onDelete: Cascade)
+  userId      String      @map("user_id")
+}
+
+
+enum JournalType {
+  INTERNATIONAL
+  NATIONAL
+  PEER_REVIEWED
+  OPEN_ACCESS
+  OTHER
+}
+
+model Journal {
+  id                  String              @id @default(cuid())
+  serialNo            String              @unique
+  titleOfJournal      String              @map("title_of_journal")
+  title         String             
+  journalType         JournalType         @map("journal_type")
+  impactFactor        Float?              @map("impact_factor")
+  dateOfImpactFactor  DateTime?           @map("date_of_impact_factor")
+  journalPublisher    String?             @map("journal_publisher")
+  status              ResearchStatus      @default(DRAFT)
+  paperLink           String?             @map("paper_link")
+  doi                 String?
+  registrationFees    Float?              @map("registration_fees")
+  reimbursement       Float?
+  isPublic            Boolean             @default(false)
+  abstract            String?
+  imageUrl            String?             @map("image_url")
+  documentUrl         String?             @map("document_url")
+  publicationDate     DateTime?           @map("publication_date")
+  keywords            String[]
+  createdAt           DateTime            @default(now()) @map("created_at")
+  updatedAt           DateTime            @updatedAt @map("updated_at")
+  studentAuthors      JournalStudentAuthor[] @relation("studentJournalAuthors")
+  facultyAuthors      JournalTeacherAuthor[] @relation("facultyJournalAuthors")
+
+  @@map("journals")
+}
+
+model JournalStudentAuthor {
+  id        String  @id @default(cuid())
+  journal   Journal @relation("studentJournalAuthors", fields: [journalId], references: [id], onDelete: Cascade)
+  journalId String  @map("journal_id")
+  user      User    @relation("studentJournalAuthors", fields: [userId], references: [id], onDelete: Cascade)
+  userId    String  @map("user_id")
+
+  @@map("journal_student_authors")
+}
+
+model JournalTeacherAuthor {
+  id        String  @id @default(cuid())
+  journal   Journal @relation("facultyJournalAuthors", fields: [journalId], references: [id], onDelete: Cascade)
+  journalId String  @map("journal_id")
+  user      User    @relation("facultyJournalAuthors", fields: [userId], references: [id], onDelete: Cascade)
+  userId    String  @map("user_id")
+
+  @@map("journal_teacher_authors")
 }

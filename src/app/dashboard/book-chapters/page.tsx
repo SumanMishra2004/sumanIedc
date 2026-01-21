@@ -1,63 +1,60 @@
 "use client";
 
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
-
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   PieChart,
   Pie,
   Cell,
   ResponsiveContainer,
   Tooltip,
-  RadarChart,
-  Radar,
-  PolarAngleAxis,
-  PolarGrid,
   Legend,
-  AreaChart,
-  Area,
-  CartesianGrid,
-  XAxis,
-  YAxis,
 } from "recharts";
-import data from "../data.json";
 import  BookChaptersTable  from "@/components/table/BookChapterTable";
-const pieData = [
-  { name: "Active", value: 45, color: "var(--chart-1)" }, // Vibrant magenta-pink
-  { name: "Pending", value: 30, color: "var(--chart-2)" }, // Bright cyan
-  { name: "Inactive", value: 25, color: "var(--chart-3)" }, // Electric lime-green
-];
-
-const radarData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 73, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
-];
-
-const areaData = [
-  { month: "January", desktop: 186, mobile: 80 },
-  { month: "February", desktop: 305, mobile: 200 },
-  { month: "March", desktop: 237, mobile: 120 },
-  { month: "April", desktop: 273, mobile: 190 },
-  { month: "May", desktop: 209, mobile: 130 },
-  { month: "June", desktop: 214, mobile: 140 },
-];
-
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "var(--chart-1)", // Vibrant magenta-pink
-  },
-  mobile: {
-    label: "Mobile",
-    color: "var(--chart-2)", // Bright cyan
-  },
-};
+import { getBookChapterStats } from "@/lib/bookChapterApi";
+import { BookChapterStatsResponse } from "@/types/book-chapter";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 export default function DashboardLayout() {
+  const [stats, setStats] = useState<BookChapterStatsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const fetchStats = async () => {
+    setIsLoading(true);
+    try {
+      const response = await getBookChapterStats();
+      if (response.data) {
+        setStats(response.data);
+      } else if (response.error) {
+        toast.error("Failed to load statistics", {
+          description: response.error
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error);
+      toast.error("Failed to load statistics");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, [refreshKey]);
+
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
+  // Transform stats for pie chart
+  const statusPieData = stats?.statusCounts.map((s, index) => ({
+    name: s.status.replace(/_/g, " "),
+    value: s.count,
+    color: `var(--chart-${(index % 5) + 1})`
+  })) || [];
+
   return (
     <div className="p-4 bg-slate-900 min-h-screen text-black max-w-full overflow-x-hidden">
       <div className="flex flex-col gap-4">
@@ -73,10 +70,13 @@ export default function DashboardLayout() {
 
               {/* 1 - PIE CHART */}
               <div className="flex-1 aspect-square bg-card rounded-xl">
+                {isLoading ? (
+                  <Skeleton className="w-full h-full" />
+                ) : statusPieData.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <defs>
-                      {pieData.map((entry, index) => (
+                      {statusPieData.map((entry, index) => (
                         <filter key={`glow-${index}`} id={`glow-${index}`} x="-50%" y="-50%" width="200%" height="200%">
                           <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
                           <feMerge>
@@ -88,7 +88,7 @@ export default function DashboardLayout() {
                     </defs>
                     
                     <Pie
-                      data={pieData}
+                      data={statusPieData}
                       cx="50%"
                       cy="50%"
                       outerRadius={"60%"}
@@ -96,7 +96,7 @@ export default function DashboardLayout() {
                       dataKey="value"
                       stroke="none"
                     >
-                      {pieData.map((entry, index) => (
+                      {statusPieData.map((entry, index) => (
                         <Cell 
                           key={`cell-${index}`} 
                           fill={entry.color}
@@ -138,7 +138,7 @@ export default function DashboardLayout() {
                                 boxShadow: `0 0 8px ${data.payload.color}`
                               }} />
                               <div style={{ color: '#fff', fontSize: '14px' }}>
-                                <strong>{data.name}:</strong> {data.value}%
+                                <strong>{data.name}:</strong> {data.value}
                               </div>
                             </div>
                           );
@@ -159,124 +159,43 @@ export default function DashboardLayout() {
                     />
                   </PieChart>
                 </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    No data available
+                  </div>
+                )}
               </div>
 
-              {/* 2 - RADAR CHART */}
-              <div className="flex-1 aspect-square bg-card rounded-xl">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart 
-                    data={radarData}
-                    margin={{
-                      top: 10,
-                      right: 10,
-                      bottom: 10,
-                      left: 10,
-                    }}
-                  >
-                    <defs>
-                      <filter id="radar-glow-desktop" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
-                        <feMerge>
-                          <feMergeNode in="coloredBlur"/>
-                          <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                      </filter>
-                      <filter id="radar-glow-mobile" x="-50%" y="-50%" width="200%" height="200%">
-                        <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
-                        <feMerge>
-                          <feMergeNode in="coloredBlur"/>
-                          <feMergeNode in="SourceGraphic"/>
-                        </feMerge>
-                      </filter>
-                    </defs>
-                    
-                    <PolarGrid 
-                      stroke="rgba(255, 255, 255, 0.2)"
-                      strokeWidth={1}
-                    />
-                    
-                    <PolarAngleAxis 
-                      dataKey="month"
-                      tick={{ fill: '#fff', fontSize: 11 }}
-                    />
-                    
-                    <Radar
-                      name="Desktop"
-                      dataKey="desktop"
-                      stroke={chartConfig.desktop.color}
-                      fill={chartConfig.desktop.color}
-                      fillOpacity={0.6}
-                      strokeWidth={2}
-                      filter="url(#radar-glow-desktop)"
-                      style={{
-                        filter: `drop-shadow(0 0 12px ${chartConfig.desktop.color})`,
-                      }}
-                    />
-                    
-                    <Radar
-                      name="Mobile"
-                      dataKey="mobile"
-                      stroke={chartConfig.mobile.color}
-                      fill={chartConfig.mobile.color}
-                      fillOpacity={0.6}
-                      strokeWidth={2}
-                      filter="url(#radar-glow-mobile)"
-                      style={{
-                        filter: `drop-shadow(0 0 12px ${chartConfig.mobile.color})`,
-                      }}
-                    />
-                    
-                    <Tooltip 
-                      cursor={false}
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          return (
-                            <div style={{
-                              backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                              border: '1px solid rgba(255, 255, 255, 0.1)',
-                              borderRadius: '20px',
-                              padding: '8px 12px',
-                            }}>
-                              <div style={{ color: '#fff', fontSize: '12px', marginBottom: '4px', fontWeight: '600' }}>
-                                {payload[0].payload.month}
-                              </div>
-                              {payload.map((entry, index) => (
-                                <div key={index} style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: '8px',
-                                  marginTop: index > 0 ? '4px' : '0'
-                                }}>
-                                  <div style={{
-                                    width: '12px',
-                                    height: '12px',
-                                    backgroundColor: entry.color,
-                                    borderRadius: '2px',
-                                    boxShadow: `0 0 8px ${entry.color}`
-                                  }} />
-                                  <div style={{ color: '#fff', fontSize: '13px' }}>
-                                    <strong>{entry.name}:</strong> {entry.value}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    
-                    <Legend 
-                      verticalAlign="bottom"
-                      iconType="circle"
-                      wrapperStyle={{
-                        color: '#fff',
-                        fontSize: '13px',
-                        paddingTop: '10px'
-                      }}
-                    />
-                  </RadarChart>
-                </ResponsiveContainer>
+              {/* 2 - Recent Activity Card */}
+              <div className="flex-1 aspect-square bg-card rounded-xl p-6">
+                <h3 className="text-xl font-bold mb-4 text-foreground">Recent Chapters</h3>
+                {isLoading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                    <Skeleton className="h-16 w-full" />
+                  </div>
+                ) : stats?.recentChapters && stats.recentChapters.length > 0 ? (
+                  <div className="space-y-3">
+                    {stats.recentChapters.slice(0, 5).map((chapter) => (
+                      <div key={chapter.id} className="p-3 bg-muted rounded-lg">
+                        <h4 className="font-medium text-sm line-clamp-1">{chapter.title}</h4>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-xs text-muted-foreground">
+                            {chapter.status.replace(/_/g, " ")}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(chapter.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-[calc(100%-2rem)] text-muted-foreground text-sm">
+                    No recent chapters
+                  </div>
+                )}
               </div>
 
             </div>
@@ -286,19 +205,49 @@ export default function DashboardLayout() {
              <ChartAreaInteractive/>
             </div>
           </div>
-
-          {/* 3 */}
-          <div className="hidden md:flex lg:w-1/3 lg:h-auto bg-sky-200 rounded-xl items-center justify-center">
-            3
+          {/* Stats Card */}
+          <div className="hidden md:flex lg:w-1/3 lg:h-auto bg-card rounded-xl p-6 flex-col gap-4">
+            {isLoading ? (
+              <Skeleton className="w-full h-full" />
+            ) : (
+              <>
+                <h3 className="text-xl font-bold">Statistics</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                    <span className="text-sm text-muted-foreground">Total Chapters</span>
+                    <span className="text-2xl font-bold">{stats?.total || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                    <span className="text-sm text-muted-foreground">Public</span>
+                    <span className="text-xl font-semibold">{stats?.publicCount || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                    <span className="text-sm text-muted-foreground">Private</span>
+                    <span className="text-xl font-semibold">{stats?.privateCount || 0}</span>
+                  </div>
+                  <div className="space-y-2 pt-4 border-t">
+                    <h4 className="font-semibold">Financials</h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Fees</span>
+                        <span className="font-medium">${stats?.financials.totalRegistrationFees.toFixed(2) || "0.00"}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Reimbursement</span>
+                        <span className="font-medium">${stats?.financials.totalReimbursement.toFixed(2) || "0.00"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* 5 */}
-     <div className=" flex-1 bg-card rounded-xl w-full shrink-0">
-        <BookChaptersTable />
-</div>
-
-
+        {/* 5 - Table */}
+        <div className="flex-1 bg-card rounded-xl w-full shrink-0">
+          <BookChaptersTable onRefresh={handleRefresh} />
+        </div>
 
       </div>
     </div>
