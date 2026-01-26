@@ -33,8 +33,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { BookAIcon } from "lucide-react"
-
+import { BookAIcon, Copyright } from "lucide-react"
+import { LuNotebookPen } from "react-icons/lu";
+import { BsJournalBookmarkFill } from "react-icons/bs";
 const data = {
   user: {
     name: "shadcn",
@@ -44,29 +45,26 @@ const data = {
   navMain: [
     {
       title: "Dashboard",
-      url: "#",
+      url: "/dashboard",
       icon: IconDashboard,
     },
     {
       title: "Book Chapters",
       url: "/dashboard/book-chapters",
-      icon: IconBrandBooking
+      icon: LuNotebookPen
     },
     {
-      title: "Analytics",
-      url: "#",
-      icon: IconChartBar,
+      title: "Copyright",
+      url: "/dashboard/copyright",
+      icon: Copyright
     },
+    
     {
-      title: "Projects",
-      url: "#",
-      icon: IconFolder,
+      title: "Journal",
+      url: "/dashboard/journal",
+      icon: BsJournalBookmarkFill
     },
-    {
-      title: "Team",
-      url: "#",
-      icon: IconUsers,
-    },
+
   ],
   navClouds: [
     {

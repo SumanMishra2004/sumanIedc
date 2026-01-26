@@ -7,36 +7,36 @@ export interface User {
   image?: string | null
 }
 
-export interface BookChapterAuthor {
+export interface CopyrightAuthor {
   id: string
   userId: string
-  bookChapterId: string
+  copyrightId: string
   user: User
 }
 
-export interface BookChapter {
+export interface Copyright {
   id: string
+  serialNo: string
   title: string
   abstract: string | null
   imageUrl: string | null
   documentUrl: string | null
-  status: ResearchStatus
-  isbnIssn: string | null
+  dateOfFiling: Date | string | null
+  dateOfSubmission: Date | string | null
+  dateOfPublished: Date | string | null
+  dateOfGrant: Date | string | null
   registrationFees: number | null
   reimbursement: number | null
+  status: ResearchStatus
   isPublic: boolean
-  keywords: string[]
-  doi: string | null
-  publicationDate: Date | string | null
-  publisher: string | null
   createdAt: Date | string
   updatedAt: Date | string
-  studentAuthors: BookChapterAuthor[]
-  facultyAuthors: BookChapterAuthor[]
+  studentAuthors: CopyrightAuthor[]
+  facultyAuthors: CopyrightAuthor[]
 }
 
-export interface BookChapterListResponse {
-  bookChapters: BookChapter[]
+export interface CopyrightListResponse {
+  copyrights: Copyright[]
   pagination: {
     total: number
     page: number
@@ -45,20 +45,25 @@ export interface BookChapterListResponse {
   }
 }
 
-export interface BookChapterFilters {
+export interface CopyrightFilters {
   page?: number
   limit?: number
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
   status?: ResearchStatus
   isPublic?: boolean
-  keyword?: string
-  publisher?: string
+  serialNo?: string
   search?: string
   createdFrom?: string
   createdTo?: string
+  filingFrom?: string
+  filingTo?: string
+  submissionFrom?: string
+  submissionTo?: string
   publishedFrom?: string
   publishedTo?: string
+  grantFrom?: string
+  grantTo?: string
   minRegistrationFees?: number
   maxRegistrationFees?: number
   minReimbursement?: number
@@ -67,27 +72,27 @@ export interface BookChapterFilters {
   studentAuthorIds?: string[]
 }
 
-export interface CreateBookChapterInput {
+export interface CreateCopyrightInput {
+  serialNo: string
   title: string
   abstract?: string
   imageUrl?: string
   documentUrl?: string
-  status?: ResearchStatus
-  isbnIssn?: string
+  dateOfFiling?: string | Date
+  dateOfSubmission?: string | Date
+  dateOfPublished?: string | Date
+  dateOfGrant?: string | Date
   registrationFees?: number
   reimbursement?: number
+  status?: ResearchStatus
   isPublic?: boolean
-  keywords?: string[]
-  doi?: string
-  publicationDate?: string | Date
-  publisher?: string
   studentAuthorIds?: string[]
   facultyAuthorIds?: string[]
 }
 
-export type UpdateBookChapterInput = Partial<CreateBookChapterInput>
+export type UpdateCopyrightInput = Partial<CreateCopyrightInput>
 
-export interface BookChapterStatsResponse {
+export interface CopyrightStatsResponse {
   total: number
   publicCount: number
   privateCount: number
@@ -98,10 +103,10 @@ export interface BookChapterStatsResponse {
   financials: {
     totalRegistrationFees: number
     totalReimbursement: number
-    avgRegistrationFees: number
-    avgReimbursement: number
+    averageRegistrationFees: number
+    averageReimbursement: number
   }
-  recentChapters: Array<{
+  recentCopyrights: Array<{
     id: string
     title: string
     status: ResearchStatus
@@ -119,16 +124,4 @@ export interface BookChapterStatsResponse {
     week: string
     count: number
   }>
-  userRole?: string
-}
-
-export interface ApiResponse<T> {
-  data?: T
-  error?: string
-  message?: string
-}
-
-export interface BulkDeleteResponse {
-  message: string
-  count: number
 }

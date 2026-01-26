@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import prisma from '@/lib/prisma'
-import { getUserRole } from '@/lib/special-users'
+
 
 export async function POST(request: Request) {
   try {
@@ -27,7 +27,9 @@ export async function POST(request: Request) {
     }
 
     // Get role from special users or default to STUDENT
-    const role = await getUserRole(email)
+    const role = await prisma.specialUser.findUnique({
+      where: { email },
+    }).then(specialUser => specialUser ? specialUser.role : 'STUDENT')
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10)

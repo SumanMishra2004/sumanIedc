@@ -19,11 +19,15 @@ export default async function Layout({
           "--header-height": "calc(var(--spacing) * 12)",
         } as React.CSSProperties
       }
+      className="h-screen overflow-hidden"
     >
       <AppSidebar variant="inset" />
-      <SidebarInset className="min-w-0 overflow-x-hidden">
+      <SidebarInset className="min-w-0 overflow-hidden flex flex-col">
         <SiteHeader />
-        {children}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-gradient">
+          
+          {children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );

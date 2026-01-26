@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ResearchStatus, UserRole } from '@prisma/client'
+import { UserRole } from '@prisma/client'
 
-// GET - Get single book chapter by ID
+// GET - Get single copyright by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+ { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth()
-    const { id } = await params
+    const { id } = await  params
 
-    const bookChapter = await prisma.bookChapter.findUnique({
+    const copyright = await prisma.copyright.findUnique({
       where: { id },
       include: {
         studentAuthors: {
@@ -42,24 +41,24 @@ export async function GET(
       }
     })
 
-    if (!bookChapter) {
+    if (!copyright) {
       return NextResponse.json(
-        { error: 'Book chapter not found' },
+        { error: 'Copyright not found' },
         { status: 404 }
       )
     }
 
     // Access control - check if user can view
-    if (!bookChapter.isPublic && (!session || session.user.role === UserRole.STUDENT)) {
+    if (!copyright.isPublic && (!session || session.user.role === UserRole.STUDENT)) {
       return NextResponse.json(
-        { error: 'Unauthorized to view this book chapter' },
+        { error: 'Unauthorized to view this copyright' },
         { status: 403 }
       )
     }
 
-    return NextResponse.json({ bookChapter })
+    return NextResponse.json({ copyright })
   } catch (error) {
-    console.error('Error fetching book chapter:', error)
+    console.error('Error fetching copyright:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -67,7 +66,7 @@ export async function GET(
   }
 }
 
-// PATCH - Update book chapter
+// PATCH - Update copyright
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -82,59 +81,59 @@ export async function PATCH(
       )
     }
 
-    const { id } = await params
+    const { id } =await  params
     const body = await request.json()
     const {
+      serialNo,
       title,
       abstract,
       imageUrl,
       documentUrl,
-      status,
-      isbnIssn,
+      dateOfFiling,
+      dateOfSubmission,
+      dateOfPublished,
+      dateOfGrant,
       registrationFees,
       reimbursement,
+      status,
       isPublic,
-      keywords,
-      doi,
-      publicationDate,
-      publisher,
       studentAuthorIds,
       facultyAuthorIds
     } = body
 
-    // Check if book chapter exists
-    const existingChapter = await prisma.bookChapter.findUnique({
+    // Check if copyright exists
+    const existingCopyright = await prisma.copyright.findUnique({
       where: { id }
     })
 
-    if (!existingChapter) {
+    if (!existingCopyright) {
       return NextResponse.json(
-        { error: 'Book chapter not found' },
+        { error: 'Copyright not found' },
         { status: 404 }
       )
     }
 
-    // Update book chapter
+    // Update copyright
     const updateData: any = {}
+    if (serialNo !== undefined) updateData.serialNo = serialNo
     if (title !== undefined) updateData.title = title
     if (abstract !== undefined) updateData.abstract = abstract
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl
     if (documentUrl !== undefined) updateData.documentUrl = documentUrl
-    if (status !== undefined) updateData.status = status
-    if (isbnIssn !== undefined) updateData.isbnIssn = isbnIssn
+    if (dateOfFiling !== undefined) updateData.dateOfFiling = dateOfFiling ? new Date(dateOfFiling) : null
+    if (dateOfSubmission !== undefined) updateData.dateOfSubmission = dateOfSubmission ? new Date(dateOfSubmission) : null
+    if (dateOfPublished !== undefined) updateData.dateOfPublished = dateOfPublished ? new Date(dateOfPublished) : null
+    if (dateOfGrant !== undefined) updateData.dateOfGrant = dateOfGrant ? new Date(dateOfGrant) : null
     if (registrationFees !== undefined) updateData.registrationFees = parseFloat(registrationFees)
     if (reimbursement !== undefined) updateData.reimbursement = parseFloat(reimbursement)
+    if (status !== undefined) updateData.status = status
     if (isPublic !== undefined) updateData.isPublic = isPublic
-    if (keywords !== undefined) updateData.keywords = keywords
-    if (doi !== undefined) updateData.doi = doi
-    if (publicationDate !== undefined) updateData.publicationDate = publicationDate ? new Date(publicationDate) : null
-    if (publisher !== undefined) updateData.publisher = publisher
 
     // Update authors if provided
     if (studentAuthorIds !== undefined) {
       // Delete existing student authors
-      await prisma.bookChapterStudentAuthor.deleteMany({
-        where: { bookChapterId: id }
+      await prisma.copyrightStudentAuthor.deleteMany({
+        where: { copyrightId: id }
       })
       // Create new student authors
       updateData.studentAuthors = {
@@ -146,8 +145,8 @@ export async function PATCH(
 
     if (facultyAuthorIds !== undefined) {
       // Delete existing faculty authors
-      await prisma.bookChapterTeacherAuthor.deleteMany({
-        where: { bookChapterId: id }
+      await prisma.copyrightTeacherAuthor.deleteMany({
+        where: { copyrightId: id }
       })
       // Create new faculty authors
       updateData.facultyAuthors = {
@@ -157,7 +156,7 @@ export async function PATCH(
       }
     }
 
-    const bookChapter = await prisma.bookChapter.update({
+    const copyright = await prisma.copyright.update({
       where: { id },
       data: updateData,
       include: {
@@ -186,9 +185,9 @@ export async function PATCH(
       }
     })
 
-    return NextResponse.json({ bookChapter })
+    return NextResponse.json({ copyright })
   } catch (error) {
-    console.error('Error updating book chapter:', error)
+    console.error('Error updating copyright:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -196,10 +195,10 @@ export async function PATCH(
   }
 }
 
-// DELETE - Delete single book chapter
+// DELETE - Delete single copyright
 export async function DELETE(
   request: Request,
- { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await auth()
@@ -211,28 +210,28 @@ export async function DELETE(
       )
     }
 
-    const { id } =await params
+    const { id } = await params
 
-    const bookChapter = await prisma.bookChapter.findUnique({
+    const copyright = await prisma.copyright.findUnique({
       where: { id }
     })
 
-    if (!bookChapter) {
+    if (!copyright) {
       return NextResponse.json(
-        { error: 'Book chapter not found' },
+        { error: 'Copyright not found' },
         { status: 404 }
       )
     }
 
-    await prisma.bookChapter.delete({
+    await prisma.copyright.delete({
       where: { id }
     })
 
     return NextResponse.json({
-      message: 'Book chapter deleted successfully'
+      message: 'Copyright deleted successfully'
     })
   } catch (error) {
-    console.error('Error deleting book chapter:', error)
+    console.error('Error deleting copyright:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

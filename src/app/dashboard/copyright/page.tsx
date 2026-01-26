@@ -1,11 +1,11 @@
 "use client";
 
-import BookChapterTable from "@/components/book-chapter/BookChapterTable";
-import { StatusRadarChart } from "@/components/charts/book-chapter-charts/Pie";
-import { ChartAreaGradient } from "@/components/charts/book-chapter-charts/TimeSeriesChart";
+
+import { CopyrightStatusRadarChart } from "@/components/charts/copyright-charts/Pie";
+import { CopyrightTimeSeriesChart } from "@/components/charts/copyright-charts/TimeSeriesChart";
 import React, { useEffect, useState } from "react";
-import { getBookChapterStats } from "@/lib/bookChapterApi";
-import { BookChapterStatsResponse } from "@/types/book-chapter";
+import { getCopyrightStats } from "@/lib/copyrightApi";
+import { CopyrightStatsResponse } from "@/types/copyright";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -15,17 +15,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { BookOpen, DollarSign, FileText, TrendingUp } from "lucide-react";
+import { FileText, DollarSign, Shield, TrendingUp } from "lucide-react";
+import CopyrightTable from "@/components/copyright/CopyrightTable";
 
-const Bookchapter = () => {
-  const [stats, setStats] = useState<BookChapterStatsResponse | null>(null);
+const Copyright = () => {
+  const [stats, setStats] = useState<CopyrightStatsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       setIsLoading(true);
-      const response = await getBookChapterStats();
-      console.log("Book Chapter Stats Response:", response);
+      const response = await getCopyrightStats();
+      console.log("Copyright Stats Response:", response);
       if (response.data) {
         setStats(response.data);
       } else if (response.error) {
@@ -66,9 +67,9 @@ const Bookchapter = () => {
             <Card className="border-dashed border-2 border-chart-2 ">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Total Chapters
+                  Total Copyrights
                 </CardTitle>
-                <BookOpen className="h-4 w-4 text-muted-foreground" />
+                <Shield className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{stats.total}</div>
@@ -103,10 +104,10 @@ const Bookchapter = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  ${stats.financials.totalRegistrationFees.toLocaleString()}
+                  ${(stats.financials.totalRegistrationFees || 0).toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Avg: ${stats.financials.avgRegistrationFees.toFixed(0)}
+                  Avg: ${(stats.financials.averageRegistrationFees || 0).toFixed(0)}
                 </p>
               </CardContent>
             </Card>
@@ -120,10 +121,10 @@ const Bookchapter = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  ${stats.financials.totalReimbursement.toLocaleString()}
+                  ${(stats.financials.totalReimbursement || 0).toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Avg: ${stats.financials.avgReimbursement.toFixed(0)}
+                  Avg: ${(stats.financials.averageReimbursement || 0).toFixed(0)}
                 </p>
               </CardContent>
             </Card>
@@ -132,14 +133,14 @@ const Bookchapter = () => {
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-1 ">
-              <StatusRadarChart
+              <CopyrightStatusRadarChart
                 statusCounts={stats.statusCounts}
                 total={stats.total}
               />
             </div>
 
             <div className="lg:col-span-2">
-              <ChartAreaGradient
+              <CopyrightTimeSeriesChart
                 monthlyTrend={stats.monthlyTrend}
                 dailyTrend={stats.dailyTrend}
                 weeklyTrend={stats.weeklyTrend}
@@ -149,14 +150,13 @@ const Bookchapter = () => {
           </div>
         </>
       )}
-      {/* Stats Cards */}
 
       {/* Table */}
       <div className="w-full">
-        <BookChapterTable />
+        <CopyrightTable />
       </div>
     </div>
   );
 };
 
-export default Bookchapter;
+export default Copyright;

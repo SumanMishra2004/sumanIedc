@@ -31,8 +31,14 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BookChapterFilters } from "@/types/book-chapter"
 import { ResearchStatus } from "@prisma/client"
+import { MultiSelectUsers } from "@/components/ui/multi-select"
 
-export interface FilterValues extends Omit<BookChapterFilters, 'page' | 'limit' | 'sortBy' | 'sortOrder'> {}
+interface User {
+  id: string
+  name: string
+  email: string
+  image?: string
+}
 
 interface FilterDialogProps {
   filters: BookChapterFilters
@@ -50,6 +56,8 @@ export function FilterDialog({
   const isMobile = useIsMobile()
   const [open, setOpen] = React.useState(false)
   const [localFilters, setLocalFilters] = React.useState<Partial<BookChapterFilters>>(filters)
+  const [selectedFaculty, setSelectedFaculty] = React.useState<User[]>([])
+  const [selectedStudents, setSelectedStudents] = React.useState<User[]>([])
 
   // Sync local filters with external filters when dialog opens
   React.useEffect(() => {
@@ -168,8 +176,12 @@ export function FilterDialog({
       createdTo: undefined,
       publishedFrom: undefined,
       publishedTo: undefined,
+      facultyAuthorIds: undefined,
+      studentAuthorIds: undefined,
     }
     setLocalFilters(clearedFilters)
+    setSelectedFaculty([])
+    setSelectedStudents([])
     onClearFilters()
     setOpen(false)
   }
@@ -186,13 +198,16 @@ export function FilterDialog({
     if (filters.maxReimbursement !== undefined) count++
     if (filters.createdFrom || filters.createdTo) count++
     if (filters.publishedFrom || filters.publishedTo) count++
+    if (filters.facultyAuthorIds && filters.facultyAuthorIds.length > 0) count++
+    if (filters.studentAuthorIds && filters.studentAuthorIds.length > 0) count++
     return count
   }, [filters])
   const filterContent = (
     <Tabs defaultValue="dates" className="w-full flex-1 flex flex-col overflow-hidden">
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="dates">Dates</TabsTrigger>
         <TabsTrigger value="fees">Fees</TabsTrigger>
+        <TabsTrigger value="authors">Authors</TabsTrigger>
         <TabsTrigger value="other">Other</TabsTrigger>
       </TabsList>
 
@@ -407,55 +422,52 @@ export function FilterDialog({
 
             <Separator />
 
-            {/* Quick Fee Presets */}
+           
+          </div>
+        </ScrollArea>
+      </TabsContent>
+
+      <TabsContent value="authors" className="space-y-4 mt-4 flex-1 overflow-hidden">
+        <ScrollArea className="h-full pr-4">
+          <div className="space-y-6 pb-4">
+            {/* Faculty Filter */}
             <div className="space-y-3">
-              <Label className="text-sm font-semibold">Quick Presets</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    handleMinFeesChange("0")
-                    handleMaxFeesChange("5000")
-                  }}
-                >
-                  $0 - $5,000
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    handleMinFeesChange("5000")
-                    handleMaxFeesChange("10000")
-                  }}
-                >
-                  $5,000 - $10,000
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    handleMinFeesChange("10000")
-                    handleMaxFeesChange("20000")
-                  }}
-                >
-                  $10,000 - $20,000
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    handleMinFeesChange("20000")
-                    handleMaxFeesChange("")
-                  }}
-                >
-                  $20,000+
-                </Button>
-              </div>
+              <Label className="text-sm font-semibold">Faculty Authors</Label>
+              <MultiSelectUsers
+                isStudent={false}
+                value={selectedFaculty}
+                onChange={(users) => {
+                  setSelectedFaculty(users)
+                  setLocalFilters((prev) => ({
+                    ...prev,
+                    facultyAuthorIds: users.length > 0 ? users.map(u => u.id) : undefined,
+                  }))
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Filter book chapters by faculty authors
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Student Filter */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Student Authors</Label>
+              <MultiSelectUsers
+                isStudent={true}
+                value={selectedStudents}
+                onChange={(users) => {
+                  setSelectedStudents(users)
+                  setLocalFilters((prev) => ({
+                    ...prev,
+                    studentAuthorIds: users.length > 0 ? users.map(u => u.id) : undefined,
+                  }))
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                Filter book chapters by student authors
+              </p>
             </div>
           </div>
         </ScrollArea>
@@ -499,15 +511,13 @@ export function FilterDialog({
   const triggerButtonContent = triggerButton || (
     <Button variant="outline" className="gap-2 relative bg-accent hover:bg-accent/80">
       <FilterIcon className="h-4 w-4" />
-      <span className="hidden lg:inline">Advanced Filters</span>
+      <span className="inline">Advanced Filters</span>
       {activeFilterCount > 0 && (
         <Badge
           variant="default"
-          className="rounded-full px-2 py-0.5 text-xs absolute -top-2 -right-2"
-          style={{
-            background: "linear-gradient(to right, var(--first-color), var(--second-color))",
-            color: "white",
-          }}
+          className="rounded-full px-2 py-0.5 text-xs absolute -top-2 -right-2 bg-green-800 text-white shadow-md"
+          
+         
         >
           {activeFilterCount}
         </Badge>

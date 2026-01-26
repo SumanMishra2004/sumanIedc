@@ -62,21 +62,33 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ user, account, profile }) {
       if (!user.email) return false
 
-      // Check if user exists
-      const existingUser = await prisma.user.findUnique({
-        where: { email: user.email },
-      })
-
-      // Check for special user role
+      // Check for special user role first
       const specialUser = await prisma.specialUser.findUnique({
         where: { email: user.email },
       })
 
       const role = specialUser?.role || 'STUDENT'
 
-      if (existingUser) {
-        // Update role if it has changed
-        if (existingUser.role !== role) {
+      // For OAuth providers, the user is created by PrismaAdapter before this callback
+      // So we need to update the role for both new and existing users
+      if (account?.provider !== 'credentials') {
+        await prisma.user.upsert({
+          where: { email: user.email },
+          update: { role },
+          create: {
+            email: user.email,
+            name: user.name,
+            image: user.image,
+            role,
+          },
+        })
+      } else {
+        // For credentials, just update if needed
+        const existingUser = await prisma.user.findUnique({
+          where: { email: user.email },
+        })
+
+        if (existingUser && existingUser.role !== role) {
           await prisma.user.update({
             where: { email: user.email },
             data: { role },

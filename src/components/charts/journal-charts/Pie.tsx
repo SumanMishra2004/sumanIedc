@@ -23,7 +23,7 @@ export const description = "A radar chart showing status distribution"
 
 interface StatusRadarChartProps {
   statusCounts: Array<{
-    status: ResearchStatus
+    status: ResearchStatus | string
     count: number
   }>
   total: number
@@ -31,7 +31,7 @@ interface StatusRadarChartProps {
 
 const chartConfig = {
   count: {
-    label: "Chapters",
+    label: "Journals",
     color: "var(--chart-1)",
   },
 } satisfies ChartConfig
@@ -60,7 +60,7 @@ export function StatusRadarChart({ statusCounts, total }: StatusRadarChartProps)
     <Card className="flex flex-col border-dashed border-2 border-chart-2">
       <CardHeader className="items-center pb-2">
         <CardTitle className="text-base">Status Distribution</CardTitle>
-        <CardDescription className="text-xs">Chapter status breakdown</CardDescription>
+        <CardDescription className="text-xs">Journal status breakdown</CardDescription>
       </CardHeader>
       <CardContent className="pb-2">
         <ChartContainer
@@ -95,13 +95,13 @@ export function StatusRadarChart({ statusCounts, total }: StatusRadarChartProps)
         <div className="flex items-center gap-2 leading-none font-medium text-xs">
           {maxStatus && (
             <>
-              {formatStatusName(maxStatus.status)}: {maxCount} chapters
+              {formatStatusName(maxStatus.status)}: {maxCount} journals
               <TrendingUp className="h-3 w-3" />
             </>
           )}
         </div>
         <div className="text-muted-foreground leading-none text-xs">
-          Total {total} chapters across {statusCounts.length} statuses
+          Total {total} journals across {statusCounts.length} statuses
         </div>
       </CardFooter>
     </Card>

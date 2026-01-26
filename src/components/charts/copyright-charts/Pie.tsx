@@ -31,7 +31,7 @@ interface StatusRadarChartProps {
 
 const chartConfig = {
   count: {
-    label: "Chapters",
+    label: "Copyrights",
     color: "var(--chart-1)",
   },
 } satisfies ChartConfig
@@ -45,7 +45,7 @@ const formatStatusName = (status: string) => {
     .join(" ")
 }
 
-export function StatusRadarChart({ statusCounts, total }: StatusRadarChartProps) {
+export function CopyrightStatusRadarChart({ statusCounts, total }: StatusRadarChartProps) {
   // Transform status data for radar chart
   const chartData = statusCounts.map(item => ({
     status: formatStatusName(item.status),
@@ -60,7 +60,7 @@ export function StatusRadarChart({ statusCounts, total }: StatusRadarChartProps)
     <Card className="flex flex-col border-dashed border-2 border-chart-2">
       <CardHeader className="items-center pb-2">
         <CardTitle className="text-base">Status Distribution</CardTitle>
-        <CardDescription className="text-xs">Chapter status breakdown</CardDescription>
+        <CardDescription className="text-xs">Copyright status breakdown</CardDescription>
       </CardHeader>
       <CardContent className="pb-2">
         <ChartContainer
@@ -95,13 +95,13 @@ export function StatusRadarChart({ statusCounts, total }: StatusRadarChartProps)
         <div className="flex items-center gap-2 leading-none font-medium text-xs">
           {maxStatus && (
             <>
-              {formatStatusName(maxStatus.status)}: {maxCount} chapters
+              {formatStatusName(maxStatus.status)}: {maxCount} copyrights
               <TrendingUp className="h-3 w-3" />
             </>
           )}
         </div>
         <div className="text-muted-foreground leading-none text-xs">
-          Total {total} chapters across {statusCounts.length} statuses
+          Total {total} copyrights across {statusCounts.length} statuses
         </div>
       </CardFooter>
     </Card>

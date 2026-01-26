@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { ResearchStatus, UserRole } from '@prisma/client'
 
-// GET - List all book chapters with filtering, pagination, and search
+// GET - List all copyrights with filtering, pagination, and search
 export async function GET(req: NextRequest) {
   try {
     const session = await auth()
@@ -21,15 +21,20 @@ export async function GET(req: NextRequest) {
     // Filters
     const status = searchParams.get('status')
     const isPublic = searchParams.get('isPublic')
-    const keyword = searchParams.get('keyword')
-    const publisher = searchParams.get('publisher')
+    const serialNo = searchParams.get('serialNo')
     const search = searchParams.get('search')
 
     // Date range filters
     const createdFrom = searchParams.get('createdFrom')
     const createdTo = searchParams.get('createdTo')
+    const filingFrom = searchParams.get('filingFrom')
+    const filingTo = searchParams.get('filingTo')
+    const submissionFrom = searchParams.get('submissionFrom')
+    const submissionTo = searchParams.get('submissionTo')
     const publishedFrom = searchParams.get('publishedFrom')
     const publishedTo = searchParams.get('publishedTo')
+    const grantFrom = searchParams.get('grantFrom')
+    const grantTo = searchParams.get('grantTo')
 
     // Fee range filters
     const minRegistrationFees = searchParams.get('minRegistrationFees')
@@ -42,18 +47,18 @@ export async function GET(req: NextRequest) {
 
     // Access control based on role
     if (!session) {
-      // Not logged in - only public chapters
+      // Not logged in - only public copyrights
       where.isPublic = true
     } else if (session.user.role === UserRole.STUDENT) {
-      // Students see: public chapters OR chapters where they are authors
+      // Students see: public copyrights OR copyrights where they are authors
       where.OR = [
-        
+        { isPublic: true },
         { studentAuthors: { some: { userId: session.user.id } } }
       ]
     } else if (session.user.role === UserRole.FACULTY) {
-      // Faculty see: public chapters OR chapters where they are authors
+      // Faculty see: public copyrights OR copyrights where they are authors
       where.OR = [
-
+        { isPublic: true },
         { facultyAuthors: { some: { userId: session.user.id } } }
       ]
     }
@@ -68,15 +73,9 @@ export async function GET(req: NextRequest) {
       where.isPublic = isPublic === 'true'
     }
 
-    if (keyword) {
-      where.keywords = {
-        has: keyword
-      }
-    }
-
-    if (publisher) {
-      where.publisher = {
-        contains: publisher,
+    if (serialNo) {
+      where.serialNo = {
+        contains: serialNo,
         mode: 'insensitive'
       }
     }
@@ -86,9 +85,7 @@ export async function GET(req: NextRequest) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
         { abstract: { contains: search, mode: 'insensitive' } },
-        { publisher: { contains: search, mode: 'insensitive' } },
-        { isbnIssn: { contains: search, mode: 'insensitive' } },
-        { doi: { contains: search, mode: 'insensitive' } }
+        { serialNo: { contains: search, mode: 'insensitive' } }
       ]
     }
 
@@ -99,10 +96,28 @@ export async function GET(req: NextRequest) {
       if (createdTo) where.createdAt.lte = new Date(createdTo)
     }
 
+    if (filingFrom || filingTo) {
+      where.dateOfFiling = {}
+      if (filingFrom) where.dateOfFiling.gte = new Date(filingFrom)
+      if (filingTo) where.dateOfFiling.lte = new Date(filingTo)
+    }
+
+    if (submissionFrom || submissionTo) {
+      where.dateOfSubmission = {}
+      if (submissionFrom) where.dateOfSubmission.gte = new Date(submissionFrom)
+      if (submissionTo) where.dateOfSubmission.lte = new Date(submissionTo)
+    }
+
     if (publishedFrom || publishedTo) {
-      where.publicationDate = {}
-      if (publishedFrom) where.publicationDate.gte = new Date(publishedFrom)
-      if (publishedTo) where.publicationDate.lte = new Date(publishedTo)
+      where.dateOfPublished = {}
+      if (publishedFrom) where.dateOfPublished.gte = new Date(publishedFrom)
+      if (publishedTo) where.dateOfPublished.lte = new Date(publishedTo)
+    }
+
+    if (grantFrom || grantTo) {
+      where.dateOfGrant = {}
+      if (grantFrom) where.dateOfGrant.gte = new Date(grantFrom)
+      if (grantTo) where.dateOfGrant.lte = new Date(grantTo)
     }
 
     // Fee range filters
@@ -119,8 +134,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch data with pagination
-    const [bookChapters, total] = await Promise.all([
-      prisma.bookChapter.findMany({
+    const [copyrights, total] = await Promise.all([
+      prisma.copyright.findMany({
         where,
         skip,
         take: limit,
@@ -154,11 +169,11 @@ export async function GET(req: NextRequest) {
           }
         }
       }),
-      prisma.bookChapter.count({ where })
+      prisma.copyright.count({ where })
     ])
 
     return NextResponse.json({
-      bookChapters,
+      copyrights,
       pagination: {
         total,
         page,
@@ -167,7 +182,7 @@ export async function GET(req: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Error fetching book chapters:', error)
+    console.error('Error fetching copyrights:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -190,24 +205,31 @@ export async function POST(request: Request) {
     const body = await request.json()
 
     const {
+      serialNo,
       title,
       abstract,
       imageUrl,
       documentUrl,
-      status,
-      isbnIssn,
+      dateOfFiling,
+      dateOfSubmission,
+      dateOfPublished,
+      dateOfGrant,
       registrationFees,
       reimbursement,
+      status,
       isPublic,
-      keywords,
-      doi,
-      publicationDate,
-      publisher,
       studentAuthorIds = [],
       facultyAuthorIds = []
     } = body
 
     /* -------------------- Basic validation -------------------- */
+
+    if (!serialNo || typeof serialNo !== "string") {
+      return NextResponse.json(
+        { error: "Serial number is required" },
+        { status: 400 }
+      )
+    }
 
     if (!title || typeof title !== "string") {
       return NextResponse.json(
@@ -225,13 +247,6 @@ export async function POST(request: Request) {
     if (!Array.isArray(studentAuthorIds) || studentAuthorIds.length === 0) {
       return NextResponse.json(
         { error: "At least one student author is required" },
-        { status: 400 }
-      )
-    }
-
-    if (keywords && !Array.isArray(keywords)) {
-      return NextResponse.json(
-        { error: "Keywords must be an array of strings" },
         { status: 400 }
       )
     }
@@ -259,7 +274,7 @@ export async function POST(request: Request) {
       )
     }
 
-    /* -------------------- Validate student authors (optional) -------------------- */
+    /* -------------------- Validate student authors -------------------- */
 
     if (studentAuthorIds.length > 0) {
       const studentAuthors = await prisma.user.findMany({
@@ -277,27 +292,25 @@ export async function POST(request: Request) {
       }
     }
 
-    /* -------------------- Create BookChapter -------------------- */
+    /* -------------------- Create Copyright -------------------- */
 
-    const bookChapter = await prisma.bookChapter.create({
+    const copyright = await prisma.copyright.create({
       data: {
+        serialNo,
         title,
         abstract,
         imageUrl,
         documentUrl,
-        status: status ?? ResearchStatus.DRAFT,
-        isbnIssn,
+        dateOfFiling: dateOfFiling ? new Date(dateOfFiling) : null,
+        dateOfSubmission: dateOfSubmission ? new Date(dateOfSubmission) : null,
+        dateOfPublished: dateOfPublished ? new Date(dateOfPublished) : null,
+        dateOfGrant: dateOfGrant ? new Date(dateOfGrant) : null,
         registrationFees:
           registrationFees !== undefined ? Number(registrationFees) : null,
         reimbursement:
           reimbursement !== undefined ? Number(reimbursement) : null,
+        status: status ?? ResearchStatus.DRAFT,
         isPublic: Boolean(isPublic),
-        keywords: keywords ?? [],
-        doi,
-        publicationDate: publicationDate
-          ? new Date(publicationDate)
-          : null,
-        publisher,
 
         studentAuthors: {
           create: studentAuthorIds.map((userId: string) => ({
@@ -323,12 +336,12 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(
-      { bookChapter },
+      { copyright },
       { status: 201 }
     )
 
   } catch (error) {
-    console.error("BookChapter POST error:", error)
+    console.error("Copyright POST error:", error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -336,7 +349,7 @@ export async function POST(request: Request) {
   }
 }
 
-// DELETE - Bulk delete book chapters
+// DELETE - Bulk delete copyrights
 export async function DELETE(request: Request) {
   try {
     const session = await auth()
@@ -357,8 +370,8 @@ export async function DELETE(request: Request) {
       )
     }
 
-    // Delete book chapters (cascade will handle authors)
-    const result = await prisma.bookChapter.deleteMany({
+    // Delete copyrights (cascade will handle authors)
+    const result = await prisma.copyright.deleteMany({
       where: {
         id: {
           in: ids
@@ -367,11 +380,11 @@ export async function DELETE(request: Request) {
     })
 
     return NextResponse.json({
-      message: `Successfully deleted ${result.count} book chapter(s)`,
+      message: `Successfully deleted ${result.count} copyright(s)`,
       count: result.count
     })
   } catch (error) {
-    console.error('Error deleting book chapters:', error)
+    console.error('Error deleting copyrights:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

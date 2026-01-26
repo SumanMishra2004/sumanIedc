@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ResearchStatus, UserRole } from '@prisma/client'
+import { ResearchStatus, UserRole, JournalType } from '@prisma/client'
 
-// GET - Export book chapters to CSV
+// GET - Export journals to CSV
 export async function GET(req: NextRequest) {
   try {
     const session = await auth()
@@ -20,8 +20,9 @@ export async function GET(req: NextRequest) {
     // Filters (same as main GET endpoint)
     const status = searchParams.get('status')
     const isPublic = searchParams.get('isPublic')
+    const journalType = searchParams.get('journalType')
     const keyword = searchParams.get('keyword')
-    const publisher = searchParams.get('publisher')
+    const journalPublisher = searchParams.get('journalPublisher')
     const search = searchParams.get('search')
 
     // Date range filters
@@ -35,6 +36,10 @@ export async function GET(req: NextRequest) {
     const maxRegistrationFees = searchParams.get('maxRegistrationFees')
     const minReimbursement = searchParams.get('minReimbursement')
     const maxReimbursement = searchParams.get('maxReimbursement')
+
+    // Impact factor range filters
+    const minImpactFactor = searchParams.get('minImpactFactor')
+    const maxImpactFactor = searchParams.get('maxImpactFactor')
 
     // Author filters
     const facultyAuthorIds = searchParams.get('facultyAuthorIds')
@@ -63,15 +68,19 @@ export async function GET(req: NextRequest) {
       where.isPublic = isPublic === 'true'
     }
 
+    if (journalType) {
+      where.journalType = journalType as JournalType
+    }
+
     if (keyword) {
       where.keywords = {
         has: keyword
       }
     }
 
-    if (publisher) {
-      where.publisher = {
-        contains: publisher,
+    if (journalPublisher) {
+      where.journalPublisher = {
+        contains: journalPublisher,
         mode: 'insensitive'
       }
     }
@@ -79,9 +88,10 @@ export async function GET(req: NextRequest) {
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
+        { titleOfJournal: { contains: search, mode: 'insensitive' } },
         { abstract: { contains: search, mode: 'insensitive' } },
-        { publisher: { contains: search, mode: 'insensitive' } },
-        { isbnIssn: { contains: search, mode: 'insensitive' } },
+        { journalPublisher: { contains: search, mode: 'insensitive' } },
+        { serialNo: { contains: search, mode: 'insensitive' } },
         { doi: { contains: search, mode: 'insensitive' } }
       ]
     }
@@ -108,6 +118,12 @@ export async function GET(req: NextRequest) {
       where.reimbursement = {}
       if (minReimbursement) where.reimbursement.gte = parseFloat(minReimbursement)
       if (maxReimbursement) where.reimbursement.lte = parseFloat(maxReimbursement)
+    }
+
+    if (minImpactFactor || maxImpactFactor) {
+      where.impactFactor = {}
+      if (minImpactFactor) where.impactFactor.gte = parseFloat(minImpactFactor)
+      if (maxImpactFactor) where.impactFactor.lte = parseFloat(maxImpactFactor)
     }
 
     // Author filters
@@ -138,7 +154,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Fetch all matching data
-    const bookChapters = await prisma.bookChapter.findMany({
+    const journals = await prisma.journal.findMany({
       where,
       orderBy: {
         createdAt: 'desc'
@@ -170,11 +186,16 @@ export async function GET(req: NextRequest) {
     // Generate CSV content
     const headers = [
       'ID',
-      'Title',
+      'Serial No',
+      'Journal Title',
+      'Article Title',
+      'Journal Type',
       'Abstract',
       'Status',
-      'ISBN/ISSN',
-      'Publisher',
+      'Impact Factor',
+      'Date of Impact Factor',
+      'Journal Publisher',
+      'Paper Link',
       'DOI',
       'Publication Date',
       'Registration Fees',
@@ -191,36 +212,41 @@ export async function GET(req: NextRequest) {
 
     const csvRows = [
       headers.join(','),
-      ...bookChapters.map(chapter => {
-        const studentAuthors = chapter.studentAuthors
+      ...journals.map(journal => {
+        const studentAuthors = journal.studentAuthors
           .map(sa => `${sa.user.name} (${sa.user.email})`)
           .join('; ')
         
-        const facultyAuthors = chapter.facultyAuthors
+        const facultyAuthors = journal.facultyAuthors
           .map(fa => `${fa.user.name} (${fa.user.email})`)
           .join('; ')
 
-        const keywords = chapter.keywords.join('; ')
+        const keywords = journal.keywords.join('; ')
 
         return [
-          chapter.id,
-          `"${(chapter.title || '').replace(/"/g, '""')}"`,
-          `"${(chapter.abstract || '').replace(/"/g, '""')}"`,
-          chapter.status,
-          chapter.isbnIssn || '',
-          `"${(chapter.publisher || '').replace(/"/g, '""')}"`,
-          chapter.doi || '',
-          chapter.publicationDate ? new Date(chapter.publicationDate).toISOString() : '',
-          chapter.registrationFees || '',
-          chapter.reimbursement || '',
-          chapter.isPublic,
+          journal.id,
+          `"${(journal.serialNo || '').replace(/"/g, '""')}"`,
+          `"${(journal.titleOfJournal || '').replace(/"/g, '""')}"`,
+          `"${(journal.title || '').replace(/"/g, '""')}"`,
+          journal.journalType,
+          `"${(journal.abstract || '').replace(/"/g, '""')}"`,
+          journal.status,
+          journal.impactFactor || '',
+          journal.dateOfImpactFactor ? new Date(journal.dateOfImpactFactor).toISOString() : '',
+          `"${(journal.journalPublisher || '').replace(/"/g, '""')}"`,
+          journal.paperLink || '',
+          journal.doi || '',
+          journal.publicationDate ? new Date(journal.publicationDate).toISOString() : '',
+          journal.registrationFees || '',
+          journal.reimbursement || '',
+          journal.isPublic,
           `"${keywords}"`,
           `"${studentAuthors}"`,
           `"${facultyAuthors}"`,
-          new Date(chapter.createdAt).toISOString(),
-          new Date(chapter.updatedAt).toISOString(),
-          chapter.documentUrl || '',
-          chapter.imageUrl || ''
+          new Date(journal.createdAt).toISOString(),
+          new Date(journal.updatedAt).toISOString(),
+          journal.documentUrl || '',
+          journal.imageUrl || ''
         ].join(',')
       })
     ]
@@ -231,11 +257,11 @@ export async function GET(req: NextRequest) {
     return new NextResponse(csv, {
       headers: {
         'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="book-chapters-${new Date().toISOString()}.csv"`
+        'Content-Disposition': `attachment; filename="journals-${new Date().toISOString()}.csv"`
       }
     })
   } catch (error) {
-    console.error('Error exporting book chapters:', error)
+    console.error('Error exporting journals:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

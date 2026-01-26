@@ -1,31 +1,30 @@
 "use client";
 
-import BookChapterTable from "@/components/book-chapter/BookChapterTable";
-import { StatusRadarChart } from "@/components/charts/book-chapter-charts/Pie";
-import { ChartAreaGradient } from "@/components/charts/book-chapter-charts/TimeSeriesChart";
+import JournalTable from "@/components/journal/JournalTable";
+import { StatusRadarChart } from "@/components/charts/journal-charts/Pie";
+import { ChartAreaGradient } from "@/components/charts/journal-charts/TimeSeriesChart";
 import React, { useEffect, useState } from "react";
-import { getBookChapterStats } from "@/lib/bookChapterApi";
-import { BookChapterStatsResponse } from "@/types/book-chapter";
+import { getJournalStats } from "@/lib/journalApi";
+import { JournalStatsResponse } from "@/lib/journalApi";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { BookOpen, DollarSign, FileText, TrendingUp } from "lucide-react";
+import { BookOpen, DollarSign, FileText, TrendingUp, Star } from "lucide-react";
 
-const Bookchapter = () => {
-  const [stats, setStats] = useState<BookChapterStatsResponse | null>(null);
+const Journal = () => {
+  const [stats, setStats] = useState<JournalStatsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchStats = async () => {
       setIsLoading(true);
-      const response = await getBookChapterStats();
-      console.log("Book Chapter Stats Response:", response);
+      const response = await getJournalStats();
+      console.log("Journal Stats Response:", response);
       if (response.data) {
         setStats(response.data);
       } else if (response.error) {
@@ -43,7 +42,8 @@ const Bookchapter = () => {
   if (isLoading) {
     return (
       <div className="w-full h-full p-4 md:p-6 lg:p-8 flex flex-col gap-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <Skeleton className="h-32" />
           <Skeleton className="h-32" />
           <Skeleton className="h-32" />
           <Skeleton className="h-32" />
@@ -62,11 +62,11 @@ const Bookchapter = () => {
     <div className="w-full h-full p-4 md:p-6 lg:p-8 flex flex-col gap-6">
       {stats && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <Card className="border-dashed border-2 border-chart-2 ">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">
-                  Total Chapters
+                  Total Journals
                 </CardTitle>
                 <BookOpen className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -90,6 +90,23 @@ const Bookchapter = () => {
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   Successfully published
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-dashed border-2 border-chart-2 ">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Avg Impact Factor
+                </CardTitle>
+                <Star className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {stats.financials.avgImpactFactor.toFixed(3)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Journal impact score
                 </p>
               </CardContent>
             </Card>
@@ -147,16 +164,87 @@ const Bookchapter = () => {
               />
             </div>
           </div>
+
+          {/* Display journal type distribution */}
+          {stats.journalTypeCounts && stats.journalTypeCounts.length > 0 && (
+            <Card className="border-dashed border-2 border-chart-2">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">
+                  Journal Type Distribution
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                  {stats.journalTypeCounts.map((type) => (
+                    <div key={type.journalType} className="text-center p-3 bg-muted/30 rounded-lg">
+                      <div className="text-2xl font-bold text-primary">{type.count}</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {type.journalType.replace(/_/g, ' ')}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top Publishers */}
+          {stats.topPublishers && stats.topPublishers.length > 0 && (
+            <Card className="border-dashed border-2 border-chart-2">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">
+                  Top Publishers
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {stats.topPublishers.slice(0, 5).map((publisher, index) => (
+                    <div key={publisher.publisher} className="flex items-center justify-between p-2 bg-muted/20 rounded">
+                      <span className="text-sm font-medium">
+                        {index + 1}. {publisher.publisher}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {publisher.count} journals
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Top Keywords */}
+          {stats.topKeywords && stats.topKeywords.length > 0 && (
+            <Card className="border-dashed border-2 border-chart-2">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">
+                  Popular Keywords
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-2">
+                  {stats.topKeywords.slice(0, 20).map((keyword) => (
+                    <div
+                      key={keyword.keyword}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm"
+                    >
+                      <span className="font-medium">{keyword.keyword}</span>
+                      <span className="text-xs opacity-70">({keyword.count})</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
-      {/* Stats Cards */}
 
-      {/* Table */}
+      {/* Table Section */}
       <div className="w-full">
-        <BookChapterTable />
+        <JournalTable />
       </div>
     </div>
   );
 };
 
-export default Bookchapter;
+export default Journal;

@@ -1,9 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { Check, ChevronsUpDown, X } from "lucide-react"
+import { Check, X, ChevronDown, Loader2 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { Button } from "@/components/ui/button"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import {
   Command,
   CommandEmpty,
@@ -12,211 +18,259 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 
-// --- Type Definition ---
-export type UserOption = {
+type User = {
   id: string
   name: string
   email: string
-  department: string
-  avatarUrl?: string
+  image?: string
 }
 
-// --- Mock Data (Replace with API fetch later) ---
-const users: UserOption[] = [
-  {
-    id: "1",
-    name: "Alex Johnson",
-    email: "alex.j@example.com",
-    department: "Engineering",
-    avatarUrl: "https://github.com/shadcn.png",
-  },
-  {
-    id: "2",
-    name: "Sarah Williams",
-    email: "s.williams@example.com",
-    department: "Marketing",
-    avatarUrl: "https://i.pravatar.cc/150?u=sarah",
-  },
-  {
-    id: "3",
-    name: "Michael Brown",
-    email: "m.brown@corp.net",
-    department: "Sales",
-  },
-  {
-    id: "4",
-    name: "Emily Davis",
-    email: "emily.d@design.io",
-    department: "Design",
-    avatarUrl: "https://i.pravatar.cc/150?u=emily",
-  },
-  {
-    id: "5",
-    name: "James Wilson",
-    email: "j.wilson@dev.co",
-    department: "Engineering",
-  },
-]
+function useDebounce<T>(value: T, delay = 300) {
+  const [debouncedValue, setDebouncedValue] = React.useState(value)
 
-interface MultiSelectProps {
-  /** Array of selected user IDs */
-  selectedUsers?: string[]
-  /** Callback when selection changes */
-  onChange?: (values: string[]) => void
-  placeholder?: string
-  className?: string
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => clearTimeout(timer)
+  }, [value, delay])
+
+  return debouncedValue
 }
 
-export function MultiSelectUser({
-  selectedUsers = [],
+interface MultiSelectUsersProps {
+  isStudent: boolean
+  value: User[]
+  onChange: (users: User[]) => void
+}
+
+export function MultiSelectUsers({
+  isStudent,
+  value,
   onChange,
-  placeholder = "Select team members...",
-  className,
-}: MultiSelectProps) {
+}: MultiSelectUsersProps) {
   const [open, setOpen] = React.useState(false)
-  const [inputValue, setInputValue] = React.useState("")
-
-  // --- Handlers ---
+  const [users, setUsers] = React.useState<User[]>([])
+  const [loading, setLoading] = React.useState(false)
+  const [search, setSearch] = React.useState("")
+  const debouncedSearch = useDebounce(search, 300)
   
-  const handleSelect = (userId: string) => {
-    const newSelected = selectedUsers.includes(userId)
-      ? selectedUsers.filter((id) => id !== userId)
-      : [...selectedUsers, userId]
-    onChange?.(newSelected)
+  // Pagination state (for faculty)
+  const [page, setPage] = React.useState(1)
+  const [hasMore, setHasMore] = React.useState(false)
+  const [loadingMore, setLoadingMore] = React.useState(false)
+
+  /* -------------------------------------------
+     Fetch users based on role, search, and pagination
+  ------------------------------------------- */
+  const fetchUsers = React.useCallback(async (pageNum: number, searchTerm: string, append = false) => {
+    if (!open) return
+    
+    if (append) {
+      setLoadingMore(true)
+    } else {
+      setLoading(true)
+    }
+    
+    try {
+      const role = isStudent ? "STUDENT" : "FACULTY"
+      let url = `/api/user?role=${role}&page=${pageNum}&limit=50`
+      
+      if (searchTerm.trim()) {
+        url += `&search=${encodeURIComponent(searchTerm)}`
+      }
+      
+      const res = await fetch(url)
+      const data = await res.json()
+      
+      if (append) {
+        setUsers(prev => [...prev, ...(data.data || [])])
+      } else {
+        setUsers(data.data || [])
+      }
+      
+      setHasMore(data.hasMore || false)
+    } catch (error) {
+      console.error("Error fetching users:", error)
+      setUsers([])
+      setHasMore(false)
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
+  }, [open, isStudent])
+
+  /* -------------------------------------------
+     Initial fetch when popover opens
+  ------------------------------------------- */
+  React.useEffect(() => {
+    if (open) {
+      setPage(1)
+      fetchUsers(1, debouncedSearch, false)
+    }
+  }, [open, fetchUsers, debouncedSearch])
+
+  /* -------------------------------------------
+     Load more for pagination (faculty)
+  ------------------------------------------- */
+  const loadMore = () => {
+    const nextPage = page + 1
+    setPage(nextPage)
+    fetchUsers(nextPage, debouncedSearch, true)
   }
 
-  const handleRemove = (userId: string, e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent opening popover when clicking remove
-    const newSelected = selectedUsers.filter((id) => id !== userId)
-    onChange?.(newSelected)
+  const toggleUser = (user: User) => {
+    const exists = value.some((u) => u.id === user.id)
+    if (exists) {
+      onChange(value.filter((u) => u.id !== user.id))
+    } else {
+      onChange([...value, user])
+    }
   }
 
-  // Custom filter logic to search Name, Email OR Department
-  const filteredUsers = users.filter((user) =>
-    user.name.toLowerCase().includes(inputValue.toLowerCase()) ||
-    user.email.toLowerCase().includes(inputValue.toLowerCase()) ||
-    user.department.toLowerCase().includes(inputValue.toLowerCase())
-  )
+  const removeUser = (userId: string) => {
+    onChange(value.filter((u) => u.id !== userId))
+  }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          className={cn(
-            "w-full justify-between h-auto min-h-[44px] px-3 py-2 hover:bg-background",
-            className
-          )}
-        >
-          <div className="flex flex-wrap gap-1.5 items-center w-full">
-            {selectedUsers.length > 0 ? (
-              selectedUsers.map((userId) => {
-                const user = users.find((u) => u.id === userId)
-                if (!user) return null
-                return (
-                  <Badge
-                    key={userId}
-                    variant="secondary"
-                    className="flex items-center gap-2 pr-1 pl-1 py-1 text-sm font-normal rounded-md border-input border"
-                  >
-                    <Avatar className="h-5 w-5">
-                      <AvatarImage src={user.avatarUrl} alt={user.name} />
-                      <AvatarFallback className="text-[9px]">
-                        {user.name.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="truncate max-w-[100px]">{user.name}</span>
-                    <div
-                      className="ml-1 rounded-full p-0.5 hover:bg-destructive hover:text-destructive-foreground cursor-pointer transition-colors"
-                      onClick={(e) => handleRemove(userId, e)}
-                    >
-                      <X className="h-3 w-3" />
-                    </div>
-                  </Badge>
-                )
-              })
-            ) : (
-              <span className="text-muted-foreground font-normal">{placeholder}</span>
-            )}
-          </div>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
+    <div className="space-y-3">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button 
+            variant="outline" 
+            className="w-full justify-between h-12"
+            role="combobox"
+            aria-expanded={open}
+          >
+            <span className="text-sm">
+              {value.length > 0 
+                ? `${value.length} ${isStudent ? 'student' : 'faculty'} selected` 
+                : `Select ${isStudent ? 'Students' : 'Faculty'}`
+              }
+            </span>
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
 
-      <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-        <Command shouldFilter={false}> 
-          {/* Note: shouldFilter={false} is critical because we are doing custom filtering above */}
-          <CommandInput
-            placeholder="Search name, email, or dept..."
-            value={inputValue}
-            onValueChange={setInputValue}
-          />
-          <CommandList className="max-h-[300px] overflow-y-auto">
-            <CommandEmpty>No user found.</CommandEmpty>
-            <CommandGroup>
-              {filteredUsers.map((user) => {
-                const isSelected = selectedUsers.includes(user.id)
-                return (
-                  <CommandItem
-                    key={user.id}
-                    value={user.id}
-                    onSelect={() => handleSelect(user.id)}
-                    className="cursor-pointer aria-selected:bg-accent"
-                  >
-                    <div className="flex items-center w-full gap-3">
-                      
-                      {/* Checkbox State */}
-                      <div
-                        className={cn(
-                          "flex h-4 w-4 items-center justify-center rounded-sm border border-primary transition-all",
-                          isSelected
-                            ? "bg-primary text-primary-foreground"
-                            : "opacity-50 [&_svg]:invisible"
-                        )}
+        <PopoverContent className="w-100 p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              placeholder={`Search ${isStudent ? 'students' : 'faculty'} by name or email...`}
+              onValueChange={setSearch}
+              value={search}
+            />
+
+            <CommandList>
+              <CommandEmpty>
+                {loading ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  "No users found"
+                )}
+              </CommandEmpty>
+
+              {!loading && users.length > 0 && (
+                <CommandGroup>
+                  {users.map((user) => {
+                    const selected = value.some((u) => u.id === user.id)
+                    return (
+                      <CommandItem
+                        key={user.id}
+                        value={user.id}
+                        onSelect={() => toggleUser(user)}
+                        className="cursor-pointer"
                       >
-                        <Check className="h-3 w-3" />
-                      </div>
+                        <div className="flex items-center gap-3 flex-1">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={user.image} />
+                            <AvatarFallback className="text-xs">
+                              {user.name[0]?.toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
 
-                      {/* Avatar */}
-                      <Avatar className="h-9 w-9 border border-border">
-                        <AvatarImage src={user.avatarUrl} alt={user.name} />
-                        <AvatarFallback>{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-
-                      {/* Text Content */}
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium truncate text-foreground">
-                            {user.name}
-                          </span>
-                          {/* Department Badge */}
-                          <Badge variant="outline" className="ml-2 text-[10px] h-5 px-1.5 shrink-0 text-muted-foreground">
-                            {user.department}
-                          </Badge>
+                          <div className="flex flex-col overflow-hidden">
+                            <span className="text-sm font-medium truncate">
+                              {user.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {user.email}
+                            </span>
+                          </div>
                         </div>
-                        <span className="text-xs text-muted-foreground truncate">
-                          {user.email}
-                        </span>
-                      </div>
+
+                        <Check
+                          className={cn(
+                            "h-4 w-4 shrink-0",
+                            selected ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                      </CommandItem>
+                    )
+                  })}
+                  
+                  {/* Load More button for pagination (faculty) */}
+                  {!isStudent && hasMore && (
+                    <div className="p-2 border-t">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full"
+                        onClick={loadMore}
+                        disabled={loadingMore}
+                      >
+                        {loadingMore ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Loading...
+                          </>
+                        ) : (
+                          'Load More'
+                        )}
+                      </Button>
                     </div>
-                  </CommandItem>
-                )
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+                  )}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      {/* Selected users */}
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {value.map((user) => (
+            <Badge
+              key={user.id}
+              variant="secondary"
+              className="flex items-center gap-2 py-1.5 px-3"
+            >
+              <Avatar className="h-5 w-5">
+                <AvatarImage src={user.image} />
+                <AvatarFallback className="text-xs">
+                  {user.name[0]?.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+
+              <span className="text-xs font-medium">{user.name}</span>
+
+              <button
+                type="button"
+                onClick={() => removeUser(user.id)}
+                className="hover:bg-destructive/20 rounded-full p-0.5 transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma'
 import { UserRole } from '@prisma/client'
 import { auth } from '@/lib/auth'
 
-// GET - Get statistics for book chapters
+// GET - Get statistics for journals
 export async function GET(req: NextRequest) {
   try {
     // Check authentication
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         }
    
     // Get counts by status
-    const statusCounts = await prisma.bookChapter.groupBy({
+    const statusCounts = await prisma.journal.groupBy({
       by: ['status'],
       where: roleFilter,
       _count: {
@@ -55,10 +55,19 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // Get total counts - Fix: Properly combine filters
+    // Get counts by journal type
+    const typeCounts = await prisma.journal.groupBy({
+      by: ['journalType'],
+      where: roleFilter,
+      _count: {
+        id: true
+      }
+    })
+
+    // Get total counts
     const [total, publicCount, privateCount] = await Promise.all([
-      prisma.bookChapter.count({ where: roleFilter }),
-      prisma.bookChapter.count({ 
+      prisma.journal.count({ where: roleFilter }),
+      prisma.journal.count({ 
         where: user.role === UserRole.ADMIN 
           ? { isPublic: true }
           : { 
@@ -68,7 +77,7 @@ export async function GET(req: NextRequest) {
               ]
             }
       }),
-      prisma.bookChapter.count({ 
+      prisma.journal.count({ 
         where: user.role === UserRole.ADMIN 
           ? { isPublic: false }
           : { 
@@ -80,8 +89,8 @@ export async function GET(req: NextRequest) {
       })
     ])
 
-    // Get total fees and reimbursements
-    const financials = await prisma.bookChapter.aggregate({
+    // Get total fees, reimbursements, and impact factors
+    const financials = await prisma.journal.aggregate({
       where: roleFilter,
       _sum: {
         registrationFees: true,
@@ -89,12 +98,13 @@ export async function GET(req: NextRequest) {
       },
       _avg: {
         registrationFees: true,
-        reimbursement: true
+        reimbursement: true,
+        impactFactor: true
       }
     })
 
-    // Get recent book chapters
-    const recentChapters = await prisma.bookChapter.findMany({
+    // Get recent journals
+    const recentJournals = await prisma.journal.findMany({
       where: roleFilter,
       take: 5,
       orderBy: {
@@ -103,7 +113,10 @@ export async function GET(req: NextRequest) {
       select: {
         id: true,
         title: true,
+        titleOfJournal: true,
+        journalType: true,
         status: true,
+        impactFactor: true,
         createdAt: true
       }
     })
@@ -112,8 +125,7 @@ export async function GET(req: NextRequest) {
     const oneYearAgo = new Date()
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
 
-    // Fix: Get all chapters then group by month in JS
-    const chaptersForTrend = await prisma.bookChapter.findMany({
+    const journalsForTrend = await prisma.journal.findMany({
       where: {
         ...roleFilter,
         createdAt: {
@@ -126,8 +138,8 @@ export async function GET(req: NextRequest) {
     })
 
     // Group by month manually
-    const monthlyTrend = chaptersForTrend.reduce((acc: { month: string, count: number }[], chapter) => {
-      const monthYear = `${chapter.createdAt.getFullYear()}-${String(chapter.createdAt.getMonth() + 1).padStart(2, '0')}`
+    const monthlyTrend = journalsForTrend.reduce((acc: { month: string, count: number }[], journal) => {
+      const monthYear = `${journal.createdAt.getFullYear()}-${String(journal.createdAt.getMonth() + 1).padStart(2, '0')}`
       const existing = acc.find(item => item.month === monthYear)
       if (existing) {
         existing.count++
@@ -139,30 +151,31 @@ export async function GET(req: NextRequest) {
 
     // Sort by month
     monthlyTrend.sort((a, b) => a.month.localeCompare(b.month))
+
     // Get publication trend by day (last 30 days)
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-    const chaptersForDailyTrend = await prisma.bookChapter.findMany({
+    const journalsForDailyTrend = await prisma.journal.findMany({
       where: {
-      ...roleFilter,
-      createdAt: {
-        gte: thirtyDaysAgo
-      }
+        ...roleFilter,
+        createdAt: {
+          gte: thirtyDaysAgo
+        }
       },
       select: {
-      createdAt: true
+        createdAt: true
       }
     })
 
     // Group by day manually
-    const dailyTrend = chaptersForDailyTrend.reduce((acc: { date: string, count: number }[], chapter) => {
-      const dateStr = `${chapter.createdAt.getFullYear()}-${String(chapter.createdAt.getMonth() + 1).padStart(2, '0')}-${String(chapter.createdAt.getDate()).padStart(2, '0')}`
+    const dailyTrend = journalsForDailyTrend.reduce((acc: { date: string, count: number }[], journal) => {
+      const dateStr = `${journal.createdAt.getFullYear()}-${String(journal.createdAt.getMonth() + 1).padStart(2, '0')}-${String(journal.createdAt.getDate()).padStart(2, '0')}`
       const existing = acc.find(item => item.date === dateStr)
       if (existing) {
-      existing.count++
+        existing.count++
       } else {
-      acc.push({ date: dateStr, count: 1 })
+        acc.push({ date: dateStr, count: 1 })
       }
       return acc
     }, [])
@@ -174,21 +187,21 @@ export async function GET(req: NextRequest) {
     const twelveWeeksAgo = new Date()
     twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84) // 12 weeks = 84 days
 
-    const chaptersForWeeklyTrend = await prisma.bookChapter.findMany({
+    const journalsForWeeklyTrend = await prisma.journal.findMany({
       where: {
-      ...roleFilter,
-      createdAt: {
-        gte: twelveWeeksAgo
-      }
+        ...roleFilter,
+        createdAt: {
+          gte: twelveWeeksAgo
+        }
       },
       select: {
-      createdAt: true
+        createdAt: true
       }
     })
 
     // Group by week manually
-    const weeklyTrend = chaptersForWeeklyTrend.reduce((acc: { week: string, count: number }[], chapter) => {
-      const date = chapter.createdAt
+    const weeklyTrend = journalsForWeeklyTrend.reduce((acc: { week: string, count: number }[], journal) => {
+      const date = journal.createdAt
       const firstDayOfYear = new Date(date.getFullYear(), 0, 1)
       const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000
       const weekNumber = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7)
@@ -196,15 +209,16 @@ export async function GET(req: NextRequest) {
       
       const existing = acc.find(item => item.week === weekStr)
       if (existing) {
-      existing.count++
+        existing.count++
       } else {
-      acc.push({ week: weekStr, count: 1 })
+        acc.push({ week: weekStr, count: 1 })
       }
       return acc
     }, [])
 
     // Sort by week
     weeklyTrend.sort((a, b) => a.week.localeCompare(b.week))
+
     return NextResponse.json({
       userRole: user.role,
       total,
@@ -214,19 +228,24 @@ export async function GET(req: NextRequest) {
         status: s.status,
         count: s._count.id
       })),
+      typeCounts: typeCounts.map(t => ({
+        type: t.journalType,
+        count: t._count.id
+      })),
       financials: {
         totalRegistrationFees: financials._sum.registrationFees || 0,
         totalReimbursement: financials._sum.reimbursement || 0,
         avgRegistrationFees: financials._avg.registrationFees || 0,
-        avgReimbursement: financials._avg.reimbursement || 0
+        avgReimbursement: financials._avg.reimbursement || 0,
+        avgImpactFactor: financials._avg.impactFactor || 0
       },
-      recentChapters,
+      recentJournals,
       monthlyTrend,
       dailyTrend,
       weeklyTrend
     })
   } catch (error) {
-    console.error('Error fetching book chapter stats:', error)
+    console.error('Error fetching journal stats:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

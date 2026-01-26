@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ResearchStatus, UserRole } from '@prisma/client'
+import { ResearchStatus, UserRole, JournalType } from '@prisma/client'
 
-// GET - List all book chapters with filtering, pagination, and search
+// GET - List all journals with filtering, pagination, and search
 export async function GET(req: NextRequest) {
   try {
     const session = await auth()
@@ -21,8 +21,9 @@ export async function GET(req: NextRequest) {
     // Filters
     const status = searchParams.get('status')
     const isPublic = searchParams.get('isPublic')
+    const journalType = searchParams.get('journalType')
     const keyword = searchParams.get('keyword')
-    const publisher = searchParams.get('publisher')
+    const journalPublisher = searchParams.get('journalPublisher')
     const search = searchParams.get('search')
 
     // Date range filters
@@ -37,23 +38,25 @@ export async function GET(req: NextRequest) {
     const minReimbursement = searchParams.get('minReimbursement')
     const maxReimbursement = searchParams.get('maxReimbursement')
 
+    // Impact factor range filters
+    const minImpactFactor = searchParams.get('minImpactFactor')
+    const maxImpactFactor = searchParams.get('maxImpactFactor')
+
     // Build where clause
     const where: any = {}
 
     // Access control based on role
     if (!session) {
-      // Not logged in - only public chapters
+      // Not logged in - only public journals
       where.isPublic = true
     } else if (session.user.role === UserRole.STUDENT) {
-      // Students see: public chapters OR chapters where they are authors
+      // Students see: public journals OR journals where they are authors
       where.OR = [
-        
         { studentAuthors: { some: { userId: session.user.id } } }
       ]
     } else if (session.user.role === UserRole.FACULTY) {
-      // Faculty see: public chapters OR chapters where they are authors
+      // Faculty see: public journals OR journals where they are authors
       where.OR = [
-
         { facultyAuthors: { some: { userId: session.user.id } } }
       ]
     }
@@ -68,15 +71,19 @@ export async function GET(req: NextRequest) {
       where.isPublic = isPublic === 'true'
     }
 
+    if (journalType) {
+      where.journalType = journalType as JournalType
+    }
+
     if (keyword) {
       where.keywords = {
         has: keyword
       }
     }
 
-    if (publisher) {
-      where.publisher = {
-        contains: publisher,
+    if (journalPublisher) {
+      where.journalPublisher = {
+        contains: journalPublisher,
         mode: 'insensitive'
       }
     }
@@ -85,9 +92,10 @@ export async function GET(req: NextRequest) {
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
+        { titleOfJournal: { contains: search, mode: 'insensitive' } },
         { abstract: { contains: search, mode: 'insensitive' } },
-        { publisher: { contains: search, mode: 'insensitive' } },
-        { isbnIssn: { contains: search, mode: 'insensitive' } },
+        { journalPublisher: { contains: search, mode: 'insensitive' } },
+        { serialNo: { contains: search, mode: 'insensitive' } },
         { doi: { contains: search, mode: 'insensitive' } }
       ]
     }
@@ -118,9 +126,16 @@ export async function GET(req: NextRequest) {
       if (maxReimbursement) where.reimbursement.lte = parseFloat(maxReimbursement)
     }
 
+    // Impact factor range filters
+    if (minImpactFactor || maxImpactFactor) {
+      where.impactFactor = {}
+      if (minImpactFactor) where.impactFactor.gte = parseFloat(minImpactFactor)
+      if (maxImpactFactor) where.impactFactor.lte = parseFloat(maxImpactFactor)
+    }
+
     // Fetch data with pagination
-    const [bookChapters, total] = await Promise.all([
-      prisma.bookChapter.findMany({
+    const [journals, total] = await Promise.all([
+      prisma.journal.findMany({
         where,
         skip,
         take: limit,
@@ -154,11 +169,11 @@ export async function GET(req: NextRequest) {
           }
         }
       }),
-      prisma.bookChapter.count({ where })
+      prisma.journal.count({ where })
     ])
 
     return NextResponse.json({
-      bookChapters,
+      journals,
       pagination: {
         total,
         page,
@@ -167,7 +182,7 @@ export async function GET(req: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Error fetching book chapters:', error)
+    console.error('Error fetching journals:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -190,28 +205,54 @@ export async function POST(request: Request) {
     const body = await request.json()
 
     const {
+      serialNo,
+      titleOfJournal,
       title,
-      abstract,
-      imageUrl,
-      documentUrl,
+      journalType,
+      impactFactor,
+      dateOfImpactFactor,
+      journalPublisher,
       status,
-      isbnIssn,
+      paperLink,
+      doi,
       registrationFees,
       reimbursement,
       isPublic,
-      keywords,
-      doi,
+      abstract,
+      imageUrl,
+      documentUrl,
       publicationDate,
-      publisher,
+      keywords,
       studentAuthorIds = [],
       facultyAuthorIds = []
     } = body
 
     /* -------------------- Basic validation -------------------- */
 
+    if (!serialNo || typeof serialNo !== "string") {
+      return NextResponse.json(
+        { error: "Serial number is required" },
+        { status: 400 }
+      )
+    }
+
+    if (!titleOfJournal || typeof titleOfJournal !== "string") {
+      return NextResponse.json(
+        { error: "Journal title is required" },
+        { status: 400 }
+      )
+    }
+
     if (!title || typeof title !== "string") {
       return NextResponse.json(
-        { error: "Title is required" },
+        { error: "Article title is required" },
+        { status: 400 }
+      )
+    }
+
+    if (!journalType || !Object.values(JournalType).includes(journalType)) {
+      return NextResponse.json(
+        { error: "Valid journal type is required" },
         { status: 400 }
       )
     }
@@ -222,6 +263,7 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
+
     if (!Array.isArray(studentAuthorIds) || studentAuthorIds.length === 0) {
       return NextResponse.json(
         { error: "At least one student author is required" },
@@ -239,6 +281,18 @@ export async function POST(request: Request) {
     if (status && !Object.values(ResearchStatus).includes(status)) {
       return NextResponse.json(
         { error: "Invalid research status" },
+        { status: 400 }
+      )
+    }
+
+    // Check for duplicate serial number
+    const existingJournal = await prisma.journal.findUnique({
+      where: { serialNo }
+    })
+
+    if (existingJournal) {
+      return NextResponse.json(
+        { error: "A journal with this serial number already exists" },
         { status: 400 }
       )
     }
@@ -277,27 +331,28 @@ export async function POST(request: Request) {
       }
     }
 
-    /* -------------------- Create BookChapter -------------------- */
+    /* -------------------- Create Journal -------------------- */
 
-    const bookChapter = await prisma.bookChapter.create({
+    const journal = await prisma.journal.create({
       data: {
+        serialNo,
+        titleOfJournal,
         title,
+        journalType,
+        impactFactor: impactFactor !== undefined ? Number(impactFactor) : null,
+        dateOfImpactFactor: dateOfImpactFactor ? new Date(dateOfImpactFactor) : null,
+        journalPublisher,
+        status: status ?? ResearchStatus.DRAFT,
+        paperLink,
+        doi,
+        registrationFees: registrationFees !== undefined ? Number(registrationFees) : null,
+        reimbursement: reimbursement !== undefined ? Number(reimbursement) : null,
+        isPublic: Boolean(isPublic),
         abstract,
         imageUrl,
         documentUrl,
-        status: status ?? ResearchStatus.DRAFT,
-        isbnIssn,
-        registrationFees:
-          registrationFees !== undefined ? Number(registrationFees) : null,
-        reimbursement:
-          reimbursement !== undefined ? Number(reimbursement) : null,
-        isPublic: Boolean(isPublic),
+        publicationDate: publicationDate ? new Date(publicationDate) : null,
         keywords: keywords ?? [],
-        doi,
-        publicationDate: publicationDate
-          ? new Date(publicationDate)
-          : null,
-        publisher,
 
         studentAuthors: {
           create: studentAuthorIds.map((userId: string) => ({
@@ -323,12 +378,12 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(
-      { bookChapter },
+      { journal },
       { status: 201 }
     )
 
   } catch (error) {
-    console.error("BookChapter POST error:", error)
+    console.error("Journal POST error:", error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -336,7 +391,7 @@ export async function POST(request: Request) {
   }
 }
 
-// DELETE - Bulk delete book chapters
+// DELETE - Bulk delete journals
 export async function DELETE(request: Request) {
   try {
     const session = await auth()
@@ -357,8 +412,8 @@ export async function DELETE(request: Request) {
       )
     }
 
-    // Delete book chapters (cascade will handle authors)
-    const result = await prisma.bookChapter.deleteMany({
+    // Delete journals (cascade will handle authors)
+    const result = await prisma.journal.deleteMany({
       where: {
         id: {
           in: ids
@@ -367,11 +422,11 @@ export async function DELETE(request: Request) {
     })
 
     return NextResponse.json({
-      message: `Successfully deleted ${result.count} book chapter(s)`,
+      message: `Successfully deleted ${result.count} journal(s)`,
       count: result.count
     })
   } catch (error) {
-    console.error('Error deleting book chapters:', error)
+    console.error('Error deleting journals:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
