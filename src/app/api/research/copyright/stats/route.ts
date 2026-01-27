@@ -46,9 +46,18 @@ export async function GET(req: NextRequest) {
           ]
         }
    
-    // Get counts by status
-    const statusCounts = await prisma.copyright.groupBy({
-      by: ['status'],
+    // Get counts by copyright status
+    const copyrightStatusCounts = await prisma.copyright.groupBy({
+      by: ['copyrightStatus'],
+      where: roleFilter,
+      _count: {
+        id: true
+      }
+    })
+
+    // Get counts by teacher status
+    const teacherStatusCounts = await prisma.copyright.groupBy({
+      by: ['teacherStatus'],
       where: roleFilter,
       _count: {
         id: true
@@ -103,7 +112,8 @@ export async function GET(req: NextRequest) {
       select: {
         id: true,
         title: true,
-        status: true,
+        copyrightStatus: true,
+        teacherStatus: true,
         createdAt: true
       }
     })
@@ -211,8 +221,12 @@ export async function GET(req: NextRequest) {
       total,
       publicCount,
       privateCount,
-      statusCounts: statusCounts.map(s => ({
-        status: s.status,
+      copyrightStatusCounts: copyrightStatusCounts.map(s => ({
+        status: s.copyrightStatus,
+        count: s._count.id
+      })),
+      teacherStatusCounts: teacherStatusCounts.map(s => ({
+        status: s.teacherStatus,
         count: s._count.id
       })),
       financials: {

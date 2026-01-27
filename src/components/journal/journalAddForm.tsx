@@ -41,30 +41,32 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { uploadFile } from "@/lib/appwrite";
+import {
+  TeacherStatus,
+  JournalStatus,
+  JournalScope,
+  JournalReviewType,
+  JournalAccessType,
+  JournalIndexing,
+  JournalQuartile,
+  JournalPublicationMode
+} from "@prisma/client";
 
 const journalSchema = z.object({
-  serialNo: z.string().min(1, "Serial No is required"),
-  titleOfJournal: z.string().min(1, "Journal title is required").max(500),
+  serialNo: z.string(),
+  journalName: z.string().min(1, "Journal name is required").max(500),
   title: z.string().min(1, "Paper title is required").max(500),
-  journalType: z.enum([
-    "INTERNATIONAL",
-    "NATIONAL",
-    "PEER_REVIEWED",
-    "OPEN_ACCESS",
-    "OTHER",
-  ]),
+  scope: z.nativeEnum(JournalScope),
+  reviewType: z.nativeEnum(JournalReviewType),
+  accessType: z.nativeEnum(JournalAccessType),
+  indexing: z.nativeEnum(JournalIndexing),
+  quartile: z.nativeEnum(JournalQuartile),
+  publicationMode: z.nativeEnum(JournalPublicationMode),
   impactFactor: z.number().nullable().optional(),
-  dateOfImpactFactor: z.string().nullable().optional(),
-  journalPublisher: z.string().nullable().optional(),
-  status: z.enum([
-    "DRAFT",
-    "SUBMITTED",
-    "UNDER_REVIEW",
-    "REVISION",
-    "APPROVED",
-    "PUBLISHED",
-    "REJECTED",
-  ]),
+  impactFactorDate: z.string().nullable().optional(),
+  publisher: z.string().nullable().optional(),
+  journalStatus: z.nativeEnum(JournalStatus),
+ 
   paperLink: z.string().nullable().optional(),
   doi: z.string().nullable().optional(),
   registrationFees: z.number().nullable().optional(),
@@ -108,18 +110,26 @@ export default function JournalDialog({
 
   const [selectedFaculty, setSelectedFaculty] = useState<SelectedUser[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<SelectedUser[]>([]);
+  const [publisherOption, setPublisherOption] = useState<string>("");
+  const [customPublisher, setCustomPublisher] = useState<string>("");
 
   const form = useForm<JournalFormValues>({
     resolver: zodResolver(journalSchema),
     defaultValues: {
       serialNo: "",
-      titleOfJournal: "",
+      journalName: "",
       title: "",
-      journalType: "INTERNATIONAL",
+      scope: "INTERNATIONAL" as JournalScope,
+      reviewType: "PEER_REVIEWED" as JournalReviewType,
+      accessType: "OPEN_ACCESS" as JournalAccessType,
+      indexing: "NONE" as JournalIndexing,
+      quartile: "NOT_APPLICABLE" as JournalQuartile,
+      publicationMode: "ONLINE" as JournalPublicationMode,
       impactFactor: null,
-      dateOfImpactFactor: null,
-      journalPublisher: null,
-      status: "DRAFT",
+      impactFactorDate: null,
+      publisher: null,
+      journalStatus: "SUBMITTED" as JournalStatus,
+     
       paperLink: null,
       doi: null,
       registrationFees: null,
@@ -220,6 +230,8 @@ export default function JournalDialog({
       setKeywordInput("");
       setSelectedFaculty([]);
       setSelectedStudents([]);
+      setPublisherOption("");
+      setCustomPublisher("");
       setOpen(false);
       onClose?.();
       onSuccess?.();
@@ -274,7 +286,7 @@ export default function JournalDialog({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-base font-semibold">
-                            Serial No <span className="text-destructive">*</span>
+                            Serial No 
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -289,11 +301,11 @@ export default function JournalDialog({
                     />
                     <FormField
                       control={form.control}
-                      name="titleOfJournal"
+                      name="journalName"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-base font-semibold">
-                            Journal Title <span className="text-destructive">*</span>
+                            Journal Name <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -418,11 +430,11 @@ export default function JournalDialog({
                 <CardContent className="p-4 pt-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
                   <FormField
                     control={form.control}
-                    name="journalType"
+                    name="scope"
                     render={({ field }) => (
-                      <FormItem className="lg:col-span-2">
+                      <FormItem>
                         <FormLabel className="text-sm mb-1">
-                          Journal Type <span className="text-destructive">*</span>
+                          Scope <span className="text-destructive">*</span>
                         </FormLabel>
                         <Select
                           onValueChange={field.onChange}
@@ -430,15 +442,162 @@ export default function JournalDialog({
                         >
                           <FormControl>
                             <SelectTrigger className="h-10">
-                              <SelectValue placeholder="Select type" />
+                              <SelectValue placeholder="Select scope" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="INTERNATIONAL">🌍 International</SelectItem>
                             <SelectItem value="NATIONAL">🏛️ National</SelectItem>
+                            <SelectItem value="REGIONAL">🗺️ Regional</SelectItem>
+                            <SelectItem value="LOCAL">🏘️ Local</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="reviewType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm mb-1">
+                          Review Type <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select review type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
                             <SelectItem value="PEER_REVIEWED">👥 Peer Reviewed</SelectItem>
+                            <SelectItem value="DOUBLE_BLIND">🙈 Double Blind</SelectItem>
+                            <SelectItem value="SINGLE_BLIND">👁️ Single Blind</SelectItem>
+                            <SelectItem value="EDITORIAL_REVIEWED">✍️ Editorial</SelectItem>
+                            <SelectItem value="NON_PEER_REVIEWED">📄 Non-Peer</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="accessType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm mb-1">
+                          Access Type <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select access" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
                             <SelectItem value="OPEN_ACCESS">🔓 Open Access</SelectItem>
-                            <SelectItem value="OTHER">📄 Other</SelectItem>
+                            <SelectItem value="SUBSCRIPTION">💳 Subscription</SelectItem>
+                            <SelectItem value="HYBRID">🔄 Hybrid</SelectItem>
+                            <SelectItem value="DIAMOND_OPEN_ACCESS">💎 Diamond</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="indexing"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm mb-1">
+                          Indexing <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select indexing" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="SCOPUS">📊 Scopus</SelectItem>
+                            <SelectItem value="WEB_OF_SCIENCE">🕸️ Web of Science</SelectItem>
+                            <SelectItem value="SCI">🔬 SCI</SelectItem>
+                            <SelectItem value="SCIE">⚗️ SCIE</SelectItem>
+                            <SelectItem value="SSCI">📚 SSCI</SelectItem>
+                            <SelectItem value="AHCI">🎨 AHCI</SelectItem>
+                            <SelectItem value="UGC_CARE">🏛️ UGC CARE</SelectItem>
+                            <SelectItem value="DOAJ">📖 DOAJ</SelectItem>
+                            <SelectItem value="PUBMED">🏥 PubMed</SelectItem>
+                            <SelectItem value="IEEE_XPLORE">⚡ IEEE Xplore</SelectItem>
+                            <SelectItem value="NONE">❌ None</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="quartile"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm mb-1">
+                          Quartile
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select quartile" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Q1">🥇 Q1</SelectItem>
+                            <SelectItem value="Q2">🥈 Q2</SelectItem>
+                            <SelectItem value="Q3">🥉 Q3</SelectItem>
+                            <SelectItem value="Q4">4️⃣ Q4</SelectItem>
+                            <SelectItem value="NOT_APPLICABLE">➖ N/A</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="publicationMode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-sm mb-1">
+                          Publication Mode <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger className="h-10">
+                              <SelectValue placeholder="Select mode" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="ONLINE">💻 Online</SelectItem>
+                            <SelectItem value="PRINT">📰 Print</SelectItem>
+                            <SelectItem value="PRINT_AND_ONLINE">📱 Print & Online</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />
@@ -476,10 +635,10 @@ export default function JournalDialog({
                   />
                   <FormField
                     control={form.control}
-                    name="dateOfImpactFactor"
+                    name="impactFactorDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm mb-1">IF Date</FormLabel>
+                        <FormLabel className="text-sm mb-1">Impact Factor Date</FormLabel>
                         <FormControl>
                           <Input
                             type="date"
@@ -494,20 +653,70 @@ export default function JournalDialog({
                   />
                   <FormField
                     control={form.control}
-                    name="journalPublisher"
+                    name="publisher"
                     render={({ field }) => (
                       <FormItem className="lg:col-span-2">
                         <FormLabel className="text-sm mb-1">
                           Publisher
                         </FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Publisher name"
-                            className="h-10"
-                            {...field}
-                            value={field.value ?? ""}
-                          />
-                        </FormControl>
+                        <div className="space-y-2">
+                          <Select
+                            value={publisherOption}
+                            onValueChange={(value) => {
+                              setPublisherOption(value);
+                              if (value === "none") {
+                                field.onChange(null);
+                                setCustomPublisher("");
+                              } else if (value !== "other") {
+                                field.onChange(value);
+                                setCustomPublisher("");
+                              } else {
+                                field.onChange(customPublisher || null);
+                              }
+                            }}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-10 w-full">
+                                <SelectValue placeholder="Select publisher" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
+                              <SelectItem value="Springer">Springer</SelectItem>
+                              <SelectItem value="Elsevier">Elsevier</SelectItem>
+                              <SelectItem value="Wiley">Wiley</SelectItem>
+                              <SelectItem value="Taylor & Francis">Taylor & Francis</SelectItem>
+                              <SelectItem value="Sage Publications">Sage Publications</SelectItem>
+                              <SelectItem value="IEEE">IEEE</SelectItem>
+                              <SelectItem value="ACM">ACM</SelectItem>
+                              <SelectItem value="Oxford University Press">Oxford University Press</SelectItem>
+                              <SelectItem value="Cambridge University Press">Cambridge University Press</SelectItem>
+                              <SelectItem value="MDPI">MDPI</SelectItem>
+                              <SelectItem value="Nature Publishing Group">Nature Publishing Group</SelectItem>
+                              <SelectItem value="Frontiers Media">Frontiers Media</SelectItem>
+                              <SelectItem value="Public Library of Science (PLOS)">Public Library of Science (PLOS)</SelectItem>
+                              <SelectItem value="American Chemical Society">American Chemical Society</SelectItem>
+                              <SelectItem value="Royal Society of Chemistry">Royal Society of Chemistry</SelectItem>
+                              <SelectItem value="IOP Publishing">IOP Publishing</SelectItem>
+                              <SelectItem value="Wolters Kluwer">Wolters Kluwer</SelectItem>
+                              <SelectItem value="Emerald Publishing">Emerald Publishing</SelectItem>
+                              <SelectItem value="BMJ">BMJ</SelectItem>
+                              <SelectItem value="Hindawi">Hindawi</SelectItem>
+                              <SelectItem value="other">✏️ Other (Custom)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {publisherOption === "other" && (
+                            <Input
+                              placeholder="Enter custom publisher name"
+                              className="h-10"
+                              value={customPublisher}
+                              onChange={(e) => {
+                                setCustomPublisher(e.target.value);
+                                field.onChange(e.target.value || null);
+                              }}
+                            />
+                          )}
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -535,7 +744,7 @@ export default function JournalDialog({
                     name="publicationDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm mb-1">Pub Date</FormLabel>
+                        <FormLabel className="text-sm mb-1">Publication Date</FormLabel>
                         <FormControl>
                           <Input
                             type="date"
@@ -644,11 +853,11 @@ export default function JournalDialog({
                     <div className="flex flex-col gap-3">
                       <FormField
                         control={form.control}
-                        name="status"
+                        name="journalStatus"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-base font-semibold mb-1">
-                              Status
+                              Journal Status
                             </FormLabel>
                             <Select
                               onValueChange={field.onChange}
@@ -656,35 +865,21 @@ export default function JournalDialog({
                             >
                               <FormControl>
                                 <SelectTrigger className="h-12 w-full">
-                                  <SelectValue placeholder="Status" />
+                                  <SelectValue placeholder="Journal Status" />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="DRAFT">📝 Draft</SelectItem>
-                                <SelectItem value="SUBMITTED">
-                                  📤 Submitted
-                                </SelectItem>
-                                <SelectItem value="UNDER_REVIEW">
-                                  🔍 Under Review
-                                </SelectItem>
-                                <SelectItem value="REVISION">
-                                  ✏️ Revision
-                                </SelectItem>
-                                <SelectItem value="APPROVED">
-                                  ✅ Approved
-                                </SelectItem>
-                                <SelectItem value="PUBLISHED">
-                                  📚 Published
-                                </SelectItem>
-                                <SelectItem value="REJECTED">
-                                  ❌ Rejected
-                                </SelectItem>
+                                <SelectItem value="SUBMITTED">📤 Submitted</SelectItem>
+                                <SelectItem value="UNDER_REVIEW">🔍 Under Review</SelectItem>
+                                <SelectItem value="APPROVED">✅ Approved</SelectItem>
+                                <SelectItem value="PUBLISHED">📚 Published</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+                      
                       <div className="space-y-2">
                         <FormField
                           control={form.control}
@@ -939,6 +1134,8 @@ export default function JournalDialog({
                     setDocumentFile(null);
                     setSelectedFaculty([]);
                     setSelectedStudents([]);
+                    setPublisherOption("");
+                    setCustomPublisher("");
                   }}
                   disabled={isSubmitting}
                 >

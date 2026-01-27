@@ -46,18 +46,36 @@ export async function GET(req: NextRequest) {
           ]
         }
    
-    // Get counts by status
+    // Get counts by teacher status
     const statusCounts = await prisma.journal.groupBy({
-      by: ['status'],
+      by: ['teacherStatus'],
       where: roleFilter,
       _count: {
         id: true
       }
     })
 
-    // Get counts by journal type
-    const typeCounts = await prisma.journal.groupBy({
-      by: ['journalType'],
+    // Get counts by journal status
+    const journalStatusCounts = await prisma.journal.groupBy({
+      by: ['journalStatus'],
+      where: roleFilter,
+      _count: {
+        id: true
+      }
+    })
+
+    // Get counts by scope
+    const scopeCounts = await prisma.journal.groupBy({
+      by: ['scope'],
+      where: roleFilter,
+      _count: {
+        id: true
+      }
+    })
+
+    // Get counts by indexing
+    const indexingCounts = await prisma.journal.groupBy({
+      by: ['indexing'],
       where: roleFilter,
       _count: {
         id: true
@@ -113,9 +131,10 @@ export async function GET(req: NextRequest) {
       select: {
         id: true,
         title: true,
-        titleOfJournal: true,
-        journalType: true,
-        status: true,
+        journalName: true,
+        scope: true,
+        indexing: true,
+        teacherStatus: true,
         impactFactor: true,
         createdAt: true
       }
@@ -225,12 +244,20 @@ export async function GET(req: NextRequest) {
       publicCount,
       privateCount,
       statusCounts: statusCounts.map(s => ({
-        status: s.status,
+        status: s.teacherStatus,
         count: s._count.id
       })),
-      typeCounts: typeCounts.map(t => ({
-        type: t.journalType,
-        count: t._count.id
+      journalStatusCounts: journalStatusCounts.map(j => ({
+        status: j.journalStatus,
+        count: j._count.id
+      })),
+      scopeCounts: scopeCounts.map(s => ({
+        scope: s.scope,
+        count: s._count.id
+      })),
+      indexingCounts: indexingCounts.map(i => ({
+        indexing: i.indexing,
+        count: i._count.id
       })),
       financials: {
         totalRegistrationFees: financials._sum.registrationFees || 0,

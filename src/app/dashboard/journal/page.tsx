@@ -150,7 +150,7 @@ const Journal = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-1 ">
               <StatusRadarChart
-                statusCounts={stats.statusCounts}
+                statusCounts={stats.journalStatusCounts}
                 total={stats.total}
               />
             </div>
@@ -166,76 +166,8 @@ const Journal = () => {
           </div>
 
           {/* Display journal type distribution */}
-          {stats.journalTypeCounts && stats.journalTypeCounts.length > 0 && (
-            <Card className="border-dashed border-2 border-chart-2">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">
-                  Journal Type Distribution
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-                  {stats.journalTypeCounts.map((type) => (
-                    <div key={type.journalType} className="text-center p-3 bg-muted/30 rounded-lg">
-                      <div className="text-2xl font-bold text-primary">{type.count}</div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        {type.journalType.replace(/_/g, ' ')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Top Publishers */}
-          {stats.topPublishers && stats.topPublishers.length > 0 && (
-            <Card className="border-dashed border-2 border-chart-2">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">
-                  Top Publishers
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {stats.topPublishers.slice(0, 5).map((publisher, index) => (
-                    <div key={publisher.publisher} className="flex items-center justify-between p-2 bg-muted/20 rounded">
-                      <span className="text-sm font-medium">
-                        {index + 1}. {publisher.publisher}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {publisher.count} journals
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Top Keywords */}
-          {stats.topKeywords && stats.topKeywords.length > 0 && (
-            <Card className="border-dashed border-2 border-chart-2">
-              <CardHeader>
-                <CardTitle className="text-lg font-semibold">
-                  Popular Keywords
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {stats.topKeywords.slice(0, 20).map((keyword) => (
-                    <div
-                      key={keyword.keyword}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm"
-                    >
-                      <span className="font-medium">{keyword.keyword}</span>
-                      <span className="text-xs opacity-70">({keyword.count})</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+       
+       
         </>
       )}
 

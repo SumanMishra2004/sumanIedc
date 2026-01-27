@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ResearchStatus, UserRole } from '@prisma/client'
+import { BookchapterStatus, TeacherStatus, UserRole } from '@prisma/client'
 
 // GET - Export book chapters to CSV
 export async function GET(req: NextRequest) {
@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams
 
     // Filters (same as main GET endpoint)
-    const status = searchParams.get('status')
+    const bookChapterStatus = searchParams.get('bookChapterStatus')
+    const teacherStatus = searchParams.get('teacherStatus')
     const isPublic = searchParams.get('isPublic')
     const keyword = searchParams.get('keyword')
     const publisher = searchParams.get('publisher')
@@ -55,8 +56,12 @@ export async function GET(req: NextRequest) {
     }
     // ADMIN sees everything - no filter needed
 
-    if (status) {
-      where.status = status as ResearchStatus
+    if (bookChapterStatus) {
+      where.bookChapterStatus = bookChapterStatus as BookchapterStatus
+    }
+
+    if (teacherStatus) {
+      where.teacherStatus = teacherStatus as TeacherStatus
     }
 
     if (isPublic !== null && isPublic !== undefined) {
@@ -206,7 +211,8 @@ export async function GET(req: NextRequest) {
           chapter.id,
           `"${(chapter.title || '').replace(/"/g, '""')}"`,
           `"${(chapter.abstract || '').replace(/"/g, '""')}"`,
-          chapter.status,
+          chapter.bookChapterStatus,
+          chapter.teacherStatus,
           chapter.isbnIssn || '',
           `"${(chapter.publisher || '').replace(/"/g, '""')}"`,
           chapter.doi || '',

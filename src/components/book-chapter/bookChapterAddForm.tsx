@@ -43,27 +43,24 @@ import { Separator } from "@/components/ui/separator";
 import { uploadFile } from "@/lib/appwrite";
 
 const bookChapterSchema = z.object({
-  title: z.string().min(1, "Title is required").max(500, "Title is too long"),
-  abstract: z.string().nullable().optional(),
-  imageUrl: z.string().nullable().optional(),
+  title: z.string().min(1, "Title is required").max(200, "Title is too long"),
+  abstract: z.string().min(100, "Abstract must be at least 100 characters").max(1000, "Abstract is too long"),
+  imageUrl: z.string().min(1, "Cover image is required"),
   documentUrl: z.string().nullable().optional(),
-  status: z.enum([
-    "DRAFT",
+  bookChapterStatus: z.enum([
     "SUBMITTED",
     "UNDER_REVIEW",
-    "REVISION",
     "APPROVED",
     "PUBLISHED",
-    "REJECTED",
   ]),
   isbnIssn: z.string().nullable().optional(),
   registrationFees: z.number().nullable().optional(),
   reimbursement: z.number().nullable().optional(),
   isPublic: z.boolean(),
-  keywords: z.array(z.string()),
+  keywords: z.array(z.string()).min(3, "At least 3 keywords are required").max(10, "No more than 10 keywords are allowed"),
   doi: z.string().nullable().optional(),
   publicationDate: z.string().nullable().optional(),
-  publisher: z.string().nullable().optional(),
+  publisher: z.string().min(1, "Publisher is required"),
   studentAuthorIds: z.array(z.string()),
   facultyAuthorIds: z.array(z.string()),
 });
@@ -100,14 +97,42 @@ export default function BookChapterDialog({
   const [selectedFaculty, setSelectedFaculty] = useState<SelectedUser[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<SelectedUser[]>([]);
 
+  // Publisher state
+  const [showCustomPublisher, setShowCustomPublisher] = useState(false);
+  const [customPublisher, setCustomPublisher] = useState<string>("");
+
+  const publishers = [
+    "Elsevier",
+    "Springer Nature",
+    "Taylor & Francis",
+    "Wiley",
+    "SAGE Publishing",
+    "Oxford University Press",
+    "Cambridge University Press",
+    "De Gruyter",
+    "Brill Publishers",
+    "MDPI",
+    "BioMed Central (BMC)",
+    "Frontiers",
+    "Inderscience",
+    "Emerald Publishing",
+    "IEEE",
+    "American Chemical Society",
+    "American Medical Association",
+    "Palgrave Macmillan",
+    "Pearson Education",
+    "McGraw Hill Education",
+    "World Scientific",
+  ];
+
   const form = useForm<BookChapterFormValues>({
     resolver: zodResolver(bookChapterSchema),
     defaultValues: {
       title: "",
-      abstract: null,
-      imageUrl: null,
+      abstract: "",
+      imageUrl: "",
       documentUrl: null,
-      status: "DRAFT",
+      bookChapterStatus: "SUBMITTED",
       isbnIssn: null,
       registrationFees: null,
       reimbursement: null,
@@ -115,7 +140,7 @@ export default function BookChapterDialog({
       keywords: [],
       doi: null,
       publicationDate: null,
-      publisher: null,
+      publisher: "",
       studentAuthorIds: [],
       facultyAuthorIds: [],
     },
@@ -208,6 +233,8 @@ export default function BookChapterDialog({
       setKeywordInput("");
       setSelectedFaculty([]);
       setSelectedStudents([]);
+      setShowCustomPublisher(false);
+      setCustomPublisher("");
       setOpen(false);
       onClose?.();
       onSuccess?.();
@@ -281,7 +308,7 @@ export default function BookChapterDialog({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-base font-semibold mb-1">
-                            Keywords
+                            Keywords <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormControl>
                             <div>
@@ -339,7 +366,7 @@ export default function BookChapterDialog({
                       render={({ field }) => (
                         <FormItem className="lg:col-span-2">
                           <FormLabel className="text-base font-semibold mb-1">
-                            Abstract
+                            Abstract <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormControl>
                             <Textarea
@@ -372,15 +399,50 @@ export default function BookChapterDialog({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-sm mb-1">
-                          Publisher
+                          Publisher <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="Publisher"
-                            className="h-10"
-                            {...field}
-                            value={field.value ?? ""}
-                          />
+                          <div className="space-y-2">
+                            <Select
+                              value={showCustomPublisher ? "other" : field.value ?? "select"}
+                              onValueChange={(value) => {
+                                if (value === "other") {
+                                  setShowCustomPublisher(true);
+                                  field.onChange(customPublisher || null);
+                                } else if (value === "select") {
+                                  setShowCustomPublisher(false);
+                                  field.onChange(null);
+                                } else {
+                                  setShowCustomPublisher(false);
+                                  field.onChange(value);
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-12 w-full">
+                                <SelectValue placeholder="Select publisher" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="select">Select publisher</SelectItem>
+                                {publishers.map((pub) => (
+                                  <SelectItem key={pub} value={pub}>
+                                    {pub}
+                                  </SelectItem>
+                                ))}
+                                <SelectItem value="other">Other (Custom)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {showCustomPublisher && (
+                              <Input
+                                placeholder="Enter custom publisher"
+                                className="h-10"
+                                value={customPublisher}
+                                onChange={(e) => {
+                                  setCustomPublisher(e.target.value);
+                                  field.onChange(e.target.value || null);
+                                }}
+                              />
+                            )}
+                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -429,7 +491,7 @@ export default function BookChapterDialog({
                     name="publicationDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-sm mb-1">Pub Date</FormLabel>
+                        <FormLabel className="text-sm mb-1">Publication Date</FormLabel>
                         <FormControl>
                           <Input
                             type="date"
@@ -451,7 +513,7 @@ export default function BookChapterDialog({
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <div className="w-1.5 h-6 bg-green-500 rounded-full" />
-                      Authors
+                      Authors <span className="text-destructive">*</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-3">
@@ -461,10 +523,10 @@ export default function BookChapterDialog({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-base font-semibold mb-1">
-                            Faculty Authors
+                            Faculty Authors <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormDescription className="text-xs text-muted-foreground mb-2">
-                            All faculty are loaded with pagination
+                           You can search by name or email to find faculty members
                           </FormDescription>
                           <FormControl>
                             <MultiSelectUsers  
@@ -487,7 +549,7 @@ export default function BookChapterDialog({
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-base font-semibold mb-1">
-                            Student Authors
+                            Student Authors <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormDescription className="text-xs text-muted-foreground mb-2">
                             Search by name or email to find students
@@ -513,14 +575,14 @@ export default function BookChapterDialog({
                   <CardHeader className="p-4 pb-2">
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <div className="w-1.5 h-6 bg-orange-500 rounded-full" />
-                      Status
+                      Status <span className="text-destructive">*</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-4 pt-0 space-y-3">
                     <div className="flex flex-col gap-3">
                       <FormField
                         control={form.control}
-                        name="status"
+                        name="bookChapterStatus"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-base font-semibold mb-1">
@@ -528,7 +590,7 @@ export default function BookChapterDialog({
                             </FormLabel>
                             <Select
                               onValueChange={field.onChange}
-                              defaultValue={field.value}
+                              value={field.value}
                             >
                               <FormControl>
                                 <SelectTrigger className="h-12 w-full">
@@ -536,25 +598,21 @@ export default function BookChapterDialog({
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="DRAFT">📝 Draft</SelectItem>
+                                
                                 <SelectItem value="SUBMITTED">
                                   📤 Submitted
                                 </SelectItem>
                                 <SelectItem value="UNDER_REVIEW">
                                   🔍 Under Review
                                 </SelectItem>
-                                <SelectItem value="REVISION">
-                                  ✏️ Revision
-                                </SelectItem>
+                               
                                 <SelectItem value="APPROVED">
                                   ✅ Approved
                                 </SelectItem>
                                 <SelectItem value="PUBLISHED">
                                   📚 Published
                                 </SelectItem>
-                                <SelectItem value="REJECTED">
-                                  ❌ Rejected
-                                </SelectItem>
+                               
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -661,7 +719,7 @@ export default function BookChapterDialog({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-base font-semibold mb-2 block">
-                          Cover Image
+                          Cover Image <span className="text-destructive">*</span>
                         </FormLabel>
                         <FormControl>
                           <div>
@@ -698,7 +756,7 @@ export default function BookChapterDialog({
                         </FormControl>
                         <FormDescription className="text-xs text-center pt-2">
                           {imageFile && (
-                            <div className="flex items-center justify-center gap-1 text-xs bg-muted/50 p-2 rounded max-w-full">
+                            <span className="flex items-center justify-center gap-1 text-xs bg-muted/50 p-2 rounded max-w-full">
                               <Upload className="h-3 w-3 flex-shrink-0" />
                               <span className="truncate flex-1">
                                 {imageFile.name}
@@ -716,7 +774,7 @@ export default function BookChapterDialog({
                               >
                                 <X className="h-3 w-3" />
                               </Button>
-                            </div>
+                            </span>
                           )}
                           {field.value && !imageFile && (
                             <p className="text-xs text-green-600 font-medium flex items-center gap-1 justify-center">
@@ -813,6 +871,8 @@ export default function BookChapterDialog({
                     form.reset();
                     setImageFile(null);
                     setDocumentFile(null);
+                    setShowCustomPublisher(false);
+                    setCustomPublisher("");
                     setSelectedFaculty([]);
                     setSelectedStudents([]);
                   }}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ResearchStatus, UserRole } from '@prisma/client'
+import { BookchapterStatus, TeacherStatus, UserRole } from '@prisma/client'
 
 // GET - Get single book chapter by ID
 export async function GET(
@@ -89,7 +89,8 @@ export async function PATCH(
       abstract,
       imageUrl,
       documentUrl,
-      status,
+      bookChapterStatus,
+      teacherStatus,
       isbnIssn,
       registrationFees,
       reimbursement,
@@ -120,7 +121,8 @@ export async function PATCH(
     if (abstract !== undefined) updateData.abstract = abstract
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl
     if (documentUrl !== undefined) updateData.documentUrl = documentUrl
-    if (status !== undefined) updateData.status = status
+    if (bookChapterStatus !== undefined) updateData.bookChapterStatus = bookChapterStatus
+    if (teacherStatus !== undefined) updateData.teacherStatus = teacherStatus
     if (isbnIssn !== undefined) updateData.isbnIssn = isbnIssn
     if (registrationFees !== undefined) updateData.registrationFees = parseFloat(registrationFees)
     if (reimbursement !== undefined) updateData.reimbursement = parseFloat(reimbursement)

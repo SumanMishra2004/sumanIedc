@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ResearchStatus, UserRole, JournalType } from '@prisma/client'
+import { 
+  TeacherStatus, 
+  UserRole, 
+  JournalStatus,
+  JournalScope,
+  JournalReviewType,
+  JournalAccessType,
+  JournalIndexing,
+  JournalQuartile,
+  JournalPublicationMode
+} from '@prisma/client'
 
 // GET - Get single journal by ID
 export async function GET(
@@ -86,23 +96,29 @@ export async function PATCH(
     const body = await request.json()
     const {
       serialNo,
-      titleOfJournal,
+      journalStatus,
       title,
-      journalType,
-      impactFactor,
-      dateOfImpactFactor,
-      journalPublisher,
-      status,
-      paperLink,
-      doi,
-      registrationFees,
-      reimbursement,
-      isPublic,
-      abstract,
+      journalName,
       imageUrl,
       documentUrl,
+      abstract,
+      scope,
+      reviewType,
+      accessType,
+      indexing,
+      quartile,
+      publicationMode,
+      impactFactor,
+      impactFactorDate,
+      publisher,
       publicationDate,
+      doi,
+      paperLink,
       keywords,
+      registrationFees,
+      reimbursement,
+      teacherStatus,
+      isPublic,
       studentAuthorIds,
       facultyAuthorIds
     } = body
@@ -136,23 +152,29 @@ export async function PATCH(
     // Update journal
     const updateData: any = {}
     if (serialNo !== undefined) updateData.serialNo = serialNo
-    if (titleOfJournal !== undefined) updateData.titleOfJournal = titleOfJournal
     if (title !== undefined) updateData.title = title
-    if (journalType !== undefined) updateData.journalType = journalType
-    if (impactFactor !== undefined) updateData.impactFactor = impactFactor ? parseFloat(impactFactor) : null
-    if (dateOfImpactFactor !== undefined) updateData.dateOfImpactFactor = dateOfImpactFactor ? new Date(dateOfImpactFactor) : null
-    if (journalPublisher !== undefined) updateData.journalPublisher = journalPublisher
-    if (status !== undefined) updateData.status = status
-    if (paperLink !== undefined) updateData.paperLink = paperLink
-    if (doi !== undefined) updateData.doi = doi
-    if (registrationFees !== undefined) updateData.registrationFees = registrationFees ? parseFloat(registrationFees) : null
-    if (reimbursement !== undefined) updateData.reimbursement = reimbursement ? parseFloat(reimbursement) : null
-    if (isPublic !== undefined) updateData.isPublic = isPublic
-    if (abstract !== undefined) updateData.abstract = abstract
+    if (journalName !== undefined) updateData.journalName = journalName
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl
     if (documentUrl !== undefined) updateData.documentUrl = documentUrl
+    if (abstract !== undefined) updateData.abstract = abstract
+    if (scope !== undefined) updateData.scope = scope
+    if (reviewType !== undefined) updateData.reviewType = reviewType
+    if (accessType !== undefined) updateData.accessType = accessType
+    if (indexing !== undefined) updateData.indexing = indexing
+    if (quartile !== undefined) updateData.quartile = quartile
+    if (publicationMode !== undefined) updateData.publicationMode = publicationMode
+    if (impactFactor !== undefined) updateData.impactFactor = impactFactor ? parseFloat(impactFactor) : null
+    if (impactFactorDate !== undefined) updateData.impactFactorDate = impactFactorDate ? new Date(impactFactorDate) : null
+    if (publisher !== undefined) updateData.publisher = publisher
     if (publicationDate !== undefined) updateData.publicationDate = publicationDate ? new Date(publicationDate) : null
+    if (doi !== undefined) updateData.doi = doi
+    if (paperLink !== undefined) updateData.paperLink = paperLink
     if (keywords !== undefined) updateData.keywords = keywords
+    if (registrationFees !== undefined) updateData.registrationFees = registrationFees ? parseFloat(registrationFees) : null
+    if (reimbursement !== undefined) updateData.reimbursement = reimbursement ? parseFloat(reimbursement) : null
+    if (teacherStatus !== undefined) updateData.teacherStatus = teacherStatus
+    if (journalStatus !== undefined) updateData.journalStatus = journalStatus
+    if (isPublic !== undefined) updateData.isPublic = isPublic
 
     // Update authors if provided
     if (studentAuthorIds !== undefined) {

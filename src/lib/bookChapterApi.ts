@@ -230,11 +230,11 @@ export const getPublicBookChapters = async (
  */
 export const getBookChaptersByStatus = async (
   status: string,
-  filters?: Omit<BookChapterFilters, 'status'>
+  filters?: Omit<BookChapterFilters, 'bookChapterStatus'>
 ): Promise<ApiResponse<BookChapterListResponse>> => {
   return getBookChapters({
     ...filters,
-    status: status as any
+    bookChapterStatus: status as any
   })
 }
 
@@ -255,5 +255,5 @@ export const updateBookChapterStatus = async (
   id: string,
   status: string
 ): Promise<ApiResponse<{ bookChapter: BookChapter }>> => {
-  return updateBookChapter(id, { status: status as any })
+  return updateBookChapter(id, { bookChapterStatus: status as any })
 }

@@ -30,7 +30,13 @@ import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BookChapterFilters } from "@/types/book-chapter"
-import { ResearchStatus } from "@prisma/client"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { MultiSelectUsers } from "@/components/ui/multi-select"
 
 interface User {
@@ -163,7 +169,8 @@ export function FilterDialog({
 
   const handleClearFilters = () => {
     const clearedFilters: Partial<BookChapterFilters> = {
-      status: undefined,
+      bookChapterStatus: undefined,
+      teacherStatus: undefined,
       isPublic: undefined,
       keyword: undefined,
       publisher: undefined,
@@ -188,7 +195,8 @@ export function FilterDialog({
 
   const activeFilterCount = React.useMemo(() => {
     let count = 0
-    if (filters.status) count++
+    if (filters.bookChapterStatus) count++
+    if (filters.teacherStatus) count++
     if (filters.isPublic !== undefined) count++
     if (filters.keyword) count++
     if (filters.publisher) count++
@@ -476,6 +484,66 @@ export function FilterDialog({
       <TabsContent value="other" className="space-y-4 mt-4 flex-1 overflow-hidden">
         <ScrollArea className="h-full pr-4">
           <div className="space-y-6 pb-4">
+            {/* Book Chapter Status Filter */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Book Chapter Status</Label>
+              <Select
+                value={localFilters.bookChapterStatus || "all"}
+                onValueChange={(value) => {
+                  setLocalFilters((prev) => ({
+                    ...prev,
+                    bookChapterStatus: value === "all" ? undefined : value as any,
+                  }))
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select book chapter status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="SUBMITTED">📤 Submitted</SelectItem>
+                  <SelectItem value="UNDER_REVIEW">🔍 Under Review</SelectItem>
+                  <SelectItem value="APPROVED">✅ Approved</SelectItem>
+                  <SelectItem value="PUBLISHED">📚 Published</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Filter by book chapter publication status
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Teacher Status Filter */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Teacher Status</Label>
+              <Select
+                value={localFilters.teacherStatus || "all"}
+                onValueChange={(value) => {
+                  setLocalFilters((prev) => ({
+                    ...prev,
+                    teacherStatus: value === "all" ? undefined : value as any,
+                  }))
+                }}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select teacher status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="UPLOADED">📁 Uploaded</SelectItem>
+                  <SelectItem value="ACCEPTED">✔️ Accepted</SelectItem>
+                  <SelectItem value="PUBLISHED">📖 Published</SelectItem>
+                  <SelectItem value="UPDATE">🔄 Update</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Filter by teacher verification status
+              </p>
+            </div>
+
+            <Separator />
+
             {/* Publisher Filter */}
             <div className="space-y-3">
               <Label className="text-sm font-semibold">Publisher</Label>

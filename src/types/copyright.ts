@@ -1,4 +1,4 @@
-import { ResearchStatus } from "@prisma/client"
+import { CopyrightStatus, TeacherStatus } from "@prisma/client"
 
 export interface User {
   id: string
@@ -16,7 +16,7 @@ export interface CopyrightAuthor {
 
 export interface Copyright {
   id: string
-  serialNo: string
+  regNo: string
   title: string
   abstract: string | null
   imageUrl: string | null
@@ -27,7 +27,8 @@ export interface Copyright {
   dateOfGrant: Date | string | null
   registrationFees: number | null
   reimbursement: number | null
-  status: ResearchStatus
+  copyrightStatus: CopyrightStatus
+  teacherStatus: TeacherStatus
   isPublic: boolean
   createdAt: Date | string
   updatedAt: Date | string
@@ -50,9 +51,10 @@ export interface CopyrightFilters {
   limit?: number
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
-  status?: ResearchStatus
+  copyrightStatus?: CopyrightStatus
+  teacherStatus?: TeacherStatus
   isPublic?: boolean
-  serialNo?: string
+  regNo?: string
   search?: string
   createdFrom?: string
   createdTo?: string
@@ -73,7 +75,7 @@ export interface CopyrightFilters {
 }
 
 export interface CreateCopyrightInput {
-  serialNo: string
+  regNo: string
   title: string
   abstract?: string
   imageUrl?: string
@@ -84,7 +86,8 @@ export interface CreateCopyrightInput {
   dateOfGrant?: string | Date
   registrationFees?: number
   reimbursement?: number
-  status?: ResearchStatus
+  copyrightStatus?: CopyrightStatus
+  teacherStatus?: TeacherStatus
   isPublic?: boolean
   studentAuthorIds?: string[]
   facultyAuthorIds?: string[]
@@ -96,8 +99,12 @@ export interface CopyrightStatsResponse {
   total: number
   publicCount: number
   privateCount: number
-  statusCounts: Array<{
-    status: ResearchStatus
+  copyrightStatusCounts: Array<{
+    status: CopyrightStatus
+    count: number
+  }>
+  teacherStatusCounts: Array<{
+    status: TeacherStatus
     count: number
   }>
   financials: {
@@ -109,7 +116,8 @@ export interface CopyrightStatsResponse {
   recentCopyrights: Array<{
     id: string
     title: string
-    status: ResearchStatus
+    copyrightStatus: CopyrightStatus
+    teacherStatus: TeacherStatus
     createdAt: Date | string
   }>
   monthlyTrend: Array<{

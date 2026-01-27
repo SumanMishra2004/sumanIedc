@@ -44,9 +44,10 @@ export function ExportDialog({ triggerButton }: ExportDialogProps) {
       // Build query params from filters
       const params = new URLSearchParams()
       
-      if (filters.status) params.append('status', filters.status)
+      if (filters.copyrightStatus) params.append('copyrightStatus', filters.copyrightStatus)
+      if (filters.teacherStatus) params.append('teacherStatus', filters.teacherStatus)
       if (filters.isPublic !== undefined) params.append('isPublic', String(filters.isPublic))
-      if (filters.serialNo) params.append('serialNo', filters.serialNo)
+      if (filters.regNo) params.append('regNo', filters.regNo)
       if (filters.search) params.append('search', filters.search)
       if (filters.createdFrom) params.append('createdFrom', filters.createdFrom)
       if (filters.createdTo) params.append('createdTo', filters.createdTo)
@@ -106,9 +107,10 @@ export function ExportDialog({ triggerButton }: ExportDialogProps) {
 
   const activeFilterCount = React.useMemo(() => {
     let count = 0
-    if (filters.status) count++
+    if (filters.copyrightStatus) count++
+    if (filters.teacherStatus) count++
     if (filters.isPublic !== undefined) count++
-    if (filters.serialNo) count++
+    if (filters.regNo) count++
     if (filters.minRegistrationFees !== undefined) count++
     if (filters.maxRegistrationFees !== undefined) count++
     if (filters.minReimbursement !== undefined) count++

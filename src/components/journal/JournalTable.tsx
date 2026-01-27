@@ -75,7 +75,17 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import JournalDialog from "./journalAddForm";
-import { ResearchStatus, JournalType } from "@prisma/client";
+import {
+  TeacherStatus,
+  JournalScope,
+  JournalReviewType,
+  JournalAccessType,
+  JournalIndexing,
+  JournalQuartile,
+  JournalPublicationMode,
+  JournalStatus,
+
+} from "@prisma/client";
 import { toast } from "sonner";
 import {
   getJournals,
@@ -83,7 +93,7 @@ import {
   bulkDeleteJournals,
   exportJournalsToCSV,
   searchJournals,
-  getJournalsByStatus,
+  getJournalsByTeacherStatus,
 } from "@/lib/journalApi";
 import {
   Card,
@@ -94,67 +104,46 @@ import {
 } from "../ui/card";
 import { AnimatedAvatarGroupTooltip } from "../ui/animated-tooltip";
 
+
 // --- Types & Data ---
 
-type PublicationStatus = ResearchStatus;
-
-const getStatusConfig = (status: PublicationStatus) => {
-  const configs = {
+const getJournalStatus = (status: JournalStatus) => {
+  const statusMap: Record<JournalStatus, { bg: string; text: string; border: string ,dot: string}> = {
     PUBLISHED: {
       bg: "bg-emerald-50 dark:bg-emerald-950/30",
       text: "text-emerald-700 dark:text-emerald-400",
       border: "border-emerald-200 dark:border-emerald-800",
       dot: "bg-emerald-500",
-      icon: "✓"
+      
     },
     APPROVED: {
       bg: "bg-blue-50 dark:bg-blue-950/30",
       text: "text-blue-700 dark:text-blue-400",
       border: "border-blue-200 dark:border-blue-800",
       dot: "bg-blue-500",
-      icon: "✓"
+     
     },
     SUBMITTED: {
       bg: "bg-purple-50 dark:bg-purple-950/30",
       text: "text-purple-700 dark:text-purple-400",
       border: "border-purple-200 dark:border-purple-800",
       dot: "bg-purple-500",
-      icon: "↑"
+      
     },
     UNDER_REVIEW: {
       bg: "bg-amber-50 dark:bg-amber-950/30",
       text: "text-amber-700 dark:text-amber-400",
       border: "border-amber-200 dark:border-amber-800",
       dot: "bg-amber-500",
-      icon: "⌛"
+      
     },
-    REVISION: {
-      bg: "bg-orange-50 dark:bg-orange-950/30",
-      text: "text-orange-700 dark:text-orange-400",
-      border: "border-orange-200 dark:border-orange-800",
-      dot: "bg-orange-500",
-      icon: "↻"
-    },
-    DRAFT: {
-      bg: "bg-slate-50 dark:bg-slate-900/30",
-      text: "text-slate-600 dark:text-slate-400",
-      border: "border-slate-200 dark:border-slate-700",
-      dot: "bg-slate-400",
-      icon: "✎"
-    },
-    REJECTED: {
-      bg: "bg-red-50 dark:bg-red-950/30",
-      text: "text-red-700 dark:text-red-400",
-      border: "border-red-200 dark:border-red-800",
-      dot: "bg-red-500",
-      icon: "✕"
-    }
-  };
-  return configs[status];
-};
+    
+  }
 
-const getJournalTypeConfig = (type: JournalType) => {
-  const configs: Record<JournalType, { bg: string; text: string; border: string }> = {
+return statusMap[status];
+}
+const getScopeConfig = (scope: JournalScope) => {
+  const configs: Record<JournalScope, { bg: string; text: string; border: string }> = {
     INTERNATIONAL: {
       bg: "bg-violet-50 dark:bg-violet-950/30",
       text: "text-violet-700 dark:text-violet-400",
@@ -165,23 +154,44 @@ const getJournalTypeConfig = (type: JournalType) => {
       text: "text-indigo-700 dark:text-indigo-400",
       border: "border-indigo-200 dark:border-indigo-800",
     },
-    PEER_REVIEWED: {
+    REGIONAL: {
       bg: "bg-lime-50 dark:bg-lime-950/30",
       text: "text-lime-700 dark:text-lime-400",
       border: "border-lime-200 dark:border-lime-800",
     },
-    OPEN_ACCESS: {
-      bg: "bg-cyan-50 dark:bg-cyan-950/30",
-      text: "text-cyan-700 dark:text-cyan-400",
-      border: "border-cyan-200 dark:border-cyan-800",
+    LOCAL: {
+      bg: "bg-emerald-50 dark:bg-emerald-950/30",
+      text: "text-emerald-700 dark:text-emerald-400",
+      border: "border-emerald-200 dark:border-emerald-800",
     },
-    OTHER: {
-      bg: "bg-gray-50 dark:bg-gray-950/30",
-      text: "text-gray-700 dark:text-gray-400",
-      border: "border-gray-200 dark:border-gray-800",
+     };
+  return configs[scope];
+};
+
+const getTeacherStatusConfig = (status: TeacherStatus) => {
+  const configs: Record<TeacherStatus, { bg: string; text: string; border: string }> = {
+    UPLOADED: {
+      bg: "bg-blue-50 dark:bg-blue-950/30",
+      text: "text-blue-700 dark:text-blue-400",
+      border: "border-blue-200 dark:border-blue-800",
+    },
+    ACCEPTED: {
+      bg: "bg-green-50 dark:bg-green-950/30",
+      text: "text-green-700 dark:text-green-400",
+      border: "border-green-200 dark:border-green-800",
+    },
+    PUBLISHED: {
+      bg: "bg-green-200 dark:bg-green-900/30",
+      text: "text-green-900 dark:text-green-200",
+      border: "border-green-400 dark:border-green-800",
+    },
+    UPDATE: {
+      bg: "bg-red-50 dark:bg-red-950/30",
+      text: "text-red-700 dark:text-red-400",
+      border: "border-red-200 dark:border-red-800",
     },
   };
-  return configs[type];
+  return configs[status];
 };
 
 // --- Actions Component ---
@@ -312,7 +322,7 @@ export const createColumns = ({
     },
   },
   {
-    accessorKey: "titleOfJournal",
+    accessorKey: "journalName",
     header: ({ column }) => {
       return (
         <Button
@@ -321,32 +331,32 @@ export const createColumns = ({
           className="-ml-3 data-[state=open]:bg-accent"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Journal Title
+          Journal Name
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       );
     },
     cell: ({ row }) => {
-      const titleOfJournal = row.getValue("titleOfJournal") as string;
+      const journalName = row.getValue("journalName") as string;
       return (
         <div className="font-medium truncate max-w-48">
-          {titleOfJournal}
+          {journalName}
         </div>
       );
     },
   },
   {
-    accessorKey: "journalType",
-    header: "Journal Type",
+    accessorKey: "scope",
+    header: "Journal Scope",
     cell: ({ row }) => {
-      const type = row.getValue("journalType") as JournalType;
-      const config = getJournalTypeConfig(type);
+      const scope = row.getValue("scope") as JournalScope;
+      const config = getScopeConfig(scope);
       return (
         <Badge
           variant="outline"
           className={`${config.bg} ${config.text} ${config.border} font-medium px-2.5 py-1`}
         >
-          {type.replace(/_/g, " ")}
+          {scope.replace(/_/g, " ")}
         </Badge>
       );
     },
@@ -367,11 +377,11 @@ export const createColumns = ({
     },
   },
   {
-    accessorKey: "status",
-    header: "Status",
+    accessorKey: "journalStatus",
+    header: "Journal Status",
     cell: ({ row }) => {
-      const status = row.getValue("status") as PublicationStatus;
-      const config = getStatusConfig(status);
+      const status = row.getValue("journalStatus") as JournalStatus;
+      const config = getJournalStatus(status);
       return (
         <Badge
           variant="outline"
@@ -429,10 +439,10 @@ export const createColumns = ({
     },
   },
   {
-    accessorKey: "journalPublisher",
+    accessorKey: "publisher",
     header: "Publisher",
     cell: ({ row }) => {
-      const publisher = row.getValue("journalPublisher") as string | null;
+      const publisher = row.getValue("publisher") as string | null;
       return (
         <div className="text-sm truncate max-w-32">
           {publisher || "—"}
@@ -754,7 +764,7 @@ export default function JournalTable({
               >
                 <ChevronDown className="h-4 w-4" />
                 <span className="whitespace-nowrap">
-                  Status {filters.status && `(${filters.status})`}
+                  Status {filters.journalStatus && `(${filters.journalStatus  })`}
                 </span>
               </Button>
             </DropdownMenuTrigger>
@@ -765,7 +775,7 @@ export default function JournalTable({
 
               <DropdownMenuItem
                 onClick={() => {
-                  const { status, ...rest } = filters;
+                  const { journalStatus, ...rest } = filters;
                   setFilters({ ...rest, page: 1 });
                 }}
               >
@@ -773,21 +783,20 @@ export default function JournalTable({
               </DropdownMenuItem>
 
               {[
-                "DRAFT",
+               
                 "SUBMITTED",
                 "UNDER_REVIEW",
-                "REVISION",
                 "APPROVED",
                 "PUBLISHED",
-                "REJECTED",
+               
               ].map((status) => (
                 <DropdownMenuItem
                   key={status}
-                  onClick={() => setFilters(prev => ({ ...prev, status: status as any, page: 1 }))}
+                  onClick={() => setFilters(prev => ({ ...prev, journalStatus: status as any, page: 1 }))}
                   className="flex items-center gap-2"
                 >
                   <span
-                    className={`h-2 w-2 rounded-full ${getStatusConfig(status as PublicationStatus).dot}`}
+                    className={`h-2 w-2 rounded-full ${getJournalStatus(status as JournalStatus).dot}`}
                   />
                   <span className="capitalize text-sm">
                     {status.replace(/_/g, " ").toLowerCase()}
@@ -812,7 +821,7 @@ export default function JournalTable({
               >
                 <ChevronDown className="h-4 w-4" />
                 <span className="whitespace-nowrap">
-                  Type {filters.journalType && `(${filters.journalType})`}
+                  Type {filters.indexing && `(${filters.indexing})`}
                 </span>
               </Button>
             </DropdownMenuTrigger>
@@ -823,7 +832,7 @@ export default function JournalTable({
 
               <DropdownMenuItem
                 onClick={() => {
-                  const { journalType, ...rest } = filters;
+                  const { indexing, ...rest } = filters;
                   setFilters({ ...rest, page: 1 });
                 }}
               >
@@ -834,9 +843,13 @@ export default function JournalTable({
                 "SCOPUS",
                 "WEB_OF_SCIENCE",
                 "SCI",
+                "SCIE",
+                "SSCI", 
+                "AHCI",
                 "UGC_CARE",
-                "PEER_REVIEWED",
-                "OTHER",
+                "DOAJ",
+                "PUBMED",
+                "IEEE_XPLORE"
               ].map((type) => (
                 <DropdownMenuItem
                   key={type}
@@ -990,7 +1003,7 @@ export default function JournalTable({
               const journal = row.original;
               const students = journal.studentAuthors || [];
               const teachers = journal.facultyAuthors || [];
-              const typeConfig = getJournalTypeConfig(journal.journalType);
+              const typeConfig = getJournalStatus(journal.journalStatus);
               return (
                 <div
                   key={row.id}
@@ -1013,15 +1026,15 @@ export default function JournalTable({
                     <div className="flex items-start justify-between gap-2">
                       <Badge
                         variant="outline"
-                        className={`font-medium border ${getStatusConfig(journal.status).bg} ${getStatusConfig(journal.status).text} ${getStatusConfig(journal.status).border}`}
+                        className={`font-medium border ${getJournalStatus(journal.journalStatus).bg} ${getJournalStatus(journal.journalStatus).text} ${getJournalStatus(journal.journalStatus).border}`}
                       >
-                        {journal.status.replace(/_/g, " ")}
+                        {journal.journalStatus.replace(/_/g, " ")}
                       </Badge>
                       <Badge
                         variant="outline"
                         className={`font-medium border ${typeConfig.bg} ${typeConfig.text} ${typeConfig.border} text-xs`}
                       >
-                        {journal.journalType.replace(/_/g, " ")}
+                        {journal.journalStatus.replace(/_/g, " ")}
                       </Badge>
                     </div>
 
@@ -1030,7 +1043,7 @@ export default function JournalTable({
                         {journal.title}
                       </h3>
                       <p className="text-xs text-muted-foreground line-clamp-1">
-                        {journal.titleOfJournal}
+                        {journal.journalName}
                       </p>
                       <p className="line-clamp-2 text-sm text-muted-foreground">
                         {journal.abstract || "No description provided."}
@@ -1066,7 +1079,7 @@ export default function JournalTable({
                         Publisher
                       </span>
                       <span className="text-xs font-medium truncate max-w-32">
-                        {journal.journalPublisher || "—"}
+                        {journal.publisher || "—"}
                       </span>
                     </div>
                     <Button

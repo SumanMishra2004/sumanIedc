@@ -46,9 +46,18 @@ export async function GET(req: NextRequest) {
           ]
         }
    
-    // Get counts by status
-    const statusCounts = await prisma.bookChapter.groupBy({
-      by: ['status'],
+    // Get counts by book chapter status
+    const bookChapterStatusCounts = await prisma.bookChapter.groupBy({
+      by: ['bookChapterStatus'],
+      where: roleFilter,
+      _count: {
+        id: true
+      }
+    })
+
+    // Get counts by teacher status
+    const teacherStatusCounts = await prisma.bookChapter.groupBy({
+      by: ['teacherStatus'],
       where: roleFilter,
       _count: {
         id: true
@@ -103,7 +112,8 @@ export async function GET(req: NextRequest) {
       select: {
         id: true,
         title: true,
-        status: true,
+        bookChapterStatus: true,
+        teacherStatus: true,
         createdAt: true
       }
     })
@@ -210,8 +220,12 @@ export async function GET(req: NextRequest) {
       total,
       publicCount,
       privateCount,
-      statusCounts: statusCounts.map(s => ({
-        status: s.status,
+      bookChapterStatusCounts: bookChapterStatusCounts.map(s => ({
+        status: s.bookChapterStatus,
+        count: s._count.id
+      })),
+      teacherStatusCounts: teacherStatusCounts.map(s => ({
+        status: s.teacherStatus,
         count: s._count.id
       })),
       financials: {

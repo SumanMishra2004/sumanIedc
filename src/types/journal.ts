@@ -1,4 +1,13 @@
-import { ResearchStatus, JournalType } from "@prisma/client"
+import { 
+  TeacherStatus, 
+  JournalStatus,
+  JournalScope,
+  JournalReviewType,
+  JournalAccessType,
+  JournalIndexing,
+  JournalQuartile,
+  JournalPublicationMode
+} from "@prisma/client"
 
 export interface User {
   id: string
@@ -17,23 +26,29 @@ export interface JournalAuthor {
 export interface Journal {
   id: string
   serialNo: string
-  titleOfJournal: string
   title: string
-  journalType: JournalType
-  impactFactor: number | null
-  dateOfImpactFactor: Date | string | null
-  journalPublisher: string | null
-  status: ResearchStatus
-  paperLink: string | null
-  doi: string | null
-  registrationFees: number | null
-  reimbursement: number | null
-  isPublic: boolean
-  abstract: string | null
+  journalName: string
   imageUrl: string | null
   documentUrl: string | null
+  abstract: string | null
+  scope: JournalScope
+  reviewType: JournalReviewType
+  accessType: JournalAccessType
+  indexing: JournalIndexing
+  quartile: JournalQuartile
+  publicationMode: JournalPublicationMode
+  impactFactor: number | null
+  impactFactorDate: Date | string | null
+  publisher: string | null
   publicationDate: Date | string | null
+  doi: string | null
+  paperLink: string | null
   keywords: string[]
+  registrationFees: number | null
+  reimbursement: number | null
+  journalStatus: JournalStatus
+  teacherStatus: TeacherStatus
+  isPublic: boolean
   createdAt: Date | string
   updatedAt: Date | string
   studentAuthors: JournalAuthor[]
@@ -55,11 +70,17 @@ export interface JournalFilters {
   limit?: number
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
-  status?: ResearchStatus
+  journalStatus?: JournalStatus
+  teacherStatus?: TeacherStatus
   isPublic?: boolean
-  journalType?: JournalType
+  scope?: JournalScope
+  reviewType?: JournalReviewType
+  accessType?: JournalAccessType
+  indexing?: JournalIndexing
+  quartile?: JournalQuartile
+  publicationMode?: JournalPublicationMode
   keyword?: string
-  journalPublisher?: string
+  publisher?: string
   search?: string
   createdFrom?: string
   createdTo?: string
@@ -77,23 +98,29 @@ export interface JournalFilters {
 
 export interface CreateJournalInput {
   serialNo: string
-  titleOfJournal: string
   title: string
-  journalType: JournalType
-  impactFactor?: number
-  dateOfImpactFactor?: string | Date
-  journalPublisher?: string
-  status?: ResearchStatus
-  paperLink?: string
-  doi?: string
-  registrationFees?: number
-  reimbursement?: number
-  isPublic?: boolean
-  abstract?: string
+  journalName: string
   imageUrl?: string
   documentUrl?: string
+  abstract?: string
+  scope: JournalScope
+  reviewType: JournalReviewType
+  accessType: JournalAccessType
+  indexing: JournalIndexing
+  quartile?: JournalQuartile
+  publicationMode: JournalPublicationMode
+  impactFactor?: number
+  impactFactorDate?: string | Date
+  publisher?: string
   publicationDate?: string | Date
+  doi?: string
+  paperLink?: string
   keywords?: string[]
+  registrationFees?: number
+  reimbursement?: number
+  journalStatus?: JournalStatus
+  teacherStatus?: TeacherStatus
+  isPublic?: boolean
   studentAuthorIds?: string[]
   facultyAuthorIds?: string[]
 }
@@ -105,19 +132,39 @@ export interface JournalStatsResponse {
   publicCount: number
   privateCount: number
   statusCounts: Array<{
-    status: ResearchStatus
+    status: TeacherStatus
     count: number
   }>
-  typeCounts: Array<{
-    type: JournalType
+  journalStatusCounts: Array<{
+    status: JournalStatus
+    count: number
+  }>
+  scopeCounts: Array<{
+    scope: JournalScope
+    count: number
+  }>
+  indexingCounts: Array<{
+    indexing: JournalIndexing
     count: number
   }>
   financials: {
     totalRegistrationFees: number
     totalReimbursement: number
-    averageRegistrationFees: number
-    averageReimbursement: number
-    averageImpactFactor: number
+    avgRegistrationFees: number
+    avgReimbursement: number
+    avgImpactFactor: number
   }
   recentJournals: Journal[]
+  monthlyTrend: Array<{
+    month: string
+    count: number
+  }>
+  dailyTrend: Array<{
+    date: string
+    count: number
+  }>
+  weeklyTrend: Array<{
+    week: string
+    count: number
+  }>
 }

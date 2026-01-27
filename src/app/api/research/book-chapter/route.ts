@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ResearchStatus, UserRole } from '@prisma/client'
+import { BookchapterStatus, TeacherStatus, UserRole } from '@prisma/client'
 
 // GET - List all book chapters with filtering, pagination, and search
 export async function GET(req: NextRequest) {
@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
     // Filters
-    const status = searchParams.get('status')
+    const bookChapterStatus = searchParams.get('bookChapterStatus')
+    const teacherStatus = searchParams.get('teacherStatus')
     const isPublic = searchParams.get('isPublic')
     const keyword = searchParams.get('keyword')
     const publisher = searchParams.get('publisher')
@@ -60,8 +61,12 @@ export async function GET(req: NextRequest) {
     // ADMIN sees everything - no filter needed
 
     // Apply filters
-    if (status) {
-      where.status = status as ResearchStatus
+    if (bookChapterStatus) {
+      where.bookChapterStatus = bookChapterStatus as BookchapterStatus
+    }
+
+    if (teacherStatus) {
+      where.teacherStatus = teacherStatus as TeacherStatus
     }
 
     if (isPublic !== null && isPublic !== undefined) {
@@ -194,7 +199,8 @@ export async function POST(request: Request) {
       abstract,
       imageUrl,
       documentUrl,
-      status,
+      bookChapterStatus,
+      teacherStatus,
       isbnIssn,
       registrationFees,
       reimbursement,
@@ -236,9 +242,16 @@ export async function POST(request: Request) {
       )
     }
 
-    if (status && !Object.values(ResearchStatus).includes(status)) {
+    if (bookChapterStatus && !Object.values(BookchapterStatus).includes(bookChapterStatus)) {
       return NextResponse.json(
-        { error: "Invalid research status" },
+        { error: "Invalid book chapter status" },
+        { status: 400 }
+      )
+    }
+
+    if (teacherStatus && !Object.values(TeacherStatus).includes(teacherStatus)) {
+      return NextResponse.json(
+        { error: "Invalid teacher status" },
         { status: 400 }
       )
     }
@@ -285,7 +298,8 @@ export async function POST(request: Request) {
         abstract,
         imageUrl,
         documentUrl,
-        status: status ?? ResearchStatus.DRAFT,
+        bookChapterStatus: bookChapterStatus ?? BookchapterStatus.SUBMITTED,
+        teacherStatus: teacherStatus ?? TeacherStatus.UPLOADED,
         isbnIssn,
         registrationFees:
           registrationFees !== undefined ? Number(registrationFees) : null,

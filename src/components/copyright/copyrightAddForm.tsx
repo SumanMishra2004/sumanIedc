@@ -42,20 +42,17 @@ import { Separator } from "@/components/ui/separator";
 import { uploadFile } from "@/lib/appwrite";
 
 const copyrightSchema = z.object({
-  title: z.string().min(1, "Title is required").max(500, "Title is too long"),
-  description: z.string().nullable().optional(),
-  imageUrl: z.string().nullable().optional(),
+  title: z.string().min(1, "Title is required").min(10, "Title is too short").max(100, "Title is too long"),
+  abstract: z.string().min(100, "Abstract is too short").max(1000, "Abstract is too long"),
+  imageUrl: z.string().min(1, "Image is required"),
   documentUrl: z.string().nullable().optional(),
-  status: z.enum([
-    "DRAFT",
+  copyrightStatus: z.enum([
     "SUBMITTED",
     "UNDER_REVIEW",
-    "REVISION",
     "APPROVED",
     "PUBLISHED",
-    "REJECTED",
   ]),
-  serialNo: z.string().nullable().optional(),
+  regNo: z.string().nullable().optional(),
   registrationFees: z.number().nullable().optional(),
   reimbursement: z.number().nullable().optional(),
   isPublic: z.boolean(),
@@ -101,12 +98,12 @@ export default function CopyrightDialog({
   const form = useForm<CopyrightFormValues>({
     resolver: zodResolver(copyrightSchema),
     defaultValues: {
+      regNo: "",
       title: "",
-      description: null,
-      imageUrl: null,
+      abstract: "",
+      imageUrl: "",
       documentUrl: null,
-      status: "DRAFT",
-      serialNo: null,
+      copyrightStatus: "SUBMITTED",
       registrationFees: null,
       reimbursement: null,
       isPublic: false,
@@ -254,15 +251,15 @@ export default function CopyrightDialog({
                     />
                     <FormField
                       control={form.control}
-                      name="serialNo"
+                      name="regNo"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-base font-semibold">
-                            Serial Number
+                            Registration Number 
                           </FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Enter serial number"
+                              placeholder="Enter registration number"
                               className="h-12 text-base border focus-visible:ring-1"
                               {...field}
                               value={field.value ?? ""}
@@ -274,15 +271,15 @@ export default function CopyrightDialog({
                     />
                     <FormField
                       control={form.control}
-                      name="description"
+                      name="abstract"
                       render={({ field }) => (
                         <FormItem className="lg:col-span-2">
                           <FormLabel className="text-base font-semibold mb-1">
-                            Description
+                            Abstract <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Write description (optional)"
+                              placeholder="Write abstract (optional)"
                               className="min-h-[100px] text-base border focus-visible:ring-1 resize-vertical"
                               {...field}
                               value={field.value ?? ""}
@@ -461,7 +458,7 @@ export default function CopyrightDialog({
                     <div className="flex flex-col gap-3">
                       <FormField
                         control={form.control}
-                        name="status"
+                        name="copyrightStatus"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-base font-semibold mb-1">
@@ -469,7 +466,7 @@ export default function CopyrightDialog({
                             </FormLabel>
                             <Select
                               onValueChange={field.onChange}
-                              defaultValue={field.value}
+                              value={field.value}
                             >
                               <FormControl>
                                 <SelectTrigger className="h-12 w-full">
@@ -477,24 +474,17 @@ export default function CopyrightDialog({
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="DRAFT">📝 Draft</SelectItem>
                                 <SelectItem value="SUBMITTED">
                                   📤 Submitted
                                 </SelectItem>
                                 <SelectItem value="UNDER_REVIEW">
                                   🔍 Under Review
                                 </SelectItem>
-                                <SelectItem value="REVISION">
-                                  ✏️ Revision
-                                </SelectItem>
                                 <SelectItem value="APPROVED">
                                   ✅ Approved
                                 </SelectItem>
                                 <SelectItem value="PUBLISHED">
                                   📚 Published
-                                </SelectItem>
-                                <SelectItem value="REJECTED">
-                                  ❌ Rejected
                                 </SelectItem>
                               </SelectContent>
                             </Select>

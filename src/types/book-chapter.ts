@@ -1,4 +1,4 @@
-import { ResearchStatus } from "@prisma/client"
+import { BookchapterStatus, TeacherStatus } from "@prisma/client"
 
 export interface User {
   id: string
@@ -20,7 +20,8 @@ export interface BookChapter {
   abstract: string | null
   imageUrl: string | null
   documentUrl: string | null
-  status: ResearchStatus
+  bookChapterStatus: BookchapterStatus
+  teacherStatus: TeacherStatus
   isbnIssn: string | null
   registrationFees: number | null
   reimbursement: number | null
@@ -50,7 +51,8 @@ export interface BookChapterFilters {
   limit?: number
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
-  status?: ResearchStatus
+  bookChapterStatus?: BookchapterStatus
+  teacherStatus?: TeacherStatus
   isPublic?: boolean
   keyword?: string
   publisher?: string
@@ -72,7 +74,8 @@ export interface CreateBookChapterInput {
   abstract?: string
   imageUrl?: string
   documentUrl?: string
-  status?: ResearchStatus
+  bookChapterStatus?: BookchapterStatus
+  teacherStatus?: TeacherStatus
   isbnIssn?: string
   registrationFees?: number
   reimbursement?: number
@@ -91,8 +94,12 @@ export interface BookChapterStatsResponse {
   total: number
   publicCount: number
   privateCount: number
-  statusCounts: Array<{
-    status: ResearchStatus
+  bookChapterStatusCounts: Array<{
+    status: BookchapterStatus
+    count: number
+  }>
+  teacherStatusCounts: Array<{
+    status: TeacherStatus
     count: number
   }>
   financials: {
@@ -104,7 +111,8 @@ export interface BookChapterStatsResponse {
   recentChapters: Array<{
     id: string
     title: string
-    status: ResearchStatus
+    bookChapterStatus: BookchapterStatus
+    teacherStatus: TeacherStatus
     createdAt: Date | string
   }>
   monthlyTrend: Array<{

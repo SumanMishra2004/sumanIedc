@@ -43,7 +43,8 @@ export function ExportDialog({ triggerButton }: ExportDialogProps) {
       // Build query params from filters
       const params = new URLSearchParams()
       
-      if (filters.status) params.append('status', filters.status)
+      if (filters.bookChapterStatus) params.append('bookChapterStatus', filters.bookChapterStatus)
+      if (filters.teacherStatus) params.append('teacherStatus', filters.teacherStatus)
       if (filters.isPublic !== undefined) params.append('isPublic', String(filters.isPublic))
       if (filters.keyword) params.append('keyword', filters.keyword)
       if (filters.publisher) params.append('publisher', filters.publisher)
@@ -100,7 +101,8 @@ export function ExportDialog({ triggerButton }: ExportDialogProps) {
 
   const activeFilterCount = React.useMemo(() => {
     let count = 0
-    if (filters.status) count++
+    if (filters.bookChapterStatus) count++
+    if (filters.teacherStatus) count++
     if (filters.isPublic !== undefined) count++
     if (filters.keyword) count++
     if (filters.publisher) count++

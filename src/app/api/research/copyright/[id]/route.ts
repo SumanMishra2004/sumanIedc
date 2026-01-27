@@ -84,7 +84,7 @@ export async function PATCH(
     const { id } =await  params
     const body = await request.json()
     const {
-      serialNo,
+      regNo,
       title,
       abstract,
       imageUrl,
@@ -95,7 +95,8 @@ export async function PATCH(
       dateOfGrant,
       registrationFees,
       reimbursement,
-      status,
+      copyrightStatus,
+      teacherStatus,
       isPublic,
       studentAuthorIds,
       facultyAuthorIds
@@ -115,7 +116,7 @@ export async function PATCH(
 
     // Update copyright
     const updateData: any = {}
-    if (serialNo !== undefined) updateData.serialNo = serialNo
+    if (regNo !== undefined) updateData.regNo = regNo
     if (title !== undefined) updateData.title = title
     if (abstract !== undefined) updateData.abstract = abstract
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl
@@ -126,7 +127,8 @@ export async function PATCH(
     if (dateOfGrant !== undefined) updateData.dateOfGrant = dateOfGrant ? new Date(dateOfGrant) : null
     if (registrationFees !== undefined) updateData.registrationFees = parseFloat(registrationFees)
     if (reimbursement !== undefined) updateData.reimbursement = parseFloat(reimbursement)
-    if (status !== undefined) updateData.status = status
+    if (copyrightStatus !== undefined) updateData.copyrightStatus = copyrightStatus
+    if (teacherStatus !== undefined) updateData.teacherStatus = teacherStatus
     if (isPublic !== undefined) updateData.isPublic = isPublic
 
     // Update authors if provided

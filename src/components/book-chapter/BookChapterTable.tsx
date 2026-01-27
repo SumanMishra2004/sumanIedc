@@ -74,7 +74,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import BookChapterAddForm from "./bookChapterAddForm";
-import { ResearchStatus } from "@prisma/client";
 import { toast } from "sonner";
 import {
   getBookChapters,
@@ -92,12 +91,11 @@ import {
   CardTitle,
 } from "../ui/card";
 import { AnimatedAvatarGroupTooltip } from "../ui/animated-tooltip";
+import { BookchapterStatus } from "@prisma/client";
 
 // --- Types & Data ---
 
-type PublicationStatus = ResearchStatus;
-
-const getStatusConfig = (status: PublicationStatus) => {
+const getStatusConfig = (status: BookchapterStatus) => {
   const configs = {
     PUBLISHED: {
       bg: "bg-emerald-50 dark:bg-emerald-950/30",
@@ -126,27 +124,6 @@ const getStatusConfig = (status: PublicationStatus) => {
       border: "border-amber-200 dark:border-amber-800",
       dot: "bg-amber-500",
       icon: "⌛"
-    },
-    REVISION: {
-      bg: "bg-orange-50 dark:bg-orange-950/30",
-      text: "text-orange-700 dark:text-orange-400",
-      border: "border-orange-200 dark:border-orange-800",
-      dot: "bg-orange-500",
-      icon: "↻"
-    },
-    DRAFT: {
-      bg: "bg-slate-50 dark:bg-slate-900/30",
-      text: "text-slate-600 dark:text-slate-400",
-      border: "border-slate-200 dark:border-slate-700",
-      dot: "bg-slate-400",
-      icon: "✎"
-    },
-    REJECTED: {
-      bg: "bg-red-50 dark:bg-red-950/30",
-      text: "text-red-700 dark:text-red-400",
-      border: "border-red-200 dark:border-red-800",
-      dot: "bg-red-500",
-      icon: "✕"
     }
   };
   return configs[status];
@@ -268,10 +245,10 @@ export const createColumns = ({
     },
   },
    {
-    accessorKey: "status",
+    accessorKey: "bookChapterStatus",
     header: "Status",
     cell: ({ row }) => {
-      const status = row.getValue("status") as PublicationStatus;
+      const status = row.getValue("bookChapterStatus") as BookchapterStatus;
       const config = getStatusConfig(status);
       return (
         <Badge
@@ -698,7 +675,7 @@ export default function BookChapterTable({
         >
           <ChevronDown className="h-4 w-4" />
           <span className="whitespace-nowrap">
-            Status {filters.status && `(${filters.status})`}
+            Status {filters.bookChapterStatus && `(${filters.bookChapterStatus})`}
           </span>
         </Button>
       </DropdownMenuTrigger>
@@ -709,7 +686,7 @@ export default function BookChapterTable({
 
         <DropdownMenuItem
           onClick={() => {
-            const { status, ...rest } = filters;
+            const { bookChapterStatus, ...rest } = filters;
             setFilters({ ...rest, page: 1 });
           }}
         >
@@ -717,21 +694,18 @@ export default function BookChapterTable({
         </DropdownMenuItem>
 
         {[
-          "DRAFT",
           "SUBMITTED",
           "UNDER_REVIEW",
-          "REVISION",
           "APPROVED",
           "PUBLISHED",
-          "REJECTED",
         ].map((status) => (
           <DropdownMenuItem
             key={status}
-            onClick={() => setFilters(prev => ({ ...prev, status: status as any, page: 1 }))}
+            onClick={() => setFilters(prev => ({ ...prev, bookChapterStatus: status as BookchapterStatus, page: 1 }))}
             className="flex items-center gap-2"
           >
             <span
-              className={`h-2 w-2 rounded-full ${getStatusConfig(status as PublicationStatus).dot}`}
+              className={`h-2 w-2 rounded-full ${getStatusConfig(status as BookchapterStatus).dot}`}
             />
             <span className="capitalize text-sm">
               {status.replace(/_/g, " ").toLowerCase()}
@@ -904,9 +878,9 @@ export default function BookChapterTable({
                     <div className="flex items-start justify-between">
                       <Badge
                         variant="outline"
-                        className={`font-medium border ${getStatusConfig(chapter.status).bg} ${getStatusConfig(chapter.status).text} ${getStatusConfig(chapter.status).border}`}
+                        className={`font-medium border ${getStatusConfig(chapter.bookChapterStatus).bg} ${getStatusConfig(chapter.bookChapterStatus).text} ${getStatusConfig(chapter.bookChapterStatus).border}`}
                       >
-                        {chapter.status.replace(/_/g, " ")}
+                        {chapter.bookChapterStatus.replace(/_/g, " ")}
                       </Badge>
                     </div>
 

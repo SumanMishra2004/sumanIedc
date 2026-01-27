@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ResearchStatus, UserRole, JournalType } from '@prisma/client'
+import { 
+  TeacherStatus, 
+  UserRole, 
+  JournalStatus,
+  JournalScope,
+  JournalReviewType,
+  JournalAccessType,
+  JournalIndexing,
+  JournalQuartile,
+  JournalPublicationMode
+} from '@prisma/client'
 
 // GET - List all journals with filtering, pagination, and search
 export async function GET(req: NextRequest) {
@@ -19,11 +29,17 @@ export async function GET(req: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
     // Filters
-    const status = searchParams.get('status')
+    const journalStatus = searchParams.get('journalStatus')
+    const teacherStatus = searchParams.get('teacherStatus')
     const isPublic = searchParams.get('isPublic')
-    const journalType = searchParams.get('journalType')
+    const scope = searchParams.get('scope')
+    const reviewType = searchParams.get('reviewType')
+    const accessType = searchParams.get('accessType')
+    const indexing = searchParams.get('indexing')
+    const quartile = searchParams.get('quartile')
+    const publicationMode = searchParams.get('publicationMode')
     const keyword = searchParams.get('keyword')
-    const journalPublisher = searchParams.get('journalPublisher')
+    const publisher = searchParams.get('publisher')
     const search = searchParams.get('search')
 
     // Date range filters
@@ -63,16 +79,40 @@ export async function GET(req: NextRequest) {
     // ADMIN sees everything - no filter needed
 
     // Apply filters
-    if (status) {
-      where.status = status as ResearchStatus
+    if (journalStatus) {
+      where.journalStatus = journalStatus as JournalStatus
+    }
+
+    if (teacherStatus) {
+      where.teacherStatus = teacherStatus as TeacherStatus
     }
 
     if (isPublic !== null && isPublic !== undefined) {
       where.isPublic = isPublic === 'true'
     }
 
-    if (journalType) {
-      where.journalType = journalType as JournalType
+    if (scope) {
+      where.scope = scope as JournalScope
+    }
+
+    if (reviewType) {
+      where.reviewType = reviewType as JournalReviewType
+    }
+
+    if (accessType) {
+      where.accessType = accessType as JournalAccessType
+    }
+
+    if (indexing) {
+      where.indexing = indexing as JournalIndexing
+    }
+
+    if (quartile) {
+      where.quartile = quartile as JournalQuartile
+    }
+
+    if (publicationMode) {
+      where.publicationMode = publicationMode as JournalPublicationMode
     }
 
     if (keyword) {
@@ -81,9 +121,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    if (journalPublisher) {
-      where.journalPublisher = {
-        contains: journalPublisher,
+    if (publisher) {
+      where.publisher = {
+        contains: publisher,
         mode: 'insensitive'
       }
     }
@@ -92,9 +132,9 @@ export async function GET(req: NextRequest) {
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
-        { titleOfJournal: { contains: search, mode: 'insensitive' } },
+        { journalName: { contains: search, mode: 'insensitive' } },
         { abstract: { contains: search, mode: 'insensitive' } },
-        { journalPublisher: { contains: search, mode: 'insensitive' } },
+        { publisher: { contains: search, mode: 'insensitive' } },
         { serialNo: { contains: search, mode: 'insensitive' } },
         { doi: { contains: search, mode: 'insensitive' } }
       ]
@@ -206,23 +246,29 @@ export async function POST(request: Request) {
 
     const {
       serialNo,
-      titleOfJournal,
       title,
-      journalType,
-      impactFactor,
-      dateOfImpactFactor,
-      journalPublisher,
-      status,
-      paperLink,
-      doi,
-      registrationFees,
-      reimbursement,
-      isPublic,
-      abstract,
+      journalName,
       imageUrl,
       documentUrl,
+      abstract,
+      scope,
+      reviewType,
+      accessType,
+      indexing,
+      quartile,
+      publicationMode,
+      impactFactor,
+      impactFactorDate,
+      publisher,
       publicationDate,
+      doi,
+      paperLink,
       keywords,
+      registrationFees,
+      reimbursement,
+      journalStatus,
+      teacherStatus,
+      isPublic,
       studentAuthorIds = [],
       facultyAuthorIds = []
     } = body
@@ -236,23 +282,51 @@ export async function POST(request: Request) {
       )
     }
 
-    if (!titleOfJournal || typeof titleOfJournal !== "string") {
-      return NextResponse.json(
-        { error: "Journal title is required" },
-        { status: 400 }
-      )
-    }
-
     if (!title || typeof title !== "string") {
       return NextResponse.json(
-        { error: "Article title is required" },
+        { error: "Title is required" },
         { status: 400 }
       )
     }
 
-    if (!journalType || !Object.values(JournalType).includes(journalType)) {
+    if (!journalName || typeof journalName !== "string") {
       return NextResponse.json(
-        { error: "Valid journal type is required" },
+        { error: "Journal name is required" },
+        { status: 400 }
+      )
+    }
+
+    if (!scope || !Object.values(JournalScope).includes(scope)) {
+      return NextResponse.json(
+        { error: "Valid scope is required" },
+        { status: 400 }
+      )
+    }
+
+    if (!reviewType || !Object.values(JournalReviewType).includes(reviewType)) {
+      return NextResponse.json(
+        { error: "Valid review type is required" },
+        { status: 400 }
+      )
+    }
+
+    if (!accessType || !Object.values(JournalAccessType).includes(accessType)) {
+      return NextResponse.json(
+        { error: "Valid access type is required" },
+        { status: 400 }
+      )
+    }
+
+    if (!indexing || !Object.values(JournalIndexing).includes(indexing)) {
+      return NextResponse.json(
+        { error: "Valid indexing is required" },
+        { status: 400 }
+      )
+    }
+
+    if (!publicationMode || !Object.values(JournalPublicationMode).includes(publicationMode)) {
+      return NextResponse.json(
+        { error: "Valid publication mode is required" },
         { status: 400 }
       )
     }
@@ -278,9 +352,23 @@ export async function POST(request: Request) {
       )
     }
 
-    if (status && !Object.values(ResearchStatus).includes(status)) {
+    if (journalStatus && !Object.values(JournalStatus).includes(journalStatus)) {
       return NextResponse.json(
-        { error: "Invalid research status" },
+        { error: "Invalid journal status" },
+        { status: 400 }
+      )
+    }
+
+    if (teacherStatus && !Object.values(TeacherStatus).includes(teacherStatus)) {
+      return NextResponse.json(
+        { error: "Invalid teacher status" },
+        { status: 400 }
+      )
+    }
+
+    if (quartile && !Object.values(JournalQuartile).includes(quartile)) {
+      return NextResponse.json(
+        { error: "Invalid quartile" },
         { status: 400 }
       )
     }
@@ -336,23 +424,29 @@ export async function POST(request: Request) {
     const journal = await prisma.journal.create({
       data: {
         serialNo,
-        titleOfJournal,
         title,
-        journalType,
-        impactFactor: impactFactor !== undefined ? Number(impactFactor) : null,
-        dateOfImpactFactor: dateOfImpactFactor ? new Date(dateOfImpactFactor) : null,
-        journalPublisher,
-        status: status ?? ResearchStatus.DRAFT,
-        paperLink,
-        doi,
-        registrationFees: registrationFees !== undefined ? Number(registrationFees) : null,
-        reimbursement: reimbursement !== undefined ? Number(reimbursement) : null,
-        isPublic: Boolean(isPublic),
-        abstract,
+        journalName,
         imageUrl,
         documentUrl,
+        abstract,
+        scope,
+        reviewType,
+        accessType,
+        indexing,
+        quartile: quartile ?? JournalQuartile.NOT_APPLICABLE,
+        publicationMode,
+        impactFactor: impactFactor !== undefined ? Number(impactFactor) : null,
+        impactFactorDate: impactFactorDate ? new Date(impactFactorDate) : null,
+        publisher,
         publicationDate: publicationDate ? new Date(publicationDate) : null,
+        doi,
+        paperLink,
         keywords: keywords ?? [],
+        registrationFees: registrationFees !== undefined ? Number(registrationFees) : null,
+        reimbursement: reimbursement !== undefined ? Number(reimbursement) : null,
+        journalStatus: journalStatus ?? JournalStatus.SUBMITTED,
+        teacherStatus: teacherStatus ?? TeacherStatus.UPLOADED,
+        isPublic: Boolean(isPublic),
 
         studentAuthors: {
           create: studentAuthorIds.map((userId: string) => ({

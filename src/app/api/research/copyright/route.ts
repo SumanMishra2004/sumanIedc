@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ResearchStatus, UserRole } from '@prisma/client'
+import { CopyrightStatus, TeacherStatus, UserRole } from '@prisma/client'
 
 // GET - List all copyrights with filtering, pagination, and search
 export async function GET(req: NextRequest) {
@@ -19,9 +19,10 @@ export async function GET(req: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
     // Filters
-    const status = searchParams.get('status')
+    const copyrightStatus = searchParams.get('copyrightStatus')
+    const teacherStatus = searchParams.get('teacherStatus')
     const isPublic = searchParams.get('isPublic')
-    const serialNo = searchParams.get('serialNo')
+    const regNo = searchParams.get('regNo')
     const search = searchParams.get('search')
 
     // Date range filters
@@ -65,17 +66,21 @@ export async function GET(req: NextRequest) {
     // ADMIN sees everything - no filter needed
 
     // Apply filters
-    if (status) {
-      where.status = status as ResearchStatus
+    if (copyrightStatus) {
+      where.copyrightStatus = copyrightStatus as CopyrightStatus
+    }
+
+    if (teacherStatus) {
+      where.teacherStatus = teacherStatus as TeacherStatus
     }
 
     if (isPublic !== null && isPublic !== undefined) {
       where.isPublic = isPublic === 'true'
     }
 
-    if (serialNo) {
-      where.serialNo = {
-        contains: serialNo,
+    if (regNo) {
+      where.regNo = {
+        contains: regNo,
         mode: 'insensitive'
       }
     }
@@ -85,7 +90,7 @@ export async function GET(req: NextRequest) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
         { abstract: { contains: search, mode: 'insensitive' } },
-        { serialNo: { contains: search, mode: 'insensitive' } }
+        { regNo: { contains: search, mode: 'insensitive' } }
       ]
     }
 
@@ -205,7 +210,7 @@ export async function POST(request: Request) {
     const body = await request.json()
 
     const {
-      serialNo,
+      regNo,
       title,
       abstract,
       imageUrl,
@@ -216,7 +221,8 @@ export async function POST(request: Request) {
       dateOfGrant,
       registrationFees,
       reimbursement,
-      status,
+      copyrightStatus,
+      teacherStatus,
       isPublic,
       studentAuthorIds = [],
       facultyAuthorIds = []
@@ -224,9 +230,9 @@ export async function POST(request: Request) {
 
     /* -------------------- Basic validation -------------------- */
 
-    if (!serialNo || typeof serialNo !== "string") {
+    if (!regNo || typeof regNo !== "string") {
       return NextResponse.json(
-        { error: "Serial number is required" },
+        { error: "Registration number is required" },
         { status: 400 }
       )
     }
@@ -251,9 +257,16 @@ export async function POST(request: Request) {
       )
     }
 
-    if (status && !Object.values(ResearchStatus).includes(status)) {
+    if (copyrightStatus && !Object.values(CopyrightStatus).includes(copyrightStatus)) {
       return NextResponse.json(
-        { error: "Invalid research status" },
+        { error: "Invalid copyright status" },
+        { status: 400 }
+      )
+    }
+
+    if (teacherStatus && !Object.values(TeacherStatus).includes(teacherStatus)) {
+      return NextResponse.json(
+        { error: "Invalid teacher status" },
         { status: 400 }
       )
     }
@@ -296,7 +309,7 @@ export async function POST(request: Request) {
 
     const copyright = await prisma.copyright.create({
       data: {
-        serialNo,
+        regNo,
         title,
         abstract,
         imageUrl,
@@ -309,7 +322,8 @@ export async function POST(request: Request) {
           registrationFees !== undefined ? Number(registrationFees) : null,
         reimbursement:
           reimbursement !== undefined ? Number(reimbursement) : null,
-        status: status ?? ResearchStatus.DRAFT,
+        copyrightStatus: copyrightStatus ?? CopyrightStatus.SUBMITTED,
+        teacherStatus: teacherStatus ?? TeacherStatus.UPLOADED,
         isPublic: Boolean(isPublic),
 
         studentAuthors: {

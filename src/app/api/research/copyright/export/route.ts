@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ResearchStatus, UserRole } from '@prisma/client'
+import { CopyrightStatus, TeacherStatus, UserRole } from '@prisma/client'
 
 // GET - Export copyrights to CSV
 export async function GET(req: NextRequest) {
@@ -18,9 +18,10 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams
 
     // Filters (same as main GET endpoint)
-    const status = searchParams.get('status')
+    const copyrightStatus = searchParams.get('copyrightStatus')
+    const teacherStatus = searchParams.get('teacherStatus')
     const isPublic = searchParams.get('isPublic')
-    const serialNo = searchParams.get('serialNo')
+    const regNo = searchParams.get('regNo')
     const search = searchParams.get('search')
 
     // Date range filters
@@ -62,17 +63,21 @@ export async function GET(req: NextRequest) {
     }
     // ADMIN sees everything - no filter needed
 
-    if (status) {
-      where.status = status as ResearchStatus
+    if (copyrightStatus) {
+      where.copyrightStatus = copyrightStatus as CopyrightStatus
+    }
+
+    if (teacherStatus) {
+      where.teacherStatus = teacherStatus as TeacherStatus
     }
 
     if (isPublic !== null && isPublic !== undefined) {
       where.isPublic = isPublic === 'true'
     }
 
-    if (serialNo) {
-      where.serialNo = {
-        contains: serialNo,
+    if (regNo) {
+      where.regNo = {
+        contains: regNo,
         mode: 'insensitive'
       }
     }
@@ -81,7 +86,7 @@ export async function GET(req: NextRequest) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
         { abstract: { contains: search, mode: 'insensitive' } },
-        { serialNo: { contains: search, mode: 'insensitive' } }
+        { regNo: { contains: search, mode: 'insensitive' } }
       ]
     }
 
@@ -187,10 +192,11 @@ export async function GET(req: NextRequest) {
     // Generate CSV content
     const headers = [
       'ID',
-      'Serial No',
+      'Registration No',
       'Title',
       'Abstract',
-      'Status',
+      'Copyright Status',
+      'Teacher Status',
       'Date of Filing',
       'Date of Submission',
       'Date of Published',
@@ -219,10 +225,11 @@ export async function GET(req: NextRequest) {
 
         return [
           copyright.id,
-          `"${(copyright.serialNo || '').replace(/"/g, '""')}"`,
+          `"${(copyright.regNo || '').replace(/"/g, '""')}"`,
           `"${(copyright.title || '').replace(/"/g, '""')}"`,
           `"${(copyright.abstract || '').replace(/"/g, '""')}"`,
-          copyright.status,
+          copyright.copyrightStatus,
+          copyright.teacherStatus,
           copyright.dateOfFiling ? new Date(copyright.dateOfFiling).toISOString() : '',
           copyright.dateOfSubmission ? new Date(copyright.dateOfSubmission).toISOString() : '',
           copyright.dateOfPublished ? new Date(copyright.dateOfPublished).toISOString() : '',

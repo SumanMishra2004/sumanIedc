@@ -31,7 +31,16 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { JournalFilters } from "@/types/journal"
 import { MultiSelectUsers } from "@/components/ui/multi-select"
-import { JournalType, ResearchStatus } from "@prisma/client"
+import {
+  TeacherStatus,
+  JournalStatus,
+  JournalScope,
+  JournalReviewType,
+  JournalAccessType,
+  JournalIndexing,
+  JournalQuartile,
+  JournalPublicationMode
+} from "@prisma/client"
 
 interface User {
   id: string
@@ -125,27 +134,75 @@ export function FilterDialog({
     }))
   }
 
-  // Journal Type handler
-  const handleJournalTypeChange = (type: JournalType | undefined) => {
+  // Scope handler
+  const handleScopeChange = (scope: JournalScope | undefined) => {
     setLocalFilters((prev) => ({
       ...prev,
-      journalType: type,
+      scope: scope,
     }))
   }
 
-  // Status handler
-  const handleStatusChange = (status: ResearchStatus | undefined) => {
+  // Review Type handler  
+  const handleReviewTypeChange = (reviewType: JournalReviewType | undefined) => {
     setLocalFilters((prev) => ({
       ...prev,
-      status: status,
+      reviewType: reviewType,
     }))
   }
 
-  // Journal Publisher filter
-  const handleJournalPublisherChange = (value: string) => {
+  // Access Type handler
+  const handleAccessTypeChange = (accessType: JournalAccessType | undefined) => {
     setLocalFilters((prev) => ({
       ...prev,
-      journalPublisher: value || undefined,
+      accessType: accessType,
+    }))
+  }
+
+  // Indexing handler
+  const handleIndexingChange = (indexing: JournalIndexing | undefined) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      indexing: indexing,
+    }))
+  }
+
+  // Quartile handler
+  const handleQuartileChange = (quartile: JournalQuartile | undefined) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      quartile: quartile,
+    }))
+  }
+
+  // Publication Mode handler
+  const handlePublicationModeChange = (publicationMode: JournalPublicationMode | undefined) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      publicationMode: publicationMode,
+    }))
+  }
+
+  // Journal Status handler
+  const handleJournalStatusChange = (journalStatus: JournalStatus | undefined) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      journalStatus: journalStatus,
+    }))
+  }
+
+  // Teacher Status handler
+  const handleTeacherStatusChange = (teacherStatus: TeacherStatus | undefined) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      teacherStatus: teacherStatus,
+    }))
+  }
+
+  // Publisher filter
+  const handlePublisherChange = (value: string) => {
+    setLocalFilters((prev) => ({
+      ...prev,
+      publisher: value || undefined,
     }))
   }
 
@@ -156,10 +213,16 @@ export function FilterDialog({
 
   const handleClearFilters = () => {
     const clearedFilters: Partial<JournalFilters> = {
-      status: undefined,
+      journalStatus: undefined,
+      teacherStatus: undefined,
       isPublic: undefined,
-      journalType: undefined,
-      journalPublisher: undefined,
+      scope: undefined,
+      reviewType: undefined,
+      accessType: undefined,
+      indexing: undefined,
+      quartile: undefined,
+      publicationMode: undefined,
+      publisher: undefined,
       search: undefined,
       minRegistrationFees: undefined,
       maxRegistrationFees: undefined,
@@ -183,10 +246,16 @@ export function FilterDialog({
 
   const activeFilterCount = React.useMemo(() => {
     let count = 0
-    if (filters.status) count++
+    if (filters.journalStatus) count++
+    if (filters.teacherStatus) count++
     if (filters.isPublic !== undefined) count++
-    if (filters.journalType) count++
-    if (filters.journalPublisher) count++
+    if (filters.scope) count++
+    if (filters.reviewType) count++
+    if (filters.accessType) count++
+    if (filters.indexing) count++
+    if (filters.quartile) count++
+    if (filters.publicationMode) count++
+    if (filters.publisher) count++
     if (filters.minRegistrationFees !== undefined) count++
     if (filters.maxRegistrationFees !== undefined) count++
     if (filters.minReimbursement !== undefined) count++
@@ -520,59 +589,26 @@ export function FilterDialog({
 
       <TabsContent value="type-other" className="scrollbar-gradient mt-4 overflow-auto max-h-[50vh]">
         <div className="space-y-6 pb-4 pr-4">
-            {/* Journal Type Filter */}
+            {/* Journal Status Filter */}
             <div className="space-y-3">
-              <Label className="text-sm font-semibold">Journal Type</Label>
+              <Label className="text-sm font-semibold">Journal Status</Label>
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   type="button"
-                  variant={localFilters.journalType === undefined ? "default" : "outline"}
+                  variant={localFilters.journalStatus === undefined ? "default" : "outline"}
                   size="sm"
-                  onClick={() => handleJournalTypeChange(undefined)}
-                  className="w-full"
-                >
-                  All Types
-                </Button>
-                {Object.values(JournalType).map((type) => (
-                  <Button
-                    key={type}
-                    type="button"
-                    variant={localFilters.journalType === type ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => handleJournalTypeChange(type)}
-                    className="w-full"
-                  >
-                    {type.replace(/_/g, ' ')}
-                  </Button>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Filter journals by type
-              </p>
-            </div>
-
-            <Separator />
-
-            {/* Status Filter */}
-            <div className="space-y-3">
-              <Label className="text-sm font-semibold">Status</Label>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={localFilters.status === undefined ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleStatusChange(undefined)}
+                  onClick={() => handleJournalStatusChange(undefined)}
                   className="w-full"
                 >
                   All Status
                 </Button>
-                {Object.values(ResearchStatus).map((status) => (
+                {Object.values(JournalStatus).map((status) => (
                   <Button
                     key={status}
                     type="button"
-                    variant={localFilters.status === status ? "default" : "outline"}
+                    variant={localFilters.journalStatus === status ? "default" : "outline"}
                     size="sm"
-                    onClick={() => handleStatusChange(status)}
+                    onClick={() => handleJournalStatusChange(status)}
                     className="w-full"
                   >
                     {status.replace(/_/g, ' ')}
@@ -580,23 +616,56 @@ export function FilterDialog({
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Filter journals by submission status
+                Filter journals by publication status
               </p>
             </div>
 
             <Separator />
 
-            {/* Journal Publisher Filter */}
+            {/* Teacher Status Filter */}
             <div className="space-y-3">
-              <Label className="text-sm font-semibold">Journal Publisher</Label>
+              <Label className="text-sm font-semibold">Teacher Status</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  variant={localFilters.teacherStatus === undefined ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleTeacherStatusChange(undefined)}
+                  className="w-full"
+                >
+                  All Status
+                </Button>
+                {Object.values(TeacherStatus).map((status) => (
+                  <Button
+                    key={status}
+                    type="button"
+                    variant={localFilters.teacherStatus === status ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleTeacherStatusChange(status)}
+                    className="w-full"
+                  >
+                    {status.replace(/_/g, ' ')}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Filter journals by teacher approval status
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Publisher Filter */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Publisher</Label>
               <Input
-                placeholder="Enter journal publisher..."
-                value={localFilters.journalPublisher || ""}
-                onChange={(e) => handleJournalPublisherChange(e.target.value)}
+                placeholder="Enter publisher name..."
+                value={localFilters.publisher || ""}
+                onChange={(e) => handlePublisherChange(e.target.value)}
                 className="w-full"
               />
               <p className="text-xs text-muted-foreground">
-                Search by journal publisher name
+                Search by publisher name
               </p>
             </div>
           </div>

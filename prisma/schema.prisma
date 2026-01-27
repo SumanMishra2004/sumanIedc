@@ -99,6 +99,16 @@ enum CopyrightStatus {
   PUBLISHED
 }
 
+
+enum JournalStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  PUBLISHED
+}
+
+
+
 model Account {
   id                String  @id @default(cuid())
   userId            String  @map("user_id")
@@ -249,6 +259,9 @@ model Journal {
 id String @id @default(cuid())
 serialNo String @unique
 title String
+journalName String
+imageUrl String?
+documentUrl String?
 abstract String?
 
 
@@ -276,7 +289,7 @@ keywords String[]
 registrationFees Float?
 reimbursement Float?
 
-
+journalStatus JournalStatus @default(SUBMITTED)
 teacherStatus TeacherStatus @default(UPLOADED)
 isPublic Boolean @default(false)
 

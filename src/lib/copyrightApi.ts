@@ -235,15 +235,28 @@ export const getPublicCopyrights = async (
 }
 
 /**
- * Get copyrights by status
+ * Get copyrights by copyright status
  */
-export const getCopyrightsByStatus = async (
-  status: string,
-  filters?: Omit<CopyrightFilters, 'status'>
+export const getCopyrightsByCopyrightStatus = async (
+  copyrightStatus: string,
+  filters?: Omit<CopyrightFilters, 'copyrightStatus'>
 ): Promise<ApiResponse<CopyrightListResponse>> => {
   return getCopyrights({
     ...filters,
-    status: status as any
+    copyrightStatus: copyrightStatus as any
+  })
+}
+
+/**
+ * Get copyrights by teacher status
+ */
+export const getCopyrightsByTeacherStatus = async (
+  teacherStatus: string,
+  filters?: Omit<CopyrightFilters, 'teacherStatus'>
+): Promise<ApiResponse<CopyrightListResponse>> => {
+  return getCopyrights({
+    ...filters,
+    teacherStatus: teacherStatus as any
   })
 }
 
@@ -262,7 +275,17 @@ export const toggleCopyrightVisibility = async (
  */
 export const updateCopyrightStatus = async (
   id: string,
-  status: string
+  copyrightStatus: string
 ): Promise<ApiResponse<{ copyright: Copyright }>> => {
-  return updateCopyright(id, { status: status as any })
+  return updateCopyright(id, { copyrightStatus: copyrightStatus as any })
+}
+
+/**
+ * Update copyright teacher status
+ */
+export const updateCopyrightTeacherStatus = async (
+  id: string,
+  teacherStatus: string
+): Promise<ApiResponse<{ copyright: Copyright }>> => {
+  return updateCopyright(id, { teacherStatus: teacherStatus as any })
 }

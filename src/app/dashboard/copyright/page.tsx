@@ -86,7 +86,7 @@ const Copyright = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {stats.statusCounts.find((s) => s.status === "PUBLISHED")
+                  {stats.copyrightStatusCounts.find((s) => s.status === "PUBLISHED")
                     ?.count || 0}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -134,7 +134,7 @@ const Copyright = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-1 ">
               <CopyrightStatusRadarChart
-                statusCounts={stats.statusCounts}
+                statusCounts={stats.copyrightStatusCounts}
                 total={stats.total}
               />
             </div>

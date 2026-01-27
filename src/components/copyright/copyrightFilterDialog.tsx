@@ -29,8 +29,16 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { CopyrightFilters } from "@/types/copyright"
 import { MultiSelectUsers } from "@/components/ui/multi-select"
+import { CopyrightStatus, TeacherStatus } from "@prisma/client"
 
 interface User {
   id: string
@@ -110,10 +118,10 @@ export function FilterDialog({
   }
 
   // Serial Number filter
-  const handleSerialNoChange = (value: string) => {
+  const handleRegNoChange = (value: string) => {
     setLocalFilters((prev) => ({
       ...prev,
-      serialNo: value || undefined,
+      regNo: value || undefined,
     }))
   }
 
@@ -124,9 +132,10 @@ export function FilterDialog({
 
   const handleClearFilters = () => {
     const clearedFilters: Partial<CopyrightFilters> = {
-      status: undefined,
+      copyrightStatus: undefined,
+      teacherStatus: undefined,
       isPublic: undefined,
-      serialNo: undefined,
+      regNo: undefined,
       search: undefined,
       minRegistrationFees: undefined,
       maxRegistrationFees: undefined,
@@ -154,9 +163,10 @@ export function FilterDialog({
 
   const activeFilterCount = React.useMemo(() => {
     let count = 0
-    if (filters.status) count++
+    if (filters.copyrightStatus) count++
+    if (filters.teacherStatus) count++
     if (filters.isPublic !== undefined) count++
-    if (filters.serialNo) count++
+    if (filters.regNo) count++
     if (filters.minRegistrationFees !== undefined) count++
     if (filters.maxRegistrationFees !== undefined) count++
     if (filters.minReimbursement !== undefined) count++
@@ -548,17 +558,77 @@ export function FilterDialog({
 
       <TabsContent value="other" className="scrollbar-gradient mt-4 overflow-auto max-h-[50vh]">
         <div className="space-y-6 pb-4 pr-4">
-            {/* Serial Number Filter */}
+            {/* Copyright Status Filter */}
             <div className="space-y-3">
-              <Label className="text-sm font-semibold">Serial Number</Label>
+              <Label className="text-sm font-semibold">Copyright Status</Label>
+              <Select
+                value={localFilters.copyrightStatus || ""}
+                onValueChange={(value) =>
+                  setLocalFilters((prev) => ({
+                    ...prev,
+                    copyrightStatus: value as CopyrightStatus || undefined,
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select copyright status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value={CopyrightStatus.SUBMITTED}>Submitted</SelectItem>
+                  <SelectItem value={CopyrightStatus.UNDER_REVIEW}>Under Review</SelectItem>
+                  <SelectItem value={CopyrightStatus.APPROVED}>Approved</SelectItem>
+                  <SelectItem value={CopyrightStatus.PUBLISHED}>Published</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Filter by copyright publication status
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Teacher Status Filter */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Teacher Status</Label>
+              <Select
+                value={localFilters.teacherStatus || ""}
+                onValueChange={(value) =>
+                  setLocalFilters((prev) => ({
+                    ...prev,
+                    teacherStatus: value as TeacherStatus || undefined,
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select teacher status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value={TeacherStatus.UPLOADED}>Uploaded</SelectItem>
+                  <SelectItem value={TeacherStatus.ACCEPTED}>Accepted</SelectItem>
+                  <SelectItem value={TeacherStatus.PUBLISHED}>Published</SelectItem>
+                  <SelectItem value={TeacherStatus.UPDATE}>Update</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Filter by teacher verification status
+              </p>
+            </div>
+
+            <Separator />
+
+            {/* Registration Number Filter */}
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold">Registration Number</Label>
               <Input
-                placeholder="Enter serial number..."
-                value={localFilters.serialNo || ""}
-                onChange={(e) => handleSerialNoChange(e.target.value)}
+                placeholder="Enter registration number..."
+                value={localFilters.regNo || ""}
+                onChange={(e) => handleRegNoChange(e.target.value)}
                 className="w-full"
               />
               <p className="text-xs text-muted-foreground">
-                Search by copyright serial number
+                Search by copyright registration number
               </p>
             </div>
           </div>

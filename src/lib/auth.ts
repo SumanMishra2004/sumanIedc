@@ -6,17 +6,19 @@ import MicrosoftEntraID from 'next-auth/providers/microsoft-entra-id'
 import Credentials from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import type { Adapter } from 'next-auth/adapters'
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma) as Adapter,
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      allowDangerousEmailAccountLinking: true,
     }),
     MicrosoftEntraID({
       clientId: process.env.MICROSOFT_CLIENT_ID!,
       clientSecret: process.env.MICROSOFT_CLIENT_SECRET!,
-
+      allowDangerousEmailAccountLinking: true,
     }),
     Credentials({
       name: 'credentials',
@@ -48,50 +50,69 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null
         }
 
+        // Check special user role and update if needed
+        const specialUser = await prisma.specialUser.findUnique({
+          where: { email: user.email! },
+        })
+
+        const assignedRole = specialUser?.role || 'STUDENT'
+
+        // Update user role if it differs from special user role
+        if (user.role !== assignedRole) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { role: assignedRole },
+          })
+        }
+
         return {
           id: user.id,
           email: user.email,
           name: user.name,
           image: user.image,
-          role: user.role,
+          role: assignedRole,
         }
       },
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       if (!user.email) return false
 
-      // Check for special user role first
+      // Check for special user role assignment
       const specialUser = await prisma.specialUser.findUnique({
         where: { email: user.email },
       })
 
-      const role = specialUser?.role || 'STUDENT'
+      const assignedRole = specialUser?.role || 'STUDENT'
 
-      // For OAuth providers, the user is created by PrismaAdapter before this callback
-      // So we need to update the role for both new and existing users
+      // For OAuth providers (Google, Microsoft)
       if (account?.provider !== 'credentials') {
-        await prisma.user.upsert({
-          where: { email: user.email },
-          update: { role },
-          create: {
-            email: user.email,
-            name: user.name,
-            image: user.image,
-            role,
-          },
-        })
-      } else {
-        // For credentials, just update if needed
+        // Check if user exists
         const existingUser = await prisma.user.findUnique({
           where: { email: user.email },
         })
 
-        if (existingUser && existingUser.role !== role) {
-          await prisma.user.update({
+        if (existingUser) {
+          // Update existing user's role if it differs
+          if (existingUser.role !== assignedRole) {
+            await prisma.user.update({
+              where: { email: user.email },
+              data: { role: assignedRole },
+            })
+          }
+        } else {
+          // New OAuth user - will be created by PrismaAdapter
+          // We'll update the role immediately after creation
+          await prisma.user.upsert({
             where: { email: user.email },
-            data: { role },
+            update: { role: assignedRole },
+            create: {
+              email: user.email,
+              name: user.name || '',
+              image: user.image,
+              role: assignedRole,
+            },
           })
         }
       }

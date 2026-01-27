@@ -11,21 +11,26 @@ const API_BASE_URL = '/api/research/journal'
 // Common types
 export interface UpdateJournalInput {
   serialNo?: string
-  titleOfJournal?: string
   title?: string
-  journalType?: string
+  journalName?: string
+  imageUrl?: string
+  documentUrl?: string
+  abstract?: string
+  scope?: string
+  reviewType?: string
+  accessType?: string
+  indexing?: string
+  quartile?: string
+  publicationMode?: string
   impactFactor?: number
-  dateOfImpactFactor?: string | Date
-  journalPublisher?: string
-  status?: string
+  impactFactorDate?: string | Date
+  publisher?: string
+  teacherStatus?: string
   paperLink?: string
   doi?: string
   registrationFees?: number
   reimbursement?: number
   isPublic?: boolean
-  abstract?: string
-  imageUrl?: string
-  documentUrl?: string
   publicationDate?: string | Date
   keywords?: string[]
   studentAuthorIds?: string[]
@@ -33,11 +38,14 @@ export interface UpdateJournalInput {
 }
 
 export interface JournalStatsResponse {
+  userRole: string
   total: number
   publicCount: number
   privateCount: number
   statusCounts: Array<{ status: string; count: number }>
-  journalTypeCounts: Array<{ journalType: string; count: number }>
+  journalStatusCounts: Array<{ status: string; count: number }>
+  scopeCounts: Array<{ scope: string; count: number }>
+  indexingCounts: Array<{ indexing: string; count: number }>
   financials: {
     totalRegistrationFees: number
     totalReimbursement: number
@@ -48,8 +56,16 @@ export interface JournalStatsResponse {
   monthlyTrend: Array<{ month: string; count: number }>
   dailyTrend: Array<{ date: string; count: number }>
   weeklyTrend: Array<{ week: string; count: number }>
-  topPublishers: Array<{ publisher: string; count: number }>
-  topKeywords: Array<{ keyword: string; count: number }>
+  recentJournals: Array<{ 
+    id: string
+    title: string
+    journalName?: string
+    scope: string
+    indexing: string
+    teacherStatus: string
+    impactFactor: number | null
+    createdAt: string
+  }>
 }
 
 export interface BulkDeleteResponse {
@@ -276,28 +292,28 @@ export const getPublicJournals = async (
 }
 
 /**
- * Get journals by status
+ * Get journals by teacher status
  */
-export const getJournalsByStatus = async (
-  status: string,
-  filters?: Omit<JournalFilters, 'status'>
+export const getJournalsByTeacherStatus = async (
+  teacherStatus: string,
+  filters?: Omit<JournalFilters, 'teacherStatus'>
 ): Promise<ApiResponse<JournalListResponse>> => {
   return getJournals({
     ...filters,
-    status: status as any
+    teacherStatus: teacherStatus as any
   })
 }
 
 /**
- * Get journals by type
+ * Get journals by scope
  */
-export const getJournalsByType = async (
-  journalType: string,
-  filters?: Omit<JournalFilters, 'journalType'>
+export const getJournalsByScope = async (
+  scope: string,
+  filters?: Omit<JournalFilters, 'scope'>
 ): Promise<ApiResponse<JournalListResponse>> => {
   return getJournals({
     ...filters,
-    journalType: journalType as any
+    scope: scope as any
   })
 }
 
@@ -312,11 +328,11 @@ export const toggleJournalVisibility = async (
 }
 
 /**
- * Update journal status
+ * Update journal teacher status
  */
-export const updateJournalStatus = async (
+export const updateJournalTeacherStatus = async (
   id: string,
-  status: string
+  teacherStatus: string
 ): Promise<ApiResponse<{ journal: Journal }>> => {
-  return updateJournal(id, { status: status as any })
+  return updateJournal(id, { teacherStatus: teacherStatus as any })
 }

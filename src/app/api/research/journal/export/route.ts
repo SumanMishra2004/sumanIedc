@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ResearchStatus, UserRole, JournalType } from '@prisma/client'
+import { 
+  TeacherStatus, 
+  UserRole, 
+  JournalScope,
+  JournalReviewType,
+  JournalAccessType,
+  JournalIndexing,
+  JournalQuartile,
+  JournalPublicationMode
+} from '@prisma/client'
 
 // GET - Export journals to CSV
 export async function GET(req: NextRequest) {
@@ -18,11 +27,16 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams
 
     // Filters (same as main GET endpoint)
-    const status = searchParams.get('status')
+    const teacherStatus = searchParams.get('teacherStatus')
     const isPublic = searchParams.get('isPublic')
-    const journalType = searchParams.get('journalType')
+    const scope = searchParams.get('scope')
+    const reviewType = searchParams.get('reviewType')
+    const accessType = searchParams.get('accessType')
+    const indexing = searchParams.get('indexing')
+    const quartile = searchParams.get('quartile')
+    const publicationMode = searchParams.get('publicationMode')
     const keyword = searchParams.get('keyword')
-    const journalPublisher = searchParams.get('journalPublisher')
+    const publisher = searchParams.get('publisher')
     const search = searchParams.get('search')
 
     // Date range filters
@@ -60,16 +74,36 @@ export async function GET(req: NextRequest) {
     }
     // ADMIN sees everything - no filter needed
 
-    if (status) {
-      where.status = status as ResearchStatus
+    if (teacherStatus) {
+      where.teacherStatus = teacherStatus as TeacherStatus
     }
 
     if (isPublic !== null && isPublic !== undefined) {
       where.isPublic = isPublic === 'true'
     }
 
-    if (journalType) {
-      where.journalType = journalType as JournalType
+    if (scope) {
+      where.scope = scope as JournalScope
+    }
+
+    if (reviewType) {
+      where.reviewType = reviewType as JournalReviewType
+    }
+
+    if (accessType) {
+      where.accessType = accessType as JournalAccessType
+    }
+
+    if (indexing) {
+      where.indexing = indexing as JournalIndexing
+    }
+
+    if (quartile) {
+      where.quartile = quartile as JournalQuartile
+    }
+
+    if (publicationMode) {
+      where.publicationMode = publicationMode as JournalPublicationMode
     }
 
     if (keyword) {
@@ -78,9 +112,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    if (journalPublisher) {
-      where.journalPublisher = {
-        contains: journalPublisher,
+    if (publisher) {
+      where.publisher = {
+        contains: publisher,
         mode: 'insensitive'
       }
     }
@@ -88,9 +122,9 @@ export async function GET(req: NextRequest) {
     if (search) {
       where.OR = [
         { title: { contains: search, mode: 'insensitive' } },
-        { titleOfJournal: { contains: search, mode: 'insensitive' } },
+        { journalName: { contains: search, mode: 'insensitive' } },
         { abstract: { contains: search, mode: 'insensitive' } },
-        { journalPublisher: { contains: search, mode: 'insensitive' } },
+        { publisher: { contains: search, mode: 'insensitive' } },
         { serialNo: { contains: search, mode: 'insensitive' } },
         { doi: { contains: search, mode: 'insensitive' } }
       ]
@@ -187,14 +221,19 @@ export async function GET(req: NextRequest) {
     const headers = [
       'ID',
       'Serial No',
-      'Journal Title',
-      'Article Title',
-      'Journal Type',
+      'Title',
+      'Journal Name',
       'Abstract',
-      'Status',
+      'Scope',
+      'Review Type',
+      'Access Type',
+      'Indexing',
+      'Quartile',
+      'Publication Mode',
+      'Teacher Status',
       'Impact Factor',
-      'Date of Impact Factor',
-      'Journal Publisher',
+      'Impact Factor Date',
+      'Publisher',
       'Paper Link',
       'DOI',
       'Publication Date',
@@ -206,8 +245,8 @@ export async function GET(req: NextRequest) {
       'Faculty Authors',
       'Created At',
       'Updated At',
-      'Document URL',
-      'Image URL'
+      'Image URL',
+      'Document URL'
     ]
 
     const csvRows = [
@@ -226,14 +265,19 @@ export async function GET(req: NextRequest) {
         return [
           journal.id,
           `"${(journal.serialNo || '').replace(/"/g, '""')}"`,
-          `"${(journal.titleOfJournal || '').replace(/"/g, '""')}"`,
           `"${(journal.title || '').replace(/"/g, '""')}"`,
-          journal.journalType,
+          `"${(journal.journalName || '').replace(/"/g, '""')}"`,
           `"${(journal.abstract || '').replace(/"/g, '""')}"`,
-          journal.status,
+          journal.scope,
+          journal.reviewType,
+          journal.accessType,
+          journal.indexing,
+          journal.quartile,
+          journal.publicationMode,
+          journal.teacherStatus,
           journal.impactFactor || '',
-          journal.dateOfImpactFactor ? new Date(journal.dateOfImpactFactor).toISOString() : '',
-          `"${(journal.journalPublisher || '').replace(/"/g, '""')}"`,
+          journal.impactFactorDate ? new Date(journal.impactFactorDate).toISOString() : '',
+          `"${(journal.publisher || '').replace(/"/g, '""')}"`,
           journal.paperLink || '',
           journal.doi || '',
           journal.publicationDate ? new Date(journal.publicationDate).toISOString() : '',
@@ -245,8 +289,8 @@ export async function GET(req: NextRequest) {
           `"${facultyAuthors}"`,
           new Date(journal.createdAt).toISOString(),
           new Date(journal.updatedAt).toISOString(),
-          journal.documentUrl || '',
-          journal.imageUrl || ''
+          journal.imageUrl || '',
+          journal.documentUrl || ''
         ].join(',')
       })
     ]
