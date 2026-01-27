@@ -12,6 +12,93 @@ enum crdb_internal_region {
 
 
 
+
+enum UserRole {
+STUDENT
+ADMIN
+FACULTY
+}
+
+
+enum TeacherStatus {
+UPLOADED
+ACCEPTED
+PUBLISHED
+UPDATE
+}
+
+
+enum JournalScope {
+INTERNATIONAL
+NATIONAL
+REGIONAL
+LOCAL
+}
+
+
+enum JournalReviewType {
+PEER_REVIEWED
+DOUBLE_BLIND
+SINGLE_BLIND
+EDITORIAL_REVIEWED
+NON_PEER_REVIEWED
+}
+
+
+enum JournalAccessType {
+OPEN_ACCESS
+SUBSCRIPTION
+HYBRID
+DIAMOND_OPEN_ACCESS
+}
+
+
+enum JournalIndexing {
+SCOPUS
+WEB_OF_SCIENCE
+SCI
+SCIE
+SSCI
+AHCI
+UGC_CARE
+DOAJ
+PUBMED
+IEEE_XPLORE
+NONE
+}
+
+
+enum JournalQuartile {
+Q1
+Q2
+Q3
+Q4
+NOT_APPLICABLE
+}
+
+
+enum JournalPublicationMode {
+ONLINE
+PRINT
+PRINT_AND_ONLINE
+}
+
+
+enum BookchapterStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  PUBLISHED
+}
+
+
+enum CopyrightStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  PUBLISHED
+}
+
 model Account {
   id                String  @id @default(cuid())
   userId            String  @map("user_id")
@@ -42,11 +129,6 @@ model Session {
   @@map("sessions")
 }
 
-enum UserRole {
-  STUDENT
-  ADMIN
-  FACULTY
-}
 model SpecialUser {
   id    String @id @default(cuid())
   email String @unique
@@ -85,16 +167,6 @@ model User {
   @@map("users")
 }
 
-enum ResearchStatus {
-  DRAFT
-  SUBMITTED
-  UNDER_REVIEW
-  REVISION
-  APPROVED
-  PUBLISHED
-  REJECTED
-}
-
 
 model BookChapter {
   id               String                       @id @default(cuid())
@@ -102,7 +174,8 @@ model BookChapter {
   abstract         String?
   imageUrl         String?
   documentUrl      String?
-  status           ResearchStatus               @default(DRAFT)
+  bookChapterStatus BookchapterStatus               @default(SUBMITTED)
+  teacherStatus     TeacherStatus               @default(UPLOADED)
   isbnIssn         String?
   registrationFees Float?
   reimbursement    Float?
@@ -136,7 +209,7 @@ model BookChapterTeacherAuthor {
 
 model Copyright {
   id               String           @id @default(cuid())
-  serialNo         String
+  regNo            String
   title            String
   abstract         String?
   imageUrl         String?
@@ -145,9 +218,10 @@ model Copyright {
   dateOfSubmission DateTime?
   dateOfPublished  DateTime?
   dateOfGrant      DateTime?
-   registrationFees Float?
+  registrationFees Float?
   reimbursement    Float?
-  status           ResearchStatus  @default(DRAFT)
+  copyrightStatus  CopyrightStatus  @default(SUBMITTED)
+  teacherStatus     TeacherStatus               @default(UPLOADED)
   isPublic         Boolean          @default(false)
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
@@ -171,40 +245,51 @@ model CopyrightTeacherAuthor {
 }
 
 
-enum JournalType {
-  INTERNATIONAL
-  NATIONAL
-  PEER_REVIEWED
-  OPEN_ACCESS
-  OTHER
-}
-
 model Journal {
-  id                  String              @id @default(cuid())
-  serialNo            String              @unique
-  titleOfJournal      String              @map("title_of_journal")
-  title         String             
-  journalType         JournalType         @map("journal_type")
-  impactFactor        Float?              @map("impact_factor")
-  dateOfImpactFactor  DateTime?           @map("date_of_impact_factor")
-  journalPublisher    String?             @map("journal_publisher")
-  status              ResearchStatus      @default(DRAFT)
-  paperLink           String?             @map("paper_link")
-  doi                 String?
-  registrationFees    Float?              @map("registration_fees")
-  reimbursement       Float?
-  isPublic            Boolean             @default(false)
-  abstract            String?
-  imageUrl            String?             @map("image_url")
-  documentUrl         String?             @map("document_url")
-  publicationDate     DateTime?           @map("publication_date")
-  keywords            String[]
-  createdAt           DateTime            @default(now()) @map("created_at")
-  updatedAt           DateTime            @updatedAt @map("updated_at")
-  studentAuthors      JournalStudentAuthor[] @relation("studentJournalAuthors")
-  facultyAuthors      JournalTeacherAuthor[] @relation("facultyJournalAuthors")
+id String @id @default(cuid())
+serialNo String @unique
+title String
+abstract String?
 
-  @@map("journals")
+
+scope JournalScope
+reviewType JournalReviewType
+accessType JournalAccessType
+indexing JournalIndexing
+quartile JournalQuartile @default(NOT_APPLICABLE)
+
+
+impactFactor Float?
+impactFactorDate DateTime?
+
+
+publisher String?
+publicationMode JournalPublicationMode
+publicationDate DateTime?
+
+
+doi String?
+paperLink String?
+keywords String[]
+
+
+registrationFees Float?
+reimbursement Float?
+
+
+teacherStatus TeacherStatus @default(UPLOADED)
+isPublic Boolean @default(false)
+
+
+createdAt DateTime @default(now())
+updatedAt DateTime @updatedAt
+
+
+studentAuthors JournalStudentAuthor[] @relation("studentJournalAuthors")
+facultyAuthors JournalTeacherAuthor[] @relation("facultyJournalAuthors")
+
+
+@@map("journals")
 }
 
 model JournalStudentAuthor {

@@ -32,7 +32,7 @@ interface StatusRadarChartProps {
 const chartConfig = {
   count: {
     label: "Copyrights",
-    color: "var(--chart-1)",
+    color: "var(--chart-2)",
   },
 } satisfies ChartConfig
 

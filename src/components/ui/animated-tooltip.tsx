@@ -44,17 +44,20 @@ export const AnimatedAvatarGroupTooltip = ({
     useTransform(x, [-100, 100], [-40, 40]),
     springConfig
   );
+const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+  const target = event.currentTarget; // ✅ capture immediately
+  const offsetX = event.nativeEvent.offsetX;
 
-  const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
+  if (animationFrameRef.current) {
+    cancelAnimationFrame(animationFrameRef.current);
+  }
 
-    animationFrameRef.current = requestAnimationFrame(() => {
-      const halfWidth = event.currentTarget.offsetWidth / 2;
-      x.set(event.nativeEvent.offsetX - halfWidth);
-    });
-  };
+  animationFrameRef.current = requestAnimationFrame(() => {
+    const halfWidth = target.offsetWidth / 2;
+    x.set(offsetX - halfWidth);
+  });
+};
+
 
   const visibleItems = items.slice(0, maxCount);
   const overflowItems = items.slice(maxCount);
