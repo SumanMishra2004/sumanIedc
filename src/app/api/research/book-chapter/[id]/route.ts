@@ -50,11 +50,32 @@ export async function GET(
     }
 
     // Access control - check if user can view
-    if (!bookChapter.isPublic && (!session || session.user.role === UserRole.STUDENT)) {
-      return NextResponse.json(
-        { error: 'Unauthorized to view this book chapter' },
-        { status: 403 }
+    if (!bookChapter.isPublic) {
+      // Private chapter - check authorization
+      if (!session) {
+        return NextResponse.json(
+          { error: 'Unauthorized - Please sign in to view this book chapter' },
+          { status: 401 }
+        )
+      }
+
+      // Allow admins
+      const isAdmin = session.user.role === UserRole.ADMIN
+
+      // Check if user is one of the authors
+      const isStudentAuthor = bookChapter.studentAuthors.some(
+        author => author.user.email === session.user.email
       )
+      const isFacultyAuthor = bookChapter.facultyAuthors.some(
+        author => author.user.email === session.user.email
+      )
+
+      if (!isAdmin && !isStudentAuthor && !isFacultyAuthor) {
+        return NextResponse.json(
+          { error: 'Unauthorized to view this book chapter' },
+          { status: 403 }
+        )
+      }
     }
 
     return NextResponse.json({ bookChapter })

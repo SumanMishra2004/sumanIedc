@@ -4,8 +4,8 @@ import JournalTable from "@/components/journal/JournalTable";
 import { StatusRadarChart } from "@/components/charts/journal-charts/Pie";
 import { ChartAreaGradient } from "@/components/charts/journal-charts/TimeSeriesChart";
 import React, { useEffect, useState } from "react";
-import { getJournalStats } from "@/lib/journalApi";
-import { JournalStatsResponse } from "@/lib/journalApi";
+import { getJournalStats } from "@/lib/research/journalApi";
+import { JournalStatsResponse } from "@/lib/research/journalApi";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import {

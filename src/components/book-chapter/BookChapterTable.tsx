@@ -61,7 +61,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Download } from "../animate-ui/icons/download";
+
 import { FilterDialog } from "./bookchapterFilterDialog.";
 import { ExportDialog } from "./bookChapterExportDialog";
 import { BookChapter, BookChapterFilters } from "@/types/book-chapter";
@@ -82,7 +82,7 @@ import {
   exportBookChaptersToCSV,
   searchBookChapters,
   getBookChaptersByStatus,
-} from "@/lib/bookChapterApi";
+} from "@/lib/research/bookChapterApi";
 import {
   Card,
   CardContent,
@@ -92,6 +92,12 @@ import {
 } from "../ui/card";
 import { AnimatedAvatarGroupTooltip } from "../ui/animated-tooltip";
 import { BookchapterStatus } from "@prisma/client";
+import { useState } from "react";
+import EditBookChapterDialog from "./bookChapterEditForm";
+import { BookChapterViewDialog } from "./viewDialog";
+
+
+
 
 // --- Types & Data ---
 
@@ -397,7 +403,10 @@ export default function BookChapterTable({
   const [rowSelection, setRowSelection] = React.useState({});
   const [viewMode, setViewMode] = React.useState<"table" | "card">("table");
   const [searchTerm, setSearchTerm] = React.useState("");
-
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingChapterId, setEditingChapterId] = useState<string | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewingChapterId, setViewingChapterId] = useState<string | null>(null);
   const [filters, setFilters] = React.useState<BookChapterFilters>({
     page: 1,
     limit: 10,
@@ -537,10 +546,12 @@ export default function BookChapterTable({
       createColumns({
         onDelete: handleDelete,
         onEdit: (id) => {
-          toast.info("Edit functionality coming soon");
+          setEditingChapterId(id);
+          setEditDialogOpen(true);
         },
         onView: (id) => {
-          toast.info("View functionality coming soon");
+          setViewingChapterId(id);
+          setViewDialogOpen(true);
         },
       }),
     [],
@@ -588,7 +599,8 @@ export default function BookChapterTable({
   const currentPage = filters.page || 1;
 
   return (
-    <Card className="w-full p-3! border-dashed border-2 border-chart-2 gap-3! ">
+    <>
+    <Card className="w-full p-3! border-dashed border-2 border-chart-2 gap-3! ">{" "}
       {/* Header Section */}
       <CardHeader className="space-y-4 border-b p-0!">
         <div className="flex flex-col gap-4 sm:flex-row lg:items-center lg:justify-between">
@@ -1000,5 +1012,29 @@ export default function BookChapterTable({
         </div>
       </CardFooter>
     </Card>
+    {editingChapterId && (
+      <EditBookChapterDialog
+        bookChapterId={editingChapterId}
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) setEditingChapterId(null);
+        }}
+        onSuccess={() => {
+          fetchData();
+          onRefresh?.();
+          toast.success("Book chapter updated successfully");
+        }}
+      />
+    )}
+    {viewingChapterId && (
+      <BookChapterViewDialog
+      chapterId={viewingChapterId}
+      open={viewDialogOpen}
+      setOpen={setViewDialogOpen}
+      setViewingChapterId={setViewingChapterId}
+      />
+    )}
+  </>
   );
 }

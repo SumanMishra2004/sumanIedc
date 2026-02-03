@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/drawer"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { JournalFilters } from "@/types/journal"
-import { exportJournalsToCSV } from "@/lib/journalApi"
+import { exportJournalsToCSV } from "@/lib/research/journalApi"
 import { FilterDialog } from "./journalFilterDialog"
 
 

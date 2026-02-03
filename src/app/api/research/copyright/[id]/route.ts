@@ -48,14 +48,33 @@ export async function GET(
       )
     }
 
-    // Access control - check if user can view
-    if (!copyright.isPublic && (!session || session.user.role === UserRole.STUDENT)) {
-      return NextResponse.json(
-        { error: 'Unauthorized to view this copyright' },
-        { status: 403 }
-      )
-    }
-
+   if (!copyright.isPublic) {
+         // Private chapter - check authorization
+         if (!session) {
+           return NextResponse.json(
+             { error: 'Unauthorized - Please sign in to view this book chapter' },
+             { status: 401 }
+           )
+         }
+   
+         // Allow admins
+         const isAdmin = session.user.role === UserRole.ADMIN
+   
+         // Check if user is one of the authors
+         const isStudentAuthor = copyright.studentAuthors.some(
+           author => author.user.email === session.user.email
+         )
+         const isFacultyAuthor = copyright.facultyAuthors.some(
+           author => author.user.email === session.user.email
+         )
+   
+         if (!isAdmin && !isStudentAuthor && !isFacultyAuthor) {
+           return NextResponse.json(
+             { error: 'Unauthorized to view this book chapter' },
+             { status: 403 }
+           )
+         }
+       }
     return NextResponse.json({ copyright })
   } catch (error) {
     console.error('Error fetching copyright:', error)

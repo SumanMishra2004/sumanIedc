@@ -74,8 +74,10 @@ import {
   getCopyrights,
   deleteCopyright,
   bulkDeleteCopyrights,
-} from "@/lib/copyrightApi";
+} from "@/lib/research/copyrightApi";
 import CopyrightAddForm from "./copyrightAddForm";
+import { useState } from "react";
+import EditCopyrightDialog from "./copyrightEditForm";
 
 
 // --- Types & Data ---
@@ -201,13 +203,13 @@ export const createColumns = ({
     enableHiding: false,
   },
   {
-    accessorKey: "serialNo",
-    header: () => <div>Serial No</div>,
+    accessorKey: "regNo",
+    header: () => <div>Reg. No</div>,
     cell: ({ row }) => {
-      const serialNo = row.getValue("serialNo") as string | null;
+      const regNo = row.getValue("regNo") as string | null;
       return (
         <div className="font-mono text-sm font-medium">
-          {serialNo || "—"}
+          {regNo || "—"}
         </div>
       )
     }
@@ -398,6 +400,8 @@ export default function CopyrightTable({
   const [rowSelection, setRowSelection] = React.useState({});
   const [viewMode, setViewMode] = React.useState<"table" | "card">("table");
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingCopyrightId, setEditingCopyrightId] = useState<string | null>(null);
 
   const [filters, setFilters] = React.useState<CopyrightFilters>({
     page: 1,
@@ -537,8 +541,9 @@ export default function CopyrightTable({
     () =>
       createColumns({
         onDelete: handleDelete,
-        onEdit: () => {
-          toast.info("Edit functionality coming soon");
+        onEdit: (id) => {
+          setEditingCopyrightId(id);
+          setEditDialogOpen(true);
         },
         onView: () => {
           toast.info("View functionality coming soon");
@@ -590,6 +595,7 @@ export default function CopyrightTable({
   const currentPage = filters.page || 1;
 
   return (
+    <>
     <Card className="w-full p-3! border-dashed border-2 border-chart-2 gap-3! ">
       {/* Header Section */}
       <CardHeader className="space-y-4 border-b p-0!">
@@ -998,5 +1004,21 @@ export default function CopyrightTable({
         </div>
       </CardFooter>
     </Card>
+    {editingCopyrightId && (
+      <EditCopyrightDialog
+        copyrightId={editingCopyrightId}
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) setEditingCopyrightId(null);
+        }}
+        onSuccess={() => {
+          fetchData();
+          onRefresh?.();
+          toast.success("Copyright updated successfully");
+        }}
+      />
+    )}
+  </>
   );
 }

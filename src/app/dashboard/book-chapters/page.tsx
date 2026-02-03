@@ -4,7 +4,7 @@ import BookChapterTable from "@/components/book-chapter/BookChapterTable";
 import { StatusRadarChart } from "@/components/charts/book-chapter-charts/Pie";
 import { ChartAreaGradient } from "@/components/charts/book-chapter-charts/TimeSeriesChart";
 import React, { useEffect, useState } from "react";
-import { getBookChapterStats } from "@/lib/bookChapterApi";
+import { getBookChapterStats } from "@/lib/research/bookChapterApi";
 import { BookChapterStatsResponse } from "@/types/book-chapter";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";

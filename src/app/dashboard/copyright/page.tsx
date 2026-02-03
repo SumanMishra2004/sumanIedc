@@ -4,7 +4,7 @@
 import { CopyrightStatusRadarChart } from "@/components/charts/copyright-charts/Pie";
 import { CopyrightTimeSeriesChart } from "@/components/charts/copyright-charts/TimeSeriesChart";
 import React, { useEffect, useState } from "react";
-import { getCopyrightStats } from "@/lib/copyrightApi";
+import { getCopyrightStats } from "@/lib/research/copyrightApi";
 import { CopyrightStatsResponse } from "@/types/copyright";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
