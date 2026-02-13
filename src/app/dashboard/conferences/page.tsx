@@ -15,9 +15,8 @@ import {
 } from "@/components/ui/card";
 import { BookOpen, DollarSign, FileText, TrendingUp } from "lucide-react";
 
-// Placeholder charts if not created yet, comment out specialized imports
-// import { StatusRadarChart } from "@/components/charts/conference-charts/Pie"; 
-// import { ChartAreaGradient } from "@/components/charts/conference-charts/TimeSeriesChart";
+import { StatusRadarChart } from "@/components/charts/conference-charts/Pie"; 
+import { ChartAreaGradient } from "@/components/charts/conference-charts/TimeSeriesChart";
 
 const ConferencesPage = () => {
   const [stats, setStats] = useState<ConferenceStatsResponse | null>(null);
@@ -49,6 +48,10 @@ const ConferencesPage = () => {
           <Skeleton className="h-32" />
           <Skeleton className="h-32" />
           <Skeleton className="h-32" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Skeleton className="h-[320px] lg:col-span-1" />
+          <Skeleton className="h-[320px] lg:col-span-2" />
         </div>
         <Skeleton className="w-full h-96" />
       </div>
@@ -91,37 +94,60 @@ const ConferencesPage = () => {
               </CardContent>
             </Card>
 
-             {/* Add more stats cards as relevant to conferences */}
-             <Card className="border-dashed border-2 border-chart-2 ">
+            <Card className="border-dashed border-2 border-chart-2 ">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Submitted</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Registration Fees
+                </CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  ${stats.financials.totalRegistrationFees.toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Avg: ${stats.financials.avgRegistrationFees.toFixed(0)}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-dashed border-2 border-chart-2 ">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Reimbursement
+                </CardTitle>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                {stats.conferenceStatusCounts.find((s) => s.status === "SUBMITTED")
-                    ?.count || 0}
+                  ${stats.financials.totalReimbursement.toLocaleString()}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Pending review
+                  Avg: ${stats.financials.avgReimbursement.toFixed(0)}
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Charts would go here */}
-          {/* <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-1">
-              <StatusRadarChart data={stats.conferenceStatusCounts} />
+              <StatusRadarChart statusCounts={stats.conferenceStatusCounts} total={stats.total} />
             </div>
             <div className="lg:col-span-2">
-               <ChartAreaGradient />
+               <ChartAreaGradient 
+                 monthlyTrend={stats.monthlyTrend} 
+                 dailyTrend={stats.dailyTrend} 
+                 weeklyTrend={stats.weeklyTrend} 
+                 total={stats.total} 
+               />
             </div>
-          </div> */}
+          </div> 
         </>
       )}
 
-      <ConferenceTable />
+      <div className="w-full">
+        <ConferenceTable />
+      </div>
     </div>
   );
 };

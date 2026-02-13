@@ -28,6 +28,8 @@ import {
   Users,
   Calendar,
   Funnel,
+  ChevronDown,
+  BookOpen, // Added for header icon
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -39,6 +41,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem, // Added
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
@@ -82,6 +85,47 @@ import {
 import { AnimatedAvatarGroupTooltip } from "@/components/ui/animated-tooltip";
 import { ConferenceStatus } from "@prisma/client";
 import { useState } from "react";
+
+const getStatusConfig = (status: string) => {
+  const configs: Record<string, { bg: string; text: string; border: string; dot: string; icon: string }> = {
+    PUBLISHED: {
+      bg: "bg-emerald-50 dark:bg-emerald-950/30",
+      text: "text-emerald-700 dark:text-emerald-400",
+      border: "border-emerald-200 dark:border-emerald-800",
+      dot: "bg-emerald-500",
+      icon: "✓"
+    },
+    APPROVED: {
+      bg: "bg-blue-50 dark:bg-blue-950/30",
+      text: "text-blue-700 dark:text-blue-400",
+      border: "border-blue-200 dark:border-blue-800",
+      dot: "bg-blue-500",
+      icon: "✓"
+    },
+    SUBMITTED: {
+      bg: "bg-purple-50 dark:bg-purple-950/30",
+      text: "text-purple-700 dark:text-purple-400",
+      border: "border-purple-200 dark:border-purple-800",
+      dot: "bg-purple-500",
+      icon: "↑"
+    },
+    UNDER_REVIEW: {
+      bg: "bg-amber-50 dark:bg-amber-950/30",
+      text: "text-amber-700 dark:text-amber-400",
+      border: "border-amber-200 dark:border-amber-800",
+      dot: "bg-amber-500",
+      icon: "⌛"
+    },
+    PRESENTED: {
+      bg: "bg-indigo-50 dark:bg-indigo-950/30",
+      text: "text-indigo-700 dark:text-indigo-400",
+      border: "border-indigo-200 dark:border-indigo-800",
+      dot: "bg-indigo-500",
+      icon: "🎤"
+    }
+  };
+  return configs[status] || configs.SUBMITTED;
+};
 
 export default function ConferenceTable() {
   const [data, setData] = useState<Conference[]>([]);
@@ -335,69 +379,221 @@ export default function ConferenceTable() {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+    <>
+    <Card className="w-full p-3! border-dashed border-2 border-chart-2 gap-3! ">
+      {/* Header Section */}
+      <CardHeader className="space-y-4 border-b p-0!">
+        <div className="flex flex-col gap-4 sm:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-white/20 backdrop-blur-sm">
+                <BookOpen className="h-6 w-6 text-chart-2" />
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                Conferences
+              </h2>
+            </div>
+           
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {Object.keys(rowSelection).length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDelete}
+                className="shadow-lg"
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Delete ({Object.keys(rowSelection).length})
+              </Button>
+            )}
+            <ConferenceExportDialog
+              trigger={
+               <Button
+                  variant="secondary"
+                  size="sm"
+                  className="shadow-lg bg-white/20 hover:bg-white/30 text-white border-white/30"
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Export
+                </Button>
+              }
+            />
+            <Button size="sm" onClick={() => setShowAddDialog(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Conference
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+
+      {/* Toolbar */}
+      <CardContent
+        className="
+          rounded-lg border bg-card p-4 shadow-sm
+          flex flex-col gap-4
+          lg:flex-row lg:items-center lg:justify-between
+        "
+      >
+        {/* LEFT SECTION */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center flex-1">
+
+          {/* Search */}
+          <div className="relative w-full lg:w-78">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search conferences..."
               value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-              className="pl-8"
+              onChange={(e) => setSearchTerm(e.target.value)}
+              disabled={loading}
+              className="h-9 pl-9 bg-background "
             />
           </div>
+
+          <Separator orientation="vertical" className="hidden sm:block h-6" />
+
+          {/* Status Filter */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loading}
+                className="
+                  h-9 gap-2
+                  border-dashed
+                  bg-muted/40 hover:bg-muted
+                "
+              >
+                <ChevronDown className="h-4 w-4" />
+                <span className="whitespace-nowrap">
+                  Status {filters.conferenceStatus && `(${filters.conferenceStatus})`}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="start" className="w-52">
+              <DropdownMenuLabel>Status</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+
+              <DropdownMenuItem
+                onClick={() => {
+                  const { conferenceStatus, ...rest } = filters;
+                  setFilters({ ...rest, page: 1 });
+                }}
+              >
+                All Statuses
+              </DropdownMenuItem>
+
+              {[
+                "SUBMITTED",
+                "UNDER_REVIEW",
+                "APPROVED",
+                "PUBLISHED",
+                "PRESENTED"
+              ].map((status) => (
+                <DropdownMenuItem
+                  key={status}
+                  onClick={() => setFilters(prev => ({ ...prev, conferenceStatus: status as ConferenceStatus, page: 1 }))}
+                  className="flex items-center gap-2"
+                >
+                  <span
+                    className={`h-2 w-2 rounded-full ${getStatusConfig(status as ConferenceStatus).dot}`}
+                  />
+                  <span className="capitalize text-sm">
+                    {status.replace(/_/g, " ").toLowerCase()}
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* RIGHT SECTION */}
+        <div className="flex flex-wrap items-center gap-2 justify-between">
+
+
           <ConferenceFilterDialog
              filters={filters}
              onFiltersChange={(newFilters) => setFilters(prev => ({ ...prev, ...newFilters }))}
              onClearFilters={() => setFilters({ page: 1, limit: 10 })}
              triggerButton={
-                <Button variant="outline" size="icon">
-                    <Funnel className="h-4 w-4" />
-                </Button>
+               <Button
+                 variant="outline"
+                 size="sm"
+                 className="h-9 gap-2 border-dashed bg-muted/40 hover:bg-muted"
+               >
+                 <Funnel className="h-4 w-4" />
+                 Filter
+               </Button>
              }
           />
+
+          {/* View Toggle */}
+          <div className="flex items-center rounded-md border bg-background p-1 shadow-sm">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setViewMode("table")}
+              className={`h-7 w-7 ${
+                viewMode === "table"
+                  ? "bg-muted shadow-sm"
+                  : "hover:bg-transparent"
+              }`}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setViewMode("grid")}
+              className={`h-7 w-7 ${
+                viewMode === "grid"
+                  ? "bg-muted shadow-sm"
+                  : "hover:bg-transparent"
+              }`}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Columns (Desktop only) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex h-9 gap-2 bg-muted/40 hover:bg-muted"
+              >
+                Columns
+                <ChevronDown className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end">
+              {table
+                .getAllColumns()
+                .filter((column) => column.getCanHide())
+                .map((column) => (
+                  <DropdownMenuCheckboxItem
+                    key={column.id}
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) =>
+                      column.toggleVisibility(!!value)
+                    }
+                    className="capitalize"
+                  >
+                    {column.id}
+                  </DropdownMenuCheckboxItem>
+                ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-             <div className="flex items-center border rounded-md bg-background">
-                 <Button
-                    variant={viewMode === "table" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-8 px-2 rounded-r-none"
-                    onClick={() => setViewMode("table")}
-                 >
-                    <List className="h-4 w-4" />
-                 </Button>
-                 <Separator orientation="vertical" className="h-4" />
-                 <Button
-                    variant={viewMode === "grid" ? "secondary" : "ghost"}
-                    size="sm"
-                    className="h-8 px-2 rounded-l-none"
-                    onClick={() => setViewMode("grid")}
-                 >
-                    <LayoutGrid className="h-4 w-4" />
-                 </Button>
-             </div>
-             
-             <ConferenceExportDialog 
-                filters={filters}
-                trigger={
-                    <Button variant="outline" size="sm">
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Export
-                    </Button>
-                }
-             />
-             
-             <Button size="sm" onClick={() => setShowAddDialog(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Conference
-             </Button>
-        </div>
-      </div>
+      </CardContent>
 
       {viewMode === "table" ? (
-        <div className="rounded-md border">
+        <div className="rounded-md border bg-card shadow-sm overflow-x-auto scroll-m-1 scrollbar-gradient">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -523,6 +719,7 @@ export default function ConferenceTable() {
           </Button>
         </div>
       </div>
+      </Card>
 
       <ConferenceAddForm 
          open={showAddDialog}
@@ -530,18 +727,28 @@ export default function ConferenceTable() {
          onSuccess={fetchConferences}
       />
 
-      <ConferenceEditForm
-         conferenceId={selectedConferenceId}
-         open={showEditDialog}
-         onOpenChange={setShowEditDialog}
-         onSuccess={fetchConferences}
-      />
+      {showEditDialog && selectedConferenceId && (
+        <ConferenceEditForm
+          open={showEditDialog}
+          onOpenChange={(open) => {
+            setShowEditDialog(open);
+            if(!open) setSelectedConferenceId(null);
+          }}
+          conferenceId={selectedConferenceId}
+          onSuccess={fetchConferences}
+        />
+      )}
       
-      <ConferenceViewDialog
-         conference={selectedConference}
-         open={showViewDialog}
-         onOpenChange={setShowViewDialog}
-      />
-    </div>
+      {showViewDialog && selectedConference && (
+        <ConferenceViewDialog
+          open={showViewDialog}
+          onOpenChange={(open) => {
+             setShowViewDialog(open);
+             if(!open) setSelectedConference(null);
+          }}
+          conference={selectedConference}
+        />
+      )}
+    </>
   );
 }

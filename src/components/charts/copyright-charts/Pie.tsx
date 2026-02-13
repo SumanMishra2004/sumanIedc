@@ -17,13 +17,14 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { ResearchStatus } from "@prisma/client"
+import { CopyrightStatus } from "@prisma/client"
+
 
 export const description = "A radar chart showing status distribution"
 
 interface StatusRadarChartProps {
   statusCounts: Array<{
-    status: ResearchStatus
+    status: CopyrightStatus
     count: number
   }>
   total: number

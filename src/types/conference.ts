@@ -101,6 +101,15 @@ export interface ConferenceStatsResponse {
     status: ConferenceStatus
     count: number
   }>
+  monthlyTrend: Array<{ month: string; count: number }>
+  dailyTrend: Array<{ date: string; count: number }>
+  weeklyTrend: Array<{ week: string; count: number }>
+  financials: {
+    totalRegistrationFees: number
+    avgRegistrationFees: number
+    totalReimbursement: number
+    avgReimbursement: number
+  }
 }
 
 export interface BulkDeleteResponse {

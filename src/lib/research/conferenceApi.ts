@@ -129,6 +129,27 @@ export const deleteConference = async (
 }
 
 /**
+ * Bulk delete conferences
+ */
+export const bulkDeleteConferences = async (
+  ids: string[]
+): Promise<ApiResponse<{ message: string; count: number }>> => {
+  try {
+    // The DELETE route expects a JSON body with { ids: string[] }
+    // Axios delete with body requires 'data' property in options
+    const response = await axios.delete<{ message: string; count: number }>(
+      API_BASE_URL,
+      { data: { ids } }
+    )
+    
+    return { data: response.data }
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+
+/**
  * Get conference statistics
  */
 export const getConferenceStats = async (): Promise<ApiResponse<ConferenceStatsResponse>> => {
