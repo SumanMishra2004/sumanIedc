@@ -262,20 +262,9 @@ const createColumns = ({
       );
     },
   },
+   
   {
-    accessorKey: "applicationNo",
-    header: () => <div className="text-right">Application No</div>,
-    cell: ({ row }) => {
-      const appNo = row.getValue("applicationNo") as string | null;
-      return (
-        <div className="text-right font-mono text-sm">
-          {appNo || "—"}
-        </div>
-      )
-    }
-  },
-  {
-    accessorKey: "createdAt",
+    accessorKey: "fillingDate",
     header: ({ column }) => {
       return (
         <Button
@@ -284,17 +273,19 @@ const createColumns = ({
           className="h-8"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Created At
+          Filled Date
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       );
     },
     cell: ({ row }) => {
-      const date = new Date(row.getValue("createdAt"));
-      return (
+      const date = row.original.filingDate;
+      return date ? (
         <div className="text-sm text-muted-foreground">
-          {date.toLocaleDateString()}
+          {new Date(date).toLocaleDateString()}
         </div>
+      ) : (
+        <div className="text-sm text-muted-foreground">—</div>
       );
     },
   },
@@ -565,11 +556,12 @@ export default function PatentTable({ onRefresh }: PatentTableProps) {
                   Delete ({Object.keys(rowSelection).length})
                 </Button>
               )}
+              
               <ExportDialog
                 triggerButton={
                   <Button
                     variant="secondary"
-                    size="sm"
+                    
                     className="shadow-lg bg-white/20 hover:bg-white/30 text-white border-white/30"
                   >
                     <FileDown className="mr-2 h-4 w-4" />

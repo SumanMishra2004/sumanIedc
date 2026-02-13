@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { uploadFile } from "@/lib/appwrite";
 import { getPatentById, updatePatent } from "@/lib/research/patentApi";
+import Image from "next/image";
 
 
 const patentSchema = z.object({
@@ -297,7 +298,7 @@ export default function EditPatentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-225 h-[90vh] p-0 overflow-hidden flex flex-col">
+      <DialogContent className="max-w-4xl h-[90vh] p-0 overflow-hidden flex flex-col">
 
         <DialogHeader className="px-6 py-4 border-b shrink-0 bg-background z-10">
           <DialogTitle>Edit Patent</DialogTitle>
@@ -311,7 +312,7 @@ export default function EditPatentDialog({
                 <Loader2 className="h-8 w-8 animate-spin" />
             </div>
         ) : (
-        <ScrollArea className="flex-1 w-full">
+        <ScrollArea className="flex-1 w-full min-h-0">
           <div className="px-6 py-6">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -641,21 +642,49 @@ export default function EditPatentDialog({
                     <h3 className="text-lg font-medium">Files & Media</h3>
                     <Separator />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="relative w-full h-64 rounded-md overflow-hidden border">
-                        {imageFile || form.getValues('imageUrl') ? (
-                          <img
-                            src={imageFile ? URL.createObjectURL(imageFile) : form.getValues('imageUrl') || ""}
-                            alt="Preview"
-                            className="object-cover w-full h-full"
-                          />
-                        ) : (
-                          <div className="flex items-center justify-center w-full h-full bg-muted/50">
-                            <Upload className="h-8 w-8 text-muted-foreground" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <div className="relative w-full h-64 rounded-md overflow-hidden border">
+
+    {/* ✅ If file is uploaded */}
+    {imageFile ? (
+      imageFile.type.startsWith("image/") ? (
+        // ✅ Image Preview
+        <Image
+          src={URL.createObjectURL(imageFile)}
+          alt="Preview"
+          fill
+          className="object-cover"
+        />
+      ) : imageFile.type === "application/pdf" ? (
+        // ✅ PDF Preview
+        <iframe
+          src={URL.createObjectURL(imageFile)}
+          title="PDF Preview"
+          className="w-full h-full"
+        />
+      ) : (
+        <p className="text-sm text-center p-4">
+          Unsupported file type
+        </p>
+      )
+
+    ) : form.getValues("imageUrl") ? (
+      // ✅ If no file, show existing URL image
+      <Image
+        src={form.getValues("imageUrl")!}
+        alt="Patent Image"
+        fill
+        className="object-cover"
+      />
+    ) : (
+      // ✅ No file, no URL
+      <p className="text-sm text-gray-500 text-center p-4">
+        No preview available
+      </p>
+    )}
+  </div>
+</div>
+
 
                      
                         <div className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-muted/50 transition-colors">

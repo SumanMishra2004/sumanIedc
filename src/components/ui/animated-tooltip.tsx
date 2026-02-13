@@ -16,10 +16,11 @@ import {
 } from "@/components/ui/avatar";
 
 type Item = {
-  id: number;
+  id: number | string;
   name: string;
-  email: string;
+  email?: string;
   image?: string;
+  designation?: string;
 };
 
 export const AnimatedAvatarGroupTooltip = ({

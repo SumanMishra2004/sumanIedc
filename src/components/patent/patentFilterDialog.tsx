@@ -146,15 +146,15 @@ export function FilterDialog({
   }, [filters])
 
   const filterContent = (
-    <Tabs defaultValue="dates" className="w-full flex-1 flex flex-col overflow-hidden">
-      <TabsList className="grid w-full grid-cols-3">
+    <Tabs defaultValue="dates"  className="w-full flex flex-col h-full">
+      <TabsList className="grid w-full grid-cols-3 shrink-0">
         <TabsTrigger value="dates">Dates</TabsTrigger>
         <TabsTrigger value="authors">Authors</TabsTrigger>
         <TabsTrigger value="other">Other</TabsTrigger>
       </TabsList>
-
-      <TabsContent value="dates" className="space-y-4 mt-4 flex-1 overflow-hidden">
-        <ScrollArea className="h-full pr-4">
+      <ScrollArea className="flex-1 min-h-0 mt-4">
+      <TabsContent value="dates" className="mt-4 flex-1 flex flex-col overflow-hidden min-h-0">
+       
           <div className="space-y-6 pb-4">
             {/* Created Date Range */}
             <div className="space-y-3">
@@ -354,11 +354,11 @@ export function FilterDialog({
               )}
             </div>
           </div>
-        </ScrollArea>
+     
       </TabsContent>
 
-      <TabsContent value="authors" className="space-y-4 mt-4 flex-1 overflow-hidden">
-        <ScrollArea className="h-full pr-4">
+      <TabsContent value="authors" className="mt-4 flex-1 flex flex-col overflow-hidden min-h-0">
+     
           <div className="space-y-6 pb-4">
             {/* Faculty Authors */}
             <div className="space-y-3">
@@ -448,11 +448,11 @@ export function FilterDialog({
               )}
             </div>
           </div>
-        </ScrollArea>
+        
       </TabsContent>
 
-      <TabsContent value="other" className="space-y-4 mt-4 flex-1 overflow-hidden">
-        <ScrollArea className="h-full pr-4">
+      <TabsContent value="other" className="mt-4 flex-1 flex flex-col overflow-hidden min-h-0">
+       
           <div className="space-y-6 pb-4">
             {/* Patent Status */}
             <div className="space-y-3">
@@ -575,8 +575,9 @@ export function FilterDialog({
               />
             </div>
           </div>
-        </ScrollArea>
+       
       </TabsContent>
+      </ScrollArea>
     </Tabs>
   )
 

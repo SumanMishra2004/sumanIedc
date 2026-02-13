@@ -4,6 +4,7 @@ import * as React from "react"
 import {
   IconBrandBooking,
   IconCamera,
+  IconCertificate,
   IconChartBar,
   IconDashboard,
   IconDatabase,
@@ -14,6 +15,7 @@ import {
   IconHelp,
   IconInnerShadowTop,
   IconListDetails,
+  IconMicrophone,
   IconReport,
   IconSearch,
   IconSettings,
@@ -31,9 +33,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { BookAIcon, Copyright } from "lucide-react"
+import { BookAIcon, Copyright, UserStar } from "lucide-react"
 import { LuNotebookPen } from "react-icons/lu";
-import { BsJournalBookmarkFill } from "react-icons/bs";
+import { BsBookFill, BsJournalBookmarkFill } from "react-icons/bs";
 import { NavMain } from "./nav-main"
 const data = {
   user: {
@@ -62,6 +64,26 @@ const data = {
       title: "Journal",
       url: "/dashboard/journal",
       icon: BsJournalBookmarkFill
+    },
+    {
+      title: "Conferences",
+      url:"/dashboard/conferences",
+      icon: IconMicrophone
+    },
+    {
+      title: "Patent",
+      url:"/dashboard/patent",
+      icon: BsBookFill
+    },
+    {
+      title: "Certificate",
+      url:"/dashboard/certificate",
+      icon: IconCertificate
+    },
+    {
+      title: "FDP",
+      url:"/dashboard/fdp",
+      icon: UserStar
     },
 
   ],

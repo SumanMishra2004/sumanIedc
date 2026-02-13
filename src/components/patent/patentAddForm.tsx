@@ -243,7 +243,7 @@ export default function PatentAddForm({
     }}>
       <DialogTrigger asChild>
         {trigger || (
-          <Button className="bg-gradient-to-r from-primary to-purple-600">
+          <Button className="bg-linear-to-r from-primary to-purple-600 ">
             Add Patent
           </Button>
         )}
