@@ -151,7 +151,7 @@ enum BillType {
 }
 
 enum BillStatus {
-  UPLOADED
+  PENDING
   ACCEPTED
   REJECTED
   PAID
@@ -492,7 +492,6 @@ model GrantIn {
   id                String  @id @default(cuid())
   projectCode       String?
   grantInStatus     GrantInStatus @default(APPLIED)
-  facultyStatus     TeacherStatus @default(UPLOADED)
   applicationDate   DateTime?
   grantDate         DateTime?
   durationOfProject String?
@@ -512,28 +511,37 @@ model GrantIn {
 
   @@map("grant_ins")
 }
-
 model GrantInBill {
-  id           String     @id @default(cuid())
-  billImageUrl String?
-  billType     BillType   @default(OTHER)
-  billStatus   BillStatus @default(UPLOADED)
-  billDate     DateTime?
+  id           String   @id @default(cuid())
+
+  // Appwrite file
+  fileId       String   @unique
+  fileUrl      String?
+
+  billType     BillType @default(OTHER)
+
+  // ✅ Master PDF Marker
+  isMasterPdf  Boolean  @default(false)
+
+  billStatus   BillStatus @default(PENDING)
+
+  billDate     DateTime @default(now())
   amount       Float?
 
-  // Relation to User (Who uploaded/spent it)
-  userId String @map("user_id")
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Uploaded by
+  userId       String
+  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // CRITICAL FIX: Relation to the Project (Grant)
-  grantInId String  @map("grant_in_id")
-  grantIn   GrantIn @relation(fields: [grantInId], references: [id], onDelete: Cascade)
+  // Relation
+  grantInId    String
+  grantIn      GrantIn @relation(fields: [grantInId], references: [id], onDelete: Cascade)
 
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+    @@unique([grantInId, isMasterPdf])
   @@map("grant_in_bills")
 }
+
 
 model GrantInMapping {
   id              String          @id @default(cuid())

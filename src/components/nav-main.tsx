@@ -1,20 +1,24 @@
 "use client"
 
-import { IconCirclePlusFilled, IconMail, type Icon } from "@tabler/icons-react"
-import type { LucideIcon } from "lucide-react"
-import type { IconType } from "react-icons"
-import { usePathname } from "next/navigation"
-
-import { Button } from "@/components/ui/button"
+import { ChevronRight, type LucideIcon } from "lucide-react"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import {
   SidebarGroup,
-  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
-import { cn } from "@/lib/utils"
+import { IconProps, type Icon } from "@tabler/icons-react"
+import { IconType } from "react-icons"
 
 export function NavMain({
   items,
@@ -22,37 +26,65 @@ export function NavMain({
   items: {
     title: string
     url: string
-    icon?: Icon | LucideIcon | IconType
+    icon?: LucideIcon | React.ForwardRefExoticComponent<IconProps & React.RefAttributes<Icon>> | IconType
+    isActive?: boolean
+    items?: {
+      title: string
+      url: string
+    }[]
   }[]
 }) {
-  const pathname = usePathname()
-
   return (
     <SidebarGroup>
-      <SidebarGroupContent className="flex flex-col gap-2">
-        
-        <SidebarMenu>
-          {items.map((item) => {
-            const isActive = pathname === item.url
-            
-            return (
-            <SidebarMenuItem key={item.title}>
-              <Link href={item.url} className="flex items-center gap-2">
-              <SidebarMenuButton 
-                tooltip={item.title}
-                className={cn(
-                  isActive && "bg-chart-2 text-chart-2-foreground hover:bg-chart-2/90 "
-                )}
-              >
-                {item.icon && <item.icon className={`size-5  ${isActive ? "text-chart-2-foreground" : "text-chart-2"}`} />}
-                <span>{item.title}</span>
-              </SidebarMenuButton>
-              </Link>
+      <SidebarGroupLabel>Platform</SidebarGroupLabel>
+      <SidebarMenu>
+        {items.map((item) => {
+          if (!item.items || item.items.length === 0) {
+             return (
+               <SidebarMenuItem key={item.title}>
+                 <SidebarMenuButton asChild tooltip={item.title}>
+                   <Link href={item.url}>
+                   {item.icon && <item.icon />}
+                     <span>{item.title}</span>
+                   </Link>
+                 </SidebarMenuButton>
+               </SidebarMenuItem>
+             )
+          }
+
+          return (
+          <Collapsible
+            key={item.title}
+            asChild
+            defaultOpen={item.isActive}
+            className="group/collapsible"
+          >
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton tooltip={item.title}>
+                  {item.icon && <item.icon />}
+                  <span>{item.title}</span>
+                  <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {item.items?.map((subItem) => (
+                    <SidebarMenuSubItem key={subItem.title}>
+                      <SidebarMenuSubButton asChild>
+                        <Link href={subItem.url}>
+                          <span>{subItem.title}</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              </CollapsibleContent>
             </SidebarMenuItem>
-            )
-          })}
-        </SidebarMenu>
-      </SidebarGroupContent>
+          </Collapsible>
+        )})}
+      </SidebarMenu>
     </SidebarGroup>
   )
 }
+

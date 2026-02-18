@@ -122,6 +122,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.role = user.role
+        token.id = user.id
       }
 
       // Check and update role on each token refresh
@@ -131,6 +132,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         })
 
         if (dbUser) {
+          token.id = dbUser.id
           token.role = dbUser.role
           token.name = dbUser.name
           token.picture = dbUser.image
@@ -145,6 +147,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
+        session.user.id = token.id as string
         session.user.role = token.role as string
         session.user.name = token.name as string
         session.user.email = token.email as string

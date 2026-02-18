@@ -33,62 +33,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { BookAIcon, Copyright, UserStar } from "lucide-react"
-import { LuNotebookPen } from "react-icons/lu";
-import { BsBookFill, BsJournalBookmarkFill } from "react-icons/bs";
+import { sidebardata } from "@/types/sidebar"
 import { NavMain } from "./nav-main"
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: IconDashboard,
-    },
-    {
-      title: "Book Chapters",
-      url: "/dashboard/book-chapters",
-      icon: LuNotebookPen
-    },
-    {
-      title: "Copyright",
-      url: "/dashboard/copyright",
-      icon: Copyright
-    },
-    
-    {
-      title: "Journal",
-      url: "/dashboard/journal",
-      icon: BsJournalBookmarkFill
-    },
-    {
-      title: "Conferences",
-      url:"/dashboard/conferences",
-      icon: IconMicrophone
-    },
-    {
-      title: "Patent",
-      url:"/dashboard/patent",
-      icon: BsBookFill
-    },
-    {
-      title: "Certificate",
-      url:"/dashboard/certificate",
-      icon: IconCertificate
-    },
-    {
-      title: "FDP",
-      url:"/dashboard/fdp",
-      icon: UserStar
-    },
 
-  ],
-  
-}
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
@@ -98,10 +45,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton
               asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
+              className="data-[slot=sidebar-menu-button]:p-1.5!"
             >
               <a href="#">
-                <IconInnerShadowTop className="!size-5" />
+                <IconInnerShadowTop className="size-5!" />
                 <span className="text-base font-semibold">Acme Inc.</span>
               </a>
             </SidebarMenuButton>
@@ -109,10 +56,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={sidebardata.navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={sidebardata.user} />
       </SidebarFooter>
     </Sidebar>
   )
