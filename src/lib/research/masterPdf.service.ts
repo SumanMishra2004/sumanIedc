@@ -78,44 +78,83 @@ export async function regenerateMasterPdf(grantId: string) {
         const bill = acceptedBills[i];
         
         try {
-            // Download file buffer
-            const fileBuffer = await storage.getFileDownload(BUCKET_ID, bill.fileId);
-            
-            // Fix: conversion to ArrayBuffer or Uint8Array
-            const pdfBytes = Buffer.isBuffer(fileBuffer) ? fileBuffer : Buffer.from(fileBuffer as any);
+            // Get the file view URL and fetch actual bytes
+            const fileViewUrl = storage.getFileView(BUCKET_ID, bill.fileId)
+            const response = await fetch(fileViewUrl.toString())
+            if (!response.ok) throw new Error(`Failed to fetch file: ${response.status}`)
+            const arrayBuffer = await response.arrayBuffer()
+            const pdfBytes = Buffer.from(arrayBuffer)
 
-            const billDoc = await PDFDocument.load(pdfBytes);
-            const copiedPages = await masterDoc.copyPages(billDoc, billDoc.getPageIndices());
+            // Detect file type by magic bytes
+            const isJpeg = pdfBytes[0] === 0xFF && pdfBytes[1] === 0xD8;
+            const isPng  = pdfBytes[0] === 0x89 && pdfBytes[1] === 0x50 && pdfBytes[2] === 0x4E && pdfBytes[3] === 0x47;
+            const isPdf  = pdfBytes[0] === 0x25 && pdfBytes[1] === 0x50 && pdfBytes[2] === 0x44 && pdfBytes[3] === 0x46; // %PDF
 
-            for (const page of copiedPages) {
-                const { width: pWidth, height: pHeight } = page.getSize();
-                
-                // Add Stamp Header
-                page.drawText(`Bill #${i + 1} | Date: ${new Date(bill.billDate).toLocaleDateString()} | Amount: ${bill.amount ?? 'N/A'}`, {
-                    x: 20,
-                    y: pHeight - 20,
-                    size: 10,
-                    font: helveticaBold,
-                    color: rgb(1, 0, 0) // Red
+            const stampText = `Bill #${i + 1} | Date: ${new Date(bill.billDate).toLocaleDateString()} | Amount: ${bill.amount ?? 'N/A'}`;
+            const uploaderText = `Uploaded By: ${bill.user.name ?? 'Unknown'} (${bill.user.email ?? 'No Email'})`;
+
+            if (isPdf) {
+                const billDoc = await PDFDocument.load(pdfBytes);
+                const copiedPages = await masterDoc.copyPages(billDoc, billDoc.getPageIndices());
+
+                for (const page of copiedPages) {
+                    const { width: pWidth, height: pHeight } = page.getSize();
+                    
+                    page.drawText(stampText, {
+                        x: 20, y: pHeight - 20, size: 10,
+                        font: helveticaBold, color: rgb(1, 0, 0)
+                    });
+                    page.drawText(uploaderText, {
+                        x: 20, y: 20, size: 8,
+                        font: helveticaFont, color: rgb(0.5, 0.5, 0.5)
+                    });
+                    page.drawText(`VERIFIED & APPROVED BY PI/CO-PI`, {
+                        x: pWidth - 200, y: 20, size: 8,
+                        font: helveticaBold, color: rgb(0, 0.6, 0)
+                    });
+
+                    masterDoc.addPage(page);
+                }
+            } else if (isJpeg || isPng) {
+                // Embed image as a full page
+                const embeddedImage = isJpeg
+                    ? await masterDoc.embedJpg(pdfBytes)
+                    : await masterDoc.embedPng(pdfBytes);
+
+                const imgPage = masterDoc.addPage();
+                const { width: pWidth, height: pHeight } = imgPage.getSize();
+                const margin = 40;
+                const maxW = pWidth - margin * 2;
+                const maxH = pHeight - margin * 2 - 40; // leave room for stamp
+
+                const scale = Math.min(maxW / embeddedImage.width, maxH / embeddedImage.height, 1);
+                const imgW = embeddedImage.width * scale;
+                const imgH = embeddedImage.height * scale;
+
+                imgPage.drawImage(embeddedImage, {
+                    x: (pWidth - imgW) / 2,
+                    y: margin,
+                    width: imgW,
+                    height: imgH,
                 });
-
-                // Add Stamp Footer
-                page.drawText(`Uploaded By: ${bill.user.name ?? 'Unknown'} (${bill.user.email ?? 'No Email'})`, {
-                    x: 20,
-                    y: 20,
-                    size: 8,
-                    font: helveticaFont,
-                    color: rgb(0.5, 0.5, 0.5)
+                imgPage.drawText(stampText, {
+                    x: 20, y: pHeight - 20, size: 10,
+                    font: helveticaBold, color: rgb(1, 0, 0)
                 });
-                page.drawText(`VERIFIED & APPROVED BY PI/CO-PI`, {
-                    x: pWidth - 200,
-                    y: 20,
-                    size: 8,
-                    font: helveticaBold,
-                    color: rgb(0, 0.6, 0)
+                imgPage.drawText(uploaderText, {
+                    x: 20, y: 10, size: 8,
+                    font: helveticaFont, color: rgb(0.5, 0.5, 0.5)
                 });
-
-                masterDoc.addPage(page);
+            } else {
+                // Unknown format — add a notice page
+                const noticePage = masterDoc.addPage();
+                const { height: pH } = noticePage.getSize();
+                noticePage.drawText(`Bill #${i + 1}: Unsupported file format`, {
+                    x: 50, y: pH - 100, size: 16, font: helveticaBold, color: rgb(1, 0, 0)
+                });
+                noticePage.drawText(`File ID: ${bill.fileId}`, {
+                    x: 50, y: pH - 130, size: 12, font: helveticaFont
+                });
             }
 
         } catch (error) {

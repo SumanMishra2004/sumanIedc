@@ -538,7 +538,7 @@ model GrantInBill {
 
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-    @@unique([grantInId, isMasterPdf])
+
   @@map("grant_in_bills")
 }
 

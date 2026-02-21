@@ -25,7 +25,9 @@ export async function POST(req: NextRequest) {
 
     const userId = session.user.id;
     const userRole = session.user.role;
-
+    if (userRole === UserRole.STUDENT) {
+  return NextResponse.json({ message: "Students cannot create grants." }, { status: 403 })
+}
     /* ----------------------------
        2. Parse Body
     ----------------------------- */
@@ -349,57 +351,36 @@ export async function GET(req: NextRequest) {
     if (queryParams.grantInStatus) {
       whereClause.grantInStatus = queryParams.grantInStatus;
     }
-    if (queryParams.applicationDateFrom){
+    if (queryParams.applicationDateFrom || queryParams.applicationDateTo) {
       whereClause.applicationDate = {
-        gte: new Date(queryParams.applicationDateFrom)
+        ...(queryParams.applicationDateFrom && { gte: new Date(queryParams.applicationDateFrom) }),
+        ...(queryParams.applicationDateTo   && { lte: new Date(queryParams.applicationDateTo)   }),
       }
     }
-    if (queryParams.applicationDateTo){
-      whereClause.applicationDate = {
-        lte: new Date(queryParams.applicationDateTo)
-      }
-    }
-    if (queryParams.grantDateFrom){
+    if (queryParams.grantDateFrom || queryParams.grantDateTo) {
       whereClause.grantDate = {
-        gte: new Date(queryParams.grantDateFrom)
+        ...(queryParams.grantDateFrom && { gte: new Date(queryParams.grantDateFrom) }),
+        ...(queryParams.grantDateTo   && { lte: new Date(queryParams.grantDateTo)   }),
       }
     }
-    if (queryParams.grantDateTo){
-      whereClause.grantDate = {
-        lte: new Date(queryParams.grantDateTo)
-      }
-    }
-    if (queryParams.projectDurationFrom){
-      whereClause.durationOfProject = {
-        gte: queryParams.projectDurationFrom
-      }
-    }
-    if (queryParams.projectDurationTo){
-      whereClause.durationOfProject = {
-        lte: queryParams.projectDurationTo
-      }
-    }
-    if (queryParams.projectDuration){
+    if (queryParams.projectDuration) {
       whereClause.durationOfProject = queryParams.projectDuration
+    } else if (queryParams.projectDurationFrom || queryParams.projectDurationTo) {
+      whereClause.durationOfProject = {
+        ...(queryParams.projectDurationFrom && { gte: queryParams.projectDurationFrom }),
+        ...(queryParams.projectDurationTo   && { lte: queryParams.projectDurationTo   }),
+      }
     }
-    if (queryParams.grantedAmountMin){
+    if (queryParams.grantedAmountMin || queryParams.grantedAmountMax) {
       whereClause.amountGranted = {
-        gte: parseFloat(queryParams.grantedAmountMin)
+        ...(queryParams.grantedAmountMin && { gte: parseFloat(queryParams.grantedAmountMin) }),
+        ...(queryParams.grantedAmountMax && { lte: parseFloat(queryParams.grantedAmountMax) }),
       }
     }
-    if (queryParams.grantedAmountMax){
-      whereClause.amountGranted = {
-        lte: parseFloat(queryParams.grantedAmountMax)
-      }
-    }
-    if (queryParams.usedAmountMin){
+    if (queryParams.usedAmountMin || queryParams.usedAmountMax) {
       whereClause.usedAmount = {
-        gte: parseFloat(queryParams.usedAmountMin)
-      }
-    }
-    if (queryParams.usedAmountMax){
-      whereClause.usedAmount = {
-        lte: parseFloat(queryParams.usedAmountMax)
+        ...(queryParams.usedAmountMin && { gte: parseFloat(queryParams.usedAmountMin) }),
+        ...(queryParams.usedAmountMax && { lte: parseFloat(queryParams.usedAmountMax) }),
       }
     }
 
@@ -415,6 +396,14 @@ export async function GET(req: NextRequest) {
         studentAuthors: {
           include: {
             user: true,
+          },
+        },
+        bills: {
+          include: {
+            user: true,
+          },
+          orderBy: {
+            createdAt: "desc",
           },
         },
       },
@@ -465,10 +454,13 @@ export async function DELETE(req: NextRequest) {
     const grantsToDelete = await prisma.grantIn.findMany({
       where: {
         id: { in: grantIdArray },
-        OR: [
-          { facultyAuthors: { some: { userId: session.user.id } } },
-          { studentAuthors: { some: { userId: session.user.id } } },
-        ],
+        ...(session.user.role === UserRole.ADMIN ? {} : {
+          OR: [
+            { facultyAuthors: { some: { userId: session.user.id } } },
+            { studentAuthors: { some: { userId: session.user.id } } },
+          ],
+        }),
+
       },
       include: {
         facultyAuthors: true,

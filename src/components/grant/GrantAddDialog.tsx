@@ -179,7 +179,7 @@ export function GrantAddDialog({ userRole }: GrantAddDialogProps) {
         </Button>
       </DialogTrigger>
       {step === 'form' ? (
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto scrollbar-gradient">
           <DialogHeader>
             <DialogTitle>Create New Grant-In-Aid Project</DialogTitle>
             <DialogDescription>

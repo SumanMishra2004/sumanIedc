@@ -61,7 +61,7 @@ export function StatusRadarChart({ statusCounts, total }: StatusRadarChartProps)
       <CardContent className="pb-2">
         <ChartContainer
           config={chartConfig}
-          className="mx-auto aspect-square max-h-[250px] w-full"
+          className="mx-auto aspect-square max-h-62.5 w-full"
         >
           <RadarChart data={chartData}>
             <ChartTooltip 
@@ -75,9 +75,9 @@ export function StatusRadarChart({ statusCounts, total }: StatusRadarChartProps)
             <PolarGrid />
             <Radar
               dataKey="count"
-              fill="var(--color-count)"
+              fill="var(--chart-2)"
               fillOpacity={0.6}
-              stroke="var(--color-count)"
+              stroke="var(--chart-2)"
               strokeWidth={2}
               dot={{
                 r: 4,

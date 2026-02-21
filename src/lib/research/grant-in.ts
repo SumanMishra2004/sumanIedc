@@ -86,3 +86,84 @@ export const deleteGrantIn = async (id: string): Promise<ApiResponse<void>> => {
      return handleApiError(error);
   }
 };
+
+// ─── Bills ────────────────────────────────────────────────────────────────────
+
+export const uploadBill = async (
+  grantId: string,
+  formData: FormData
+): Promise<ApiResponse<any>> => {
+  try {
+    const response = await axios.post(
+      `${API_BASE_URL}/${grantId}/bills/upload`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+    return { data: response.data };
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+export const updateBillStatus = async (
+  grantId: string,
+  billId: string,
+  action: "ACCEPT" | "REJECT"
+): Promise<ApiResponse<any>> => {
+  try {
+    const response = await axios.patch(
+      `${API_BASE_URL}/${grantId}/bills/${billId}`,
+      { action }
+    );
+    return { data: response.data };
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+export const deleteBill = async (
+  grantId: string,
+  billId: string
+): Promise<ApiResponse<void>> => {
+  try {
+    await axios.delete(`${API_BASE_URL}/${grantId}/bills/${billId}`);
+    return {};
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+// ─── Publication Outputs ──────────────────────────────────────────────────────
+
+export const addGrantOutput = async (
+  grantId: string,
+  payload: {
+    publicationType: string;
+    patentId?: string;
+    journalId?: string;
+    conferenceId?: string;
+    bookChapterId?: string;
+    copyrightId?: string;
+  }
+): Promise<ApiResponse<any>> => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/${grantId}/output`, payload);
+    return { data: response.data };
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+export const removeGrantOutput = async (
+  grantId: string,
+  mappingId: string
+): Promise<ApiResponse<void>> => {
+  try {
+    await axios.delete(`${API_BASE_URL}/${grantId}/output`, {
+      data: { mappingId },
+    });
+    return {};
+  } catch (error) {
+    return handleApiError(error);
+  }
+};

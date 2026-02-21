@@ -222,7 +222,36 @@ export async function PATCH(
     }
 
     /* ----------------------------
-       7. Update Grant
+       7. Amount Safety Validation
+    ----------------------------- */
+    const resolvedAmount = body.amountGranted ?? existingGrant.amountGranted
+    const resolvedUsed   = body.usedAmount   ?? existingGrant.usedAmount
+
+    if (resolvedAmount !== null && resolvedAmount < 0) {
+      return NextResponse.json(
+        { message: "amountGranted cannot be negative." },
+        { status: 400 }
+      )
+    }
+    if (resolvedUsed !== null && resolvedUsed < 0) {
+      return NextResponse.json(
+        { message: "usedAmount cannot be negative." },
+        { status: 400 }
+      )
+    }
+    if (
+      resolvedAmount !== null &&
+      resolvedUsed   !== null &&
+      resolvedUsed > resolvedAmount
+    ) {
+      return NextResponse.json(
+        { message: "usedAmount cannot exceed amountGranted." },
+        { status: 400 }
+      )
+    }
+
+    /* ----------------------------
+       8. Update Grant
     ----------------------------- */
     const updatedGrant = await prisma.grantIn.update({
       where: { id },
@@ -230,6 +259,7 @@ export async function PATCH(
         projectCode: body.projectCode,
         grantInStatus: body.grantInStatus,
         durationOfProject: body.durationOfProject,
+        applicationDate: body.applicationDate ? new Date(body.applicationDate) : undefined,
 
         amountGranted: body.amountGranted,
         usedAmount: body.usedAmount,

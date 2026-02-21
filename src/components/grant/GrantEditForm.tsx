@@ -34,7 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { GrantInRole, GrantInStatus } from "@prisma/client";
+import { GrantInRole, GrantInStatus, UserRole } from "@prisma/client";
 import { getGrantInById } from "@/lib/research/grant-in";
 
 const grantSchema = z.object({
@@ -59,11 +59,13 @@ export function GrantEditDialog({
   open,
   onOpenChange,
   onSuccess,
+  userRole,
 }: {
   grantId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
+  userRole?: UserRole;
 }) {
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(false);
@@ -169,9 +171,13 @@ export function GrantEditDialog({
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Status</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <Select
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          disabled={userRole === UserRole.FACULTY}
+                        >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger disabled={userRole === UserRole.FACULTY}>
                               <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                           </FormControl>
@@ -183,6 +189,9 @@ export function GrantEditDialog({
                             ))}
                           </SelectContent>
                         </Select>
+                        {userRole === UserRole.FACULTY && (
+                          <p className="text-xs text-muted-foreground">Status can only be changed by an Admin.</p>
+                        )}
                         <FormMessage />
                       </FormItem>
                     )}

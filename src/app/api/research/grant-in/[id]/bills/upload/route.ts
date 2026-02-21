@@ -45,13 +45,24 @@ export async function POST(
     // 1. Upload to Appwrite
     // Check if grant exists
     const grantIn = await prisma.grantIn.findUnique({
-      where: { id: grantId }
+      where: { id: grantId },
+      include:{
+        facultyAuthors: true,
+        studentAuthors: true,
+      }
     });
     
     if (!grantIn) {
       return NextResponse.json({ error: "Grant not found" }, { status: 404 });
     }
-
+    if(session.user.role !== "ADMIN"){ 
+    const isFacultyAuthor = grantIn.facultyAuthors.some(fa => fa.userId === session.user.id);
+    const isStudentAuthor = grantIn.studentAuthors.some(sa => sa.userId === session.user.id);
+    
+    if (!isFacultyAuthor && !isStudentAuthor) {
+      return NextResponse.json({ error: "Forbidden. You must be an author of this grant to upload bills." }, { status: 403 });
+    }
+  }
     // Upload
     // We use ID.unique() for fileId
     const fileId = ID.unique();

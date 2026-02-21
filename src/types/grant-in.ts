@@ -80,7 +80,7 @@ export interface GrantIn {
 
   facultyAuthors: GrantInTeacherAuthor[]
   studentAuthors: GrantInStudentAuthor[]
-  bills: GrantInBill[]
+  bills?: GrantInBill[]
   publicationMappings: GrantInMapping[]
 }
 
@@ -120,6 +120,7 @@ export interface GrantInPATCHStudentAuthorInput {
 export interface GrantInPATCHRequestBodyData {
   projectCode?: string;
   grantInStatus?: GrantInStatus;
+  applicationDate?: string;
   durationOfProject?: string;
   amountGranted?: number;
   usedAmount?: number;
