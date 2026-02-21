@@ -65,6 +65,12 @@ export async function PATCH(
             billStatus: BillStatus.ACCEPTED,
         }
       });
+      await prisma.grantIn.update({
+        where: { id: grantId },
+        data: {
+          usedAmount: { increment: bill.amount || 0 },
+        },
+      });
 
       // Trigger Master PDF Regeneration
       await regenerateMasterPdf(grantId);

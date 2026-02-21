@@ -132,7 +132,7 @@ export function BillsSection({
           {canUpload && ' Click "Upload Bill" to add the first expense.'}
         </div>
       ) : (
-        <div className="rounded-md border overflow-hidden">
+        <div className="rounded-md border overflow-x-auto scrollbar-gradient">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">

@@ -55,6 +55,22 @@ export async function PATCH(
                  data: { billStatus: BillStatus.ACCEPTED }
              });
              
+
+             // Increment usedAmount on the grant with the bill's amount
+             if (bill.amount && bill.amount > 0) {
+                 const grant = await prisma.grantIn.findUnique({
+                     where: { id: grantId },
+                     select: { usedAmount: true }
+                 });
+                 
+                 const newUsedAmount = (grant?.usedAmount || 0) + bill.amount;
+                 
+                 await prisma.grantIn.update({
+                     where: { id: grantId },
+                     data: { usedAmount: newUsedAmount },
+                 });
+             }
+
              // Regenerate Master PDF
              await regenerateMasterPdf(grantId);
 
@@ -144,7 +160,15 @@ export async function DELETE(
         where: { id: billId }
     });
 
-    // 4. Regenerate Master PDF if it was an ACCEPTED bill
+    // 4. If deleting an ACCEPTED bill, subtract its amount from usedAmount
+    if (bill.billStatus === BillStatus.ACCEPTED && bill.amount && bill.amount > 0) {
+        await prisma.grantIn.update({
+            where: { id: grantId },
+            data: { usedAmount: { decrement: bill.amount } },
+        });
+    }
+
+    // 5. Regenerate Master PDF if it was an ACCEPTED bill
     if (bill.billStatus === BillStatus.ACCEPTED) {
         await regenerateMasterPdf(grantId);
     }

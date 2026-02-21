@@ -309,3 +309,94 @@ export async function PATCH(
     );
   }
 }
+
+
+
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { message: "Unauthorized. Please login." },
+        { status: 401 },
+      );
+    }
+    if(session.user.role === UserRole.STUDENT){
+      return NextResponse.json(
+        { message: "Forbidden. Student can't delete grants." },
+        { status: 403 },
+      );
+    }
+      const { id } = await params;
+   
+    const grantsToDelete = await prisma.grantIn.findMany({
+      where: {
+        id,
+        ...(session.user.role === UserRole.ADMIN ? {} : {
+          OR: [
+            { facultyAuthors: { some: { userId: session.user.id } } },
+            { studentAuthors: { some: { userId: session.user.id } } },
+          ],
+        }),
+
+      },
+      include: {
+        facultyAuthors: true,
+      },
+    });
+    if (grantsToDelete.length !== 1) {
+      return NextResponse.json(
+        { message: "Grant not found or you don't have permission to delete it." },
+        { status: 404 },
+      );
+    }
+    if (session.user.role === UserRole.FACULTY) {
+      const allAllowed = grantsToDelete.every((grant) => {
+        const facultyEntry = grant.facultyAuthors.find(
+          (fa) => fa.userId === session.user.id,
+        );
+
+        return (
+          facultyEntry &&
+          (facultyEntry.role === GrantInRole.FACULTY_PI ||
+            facultyEntry.role === GrantInRole.FACULTY_COPI)
+        );
+      });
+
+      if (!allAllowed) {
+        return NextResponse.json(
+          {
+            message:
+              "Forbidden. Only PI or Co-PI can delete this Grant.",
+          },
+          { status: 403 },
+        );
+      }
+    }
+
+    // Admin automatically allowed
+
+    /* ----------------------------
+       6. Delete Grants
+    ----------------------------- */
+     await prisma.grantIn.delete({
+      where: {
+        id,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        message: `Deleted grant successfully ✅`,
+      },
+      { status: 200 },
+    );
+  } catch (error) {
+    console.error("GrantIn DELETE Error:", error);
+    return NextResponse.json(
+      { message: "Internal Server Error" },
+      { status: 500 },
+    );
+  }
+}

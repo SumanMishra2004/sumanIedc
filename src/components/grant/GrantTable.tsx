@@ -4,6 +4,7 @@ import * as React from "react"
 import {
   ColumnDef,
   ColumnFiltersState,
+  RowSelectionState,
   SortingState,
   flexRender,
   getCoreRowModel,
@@ -46,6 +47,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Tooltip,
   TooltipContent,
@@ -65,6 +67,7 @@ interface GrantTableProps {
   userRole: UserRole
   currentUserId: string
   onDelete?: (grant: GrantIn) => void
+  onBulkDelete?: (ids: string[]) => Promise<void>
   onRefresh?: () => void
   filters: GrantInFilters
   onFiltersChange: (filters: Partial<GrantInFilters>) => void
@@ -94,6 +97,7 @@ export function GrantTable({
   userRole,
   currentUserId,
   onDelete,
+  onBulkDelete,
   onRefresh,
   filters,
   onFiltersChange,
@@ -102,6 +106,8 @@ export function GrantTable({
 }: GrantTableProps) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
+  const [bulkDeleting, setBulkDeleting] = React.useState(false)
   const [viewingGrantId, setViewingGrantId] = React.useState<string | null>(null)
   const [editingGrantId, setEditingGrantId] = React.useState<string | null>(null)
 
@@ -120,7 +126,60 @@ export function GrantTable({
     return null
   }
 
+  const canDeleteGrant = (grant: GrantIn) =>
+    userRole === "ADMIN" || isCurrentUserPiOrCoPi(grant)
+
+  const handleBulkDelete = async () => {
+    const selectedIds = Object.keys(rowSelection).filter((k) => rowSelection[k])
+    if (selectedIds.length === 0) return
+    if (!confirm(`Delete ${selectedIds.length} selected grant(s)? This cannot be undone.`)) return
+    setBulkDeleting(true)
+    try {
+      await onBulkDelete?.(selectedIds)
+      setRowSelection({})
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
   const columns: ColumnDef<GrantIn>[] = [
+    {
+      id: "select",
+      header: ({ table }) => {
+        const selectableRows = table.getRowModel().rows.filter((r) =>
+          canDeleteGrant(r.original)
+        )
+        const allSelected =
+          selectableRows.length > 0 &&
+          selectableRows.every((r) => r.getIsSelected())
+        const someSelected = selectableRows.some((r) => r.getIsSelected())
+        return (
+          <Checkbox
+            checked={allSelected}
+            ref={(el) => { if (el) (el as any).indeterminate = !allSelected && someSelected }}
+            onCheckedChange={(checked) => {
+              selectableRows.forEach((r) => r.toggleSelected(!!checked))
+            }}
+            aria-label="Select all"
+            className="translate-y-[2px]"
+          />
+        )
+      },
+      cell: ({ row }) => {
+        if (!canDeleteGrant(row.original)) return null
+        return (
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Select row"
+            className="translate-y-[2px]"
+          />
+        )
+      },
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       accessorKey: "projectCode",
       header: ({ column }) => (
@@ -391,13 +450,17 @@ export function GrantTable({
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    enableRowSelection: (row) => canDeleteGrant(row.original),
+    onRowSelectionChange: setRowSelection,
+    getRowId: (row) => row.id,
     initialState: { pagination: { pageSize: 10 } },
-    state: { sorting, columnFilters },
+    state: { sorting, columnFilters, rowSelection },
   })
 
   const pageCount = table.getPageCount()
   const pageIndex = table.getState().pagination.pageIndex
   const totalRows = table.getFilteredRowModel().rows.length
+  const selectedCount = Object.values(rowSelection).filter(Boolean).length
 
   return (
     <div className="relative w-full rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
@@ -413,8 +476,29 @@ export function GrantTable({
           <p className="text-sm text-muted-foreground">
             grant{totalRows !== 1 ? "s" : ""}
           </p>
+          {selectedCount > 0 && (
+            <span className="text-xs text-muted-foreground ml-1">
+              · {selectedCount} selected
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          {selectedCount > 0 && onBulkDelete && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="h-8"
+            >
+              {bulkDeleting ? (
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              )}
+              Delete {selectedCount}
+            </Button>
+          )}
           <GrantFilterDialog
             filters={filters}
             onFiltersChange={onFiltersChange}
@@ -530,6 +614,7 @@ export function GrantTable({
         onOpenChange={(open) => !open && setEditingGrantId(null)}
         onSuccess={() => onRefresh?.()}
         userRole={userRole}
+        currentUserId={currentUserId}
       />
     </div>
   )

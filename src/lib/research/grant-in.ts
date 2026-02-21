@@ -69,9 +69,9 @@ export const getGrantStats = async (): Promise<ApiResponse<GrantStatsResponse>> 
   }
 };
 
-export const getGrantInById = async (id: string): Promise<ApiResponse<{ grantIn: GrantIn }>> => {
+export const getGrantInById = async (id: string): Promise<ApiResponse<{ grant: GrantIn }>> => {
   try {
-    const response = await axios.get<{ grantIn: GrantIn }>(`${API_BASE_URL}/${id}`);
+    const response = await axios.get<{ grant: GrantIn }>(`${API_BASE_URL}/${id}`);
     return { data: response.data };
   } catch (error) {
     return handleApiError(error);
@@ -163,6 +163,19 @@ export const removeGrantOutput = async (
       data: { mappingId },
     });
     return {};
+  } catch (error) {
+    return handleApiError(error);
+  }
+};
+
+export const bulkDeleteGrantIns = async (
+  ids: string[]
+): Promise<ApiResponse<{ count: number }>> => {
+  try {
+    const response = await axios.delete<{ message: string; count?: number }>(
+      `${API_BASE_URL}?grantIds=${ids.join(",")}`
+    );
+    return { data: { count: ids.length } };
   } catch (error) {
     return handleApiError(error);
   }

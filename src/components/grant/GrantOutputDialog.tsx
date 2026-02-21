@@ -304,7 +304,7 @@ export function GrantOutputDialog({
                             ) : (
                               publications.map((p) => (
                                 <SelectItem key={p.id} value={p.id}>
-                                  {p.label}
+                                  {p.label.length>50 ? p.label.slice(0, 50) + "..." : p.label}
                                 </SelectItem>
                               ))
                             )}

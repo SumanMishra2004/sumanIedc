@@ -23,7 +23,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -72,12 +71,12 @@ export function GrantViewDialog({
     setError(null)
     try {
       const response = await getGrantInById(grantId)
-      if (!response.data?.grantIn) {
+      if (!response.data?.grant) {
         setError("Unable to load grant details")
         return
       }
-      setGrant(response.data.grantIn)
-    } catch {
+      setGrant(response.data.grant)
+    } catch (err: any) {
       setError("Failed to fetch grant details")
     } finally {
       setLoading(false)
@@ -139,7 +138,7 @@ export function GrantViewDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+        <DialogContent className="max-w-4xl! max-h-[90vh] overflow-hidden flex flex-col p-0">
           <DialogHeader className="px-6 py-4 border-b bg-muted/40">
             <div className="flex items-center justify-between mr-8">
               <DialogTitle className="text-xl font-bold flex flex-wrap items-center gap-2">
@@ -155,7 +154,7 @@ export function GrantViewDialog({
             </div>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 p-6">
+          <div className="flex-1 overflow-y-auto p-6 min-h-0 scrollbar-gradient">
             {loading ? (
               <div className="space-y-4">
                 <Skeleton className="h-8 w-1/3" />
@@ -328,8 +327,9 @@ export function GrantViewDialog({
                     </CollapsibleTrigger>
                     <Badge variant="outline">{(grant.bills ?? []).filter((b) => !b.isMasterPdf).length}</Badge>
                   </div>
-                  <CollapsibleContent className="pt-4">
+                  <CollapsibleContent className="pt-4 overflox">
                     <BillsSection
+
                       bills={grant.bills ?? []}
                       grantId={grant.id}
                       userRole={userRole}
@@ -380,7 +380,7 @@ export function GrantViewDialog({
                 </div>
               </div>
             ) : null}
-          </ScrollArea>
+          </div>
 
           {/* Footer Actions */}
           {grant && (canEdit || canDelete) && (
@@ -424,6 +424,7 @@ export function GrantViewDialog({
             onOpenChange={setEditOpen}
             onSuccess={fetchGrant}
             userRole={userRole}
+            currentUserId={currentUserId}
           />
           <GrantOutputDialog
             grantId={grant.id}
