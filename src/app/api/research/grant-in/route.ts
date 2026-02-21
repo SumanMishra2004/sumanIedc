@@ -3,6 +3,7 @@ import prisma from "@/lib/prisma";
 import { GrantInRole, GrantInStatus, UserRole } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { GrantInPOSTRequestBodyData } from "@/types/grant-in";
+import { revalidateTag } from "next/cache";
 
 /* ----------------------------
    Request Body Interfaces
@@ -237,6 +238,16 @@ export async function POST(req: NextRequest) {
         },
       },
     });
+
+    // Invalidate the sidebar grants cache for all authors involved so the
+    // sidebar updates immediately on next navigation without waiting for the
+    // 5-minute revalidation window.
+    const involvedUserIds = new Set<string>([userId!])
+    newGrant.facultyAuthors.forEach((fa) => involvedUserIds.add(fa.userId))
+    newGrant.studentAuthors.forEach((sa) => involvedUserIds.add(sa.userId))
+    involvedUserIds.forEach((id) => revalidateTag(`grants-sidebar-${id}`, {}))
+    // Revalidate the admin shared cache for all-grants view
+    revalidateTag(`grants-sidebar-all`, {})
 
     return NextResponse.json(
       {
@@ -506,6 +517,14 @@ export async function DELETE(req: NextRequest) {
         id: { in: grantIdArray },
       },
     });
+
+    // Invalidate sidebar grants cache for all authors of the deleted grants
+    const affectedUserIds = new Set<string>([session.user.id!])
+    grantsToDelete.forEach((grant) =>
+      grant.facultyAuthors.forEach((fa) => affectedUserIds.add(fa.userId))
+    )
+    affectedUserIds.forEach((id) => revalidateTag(`grants-sidebar-${id}`, {}))
+    revalidateTag(`grants-sidebar-all`, {})
 
     return NextResponse.json(
       {

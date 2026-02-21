@@ -120,27 +120,37 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return true
     },
     async jwt({ token, user, trigger, session }) {
+      // On initial sign-in, seed the token directly from the user object.
+      // This avoids any DB call — the role is already correct from the signIn callback.
       if (user) {
         token.role = user.role
         token.id = user.id
+        token.name = user.name
+        token.picture = user.image
+        return token
       }
 
-      // Check and update role on each token refresh
-      if (token.email) {
-        const dbUser = await prisma.user.findUnique({
-          where: { email: token.email },
-        })
+      // Only re-read from DB when the session is explicitly updated
+      // (e.g., after an admin changes a user's role via the special-users panel).
+      // This eliminates the redundant prisma.user.findUnique on every JWT verification.
+      if (trigger === 'update') {
+        if (token.email) {
+          const dbUser = await prisma.user.findUnique({
+            where: { email: token.email },
+            select: { id: true, role: true, name: true, image: true },
+          })
 
-        if (dbUser) {
-          token.id = dbUser.id
-          token.role = dbUser.role
-          token.name = dbUser.name
-          token.picture = dbUser.image
+          if (dbUser) {
+            token.id = dbUser.id
+            token.role = dbUser.role
+            token.name = dbUser.name
+            token.picture = dbUser.image
+          }
         }
-      }
 
-      if (trigger === 'update' && session) {
-        token = { ...token, ...session }
+        if (session) {
+          token = { ...token, ...session }
+        }
       }
 
       return token

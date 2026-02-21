@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 import { UserPlus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { clearFacultyCache } from "@/lib/faculty-cache"
 
 export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState("")
@@ -56,6 +57,8 @@ export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
 
       setEmail("")
       setRole("")
+      // Invalidate the faculty list cookie so forms pick up the change
+      clearFacultyCache()
       onSuccess()
     } catch (error) {
       toast({

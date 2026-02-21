@@ -4,14 +4,14 @@ import prisma from '@/lib/prisma'
 
 export async function GET(req:NextRequest) {
   try {
-    // const session = await auth()
+    const session = await auth()
 
-    // if (!session?.user || session.user.role !== 'ADMIN') {
-    //   return NextResponse.json(
-    //     { error: 'Unauthorized - ADMIN access required' },
-    //     { status: 403 }
-    //   )
-    // }
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Unauthorized - ADMIN access required' },
+        { status: 403 }
+      )
+    }
    
       const all_user = await prisma.specialUser.findMany({
         orderBy: {
@@ -30,14 +30,14 @@ export async function GET(req:NextRequest) {
 
 export async function POST(request: Request) {
   try {
-    // const session = await auth()
+    const session = await auth()
 
-    // if (!session?.user || session.user.role !== 'ADMIN') {
-    //   return NextResponse.json(
-    //     { error: 'Unauthorized - ADMIN access required' },
-    //     { status: 403 }
-    //   )
-    // }
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Unauthorized - ADMIN access required' },
+        { status: 403 }
+      )
+    }
 
     const { email, role } = await request.json()
 
@@ -73,14 +73,14 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    // const session = await auth()
+    const session = await auth()
 
-    // if (!session?.user || session.user.role !== 'ADMIN') {
-    //   return NextResponse.json(
-    //     { error: 'Unauthorized - ADMIN access required' },
-    //     { status: 403 }
-    //   )
-    // }
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Unauthorized - ADMIN access required' },
+        { status: 403 }
+      )
+    }
 
     const { email, role } = await request.json()
 
@@ -115,14 +115,14 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    // const session = await auth()
+    const session = await auth()
 
-    // if (!session?.user || session.user.role !== 'ADMIN') {
-    //   return NextResponse.json(
-    //     { error: 'Unauthorized - ADMIN access required' },
-    //     { status: 403 }
-    //   )
-    // }
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json(
+        { error: 'Unauthorized - ADMIN access required' },
+        { status: 403 }
+      )
+    }
 
     const { email } = await request.json()
 

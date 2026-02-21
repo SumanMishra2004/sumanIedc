@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { Check, X, ChevronDown, Loader2 } from "lucide-react"
+import { getFacultyList, type CachedFaculty } from "@/lib/faculty-cache"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -26,6 +27,38 @@ type User = {
   name: string
   email: string
   image?: string
+}
+
+// sessionStorage key + TTL for the student list (client cache, not cookie,
+// because students can be hundreds of entries)
+const STUDENT_CACHE_KEY = "student_list_cache"
+const STUDENT_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+type StudentCache = { data: User[]; ts: number }
+
+function readStudentCache(): User[] | null {
+  if (typeof sessionStorage === "undefined") return null
+  try {
+    const raw = sessionStorage.getItem(STUDENT_CACHE_KEY)
+    if (!raw) return null
+    const parsed: StudentCache = JSON.parse(raw)
+    if (Date.now() - parsed.ts > STUDENT_CACHE_TTL_MS) return null
+    return parsed.data
+  } catch {
+    return null
+  }
+}
+
+function writeStudentCache(data: User[]): void {
+  if (typeof sessionStorage === "undefined") return
+  try {
+    sessionStorage.setItem(
+      STUDENT_CACHE_KEY,
+      JSON.stringify({ data, ts: Date.now() } satisfies StudentCache)
+    )
+  } catch {
+    // sessionStorage may be full — ignore
+  }
 }
 
 function useDebounce<T>(value: T, delay = 300) {
@@ -54,73 +87,137 @@ export function MultiSelectUsers({
   onChange,
 }: MultiSelectUsersProps) {
   const [open, setOpen] = React.useState(false)
+  // allFaculty holds the FULL unfiltered list read from the cookie so that
+  // local search works without any API calls.
+  const [allFaculty, setAllFaculty] = React.useState<CachedFaculty[]>([])
   const [users, setUsers] = React.useState<User[]>([])
   const [loading, setLoading] = React.useState(false)
   const [search, setSearch] = React.useState("")
   const debouncedSearch = useDebounce(search, 300)
-  
-  // Pagination state (for faculty)
+
+  // Pagination state — only used for the student list (API-backed)
   const [page, setPage] = React.useState(1)
   const [hasMore, setHasMore] = React.useState(false)
   const [loadingMore, setLoadingMore] = React.useState(false)
 
   /* -------------------------------------------
-     Fetch users based on role, search, and pagination
+     FACULTY path — cookie-backed, local search
   ------------------------------------------- */
-  const fetchUsers = React.useCallback(async (pageNum: number, searchTerm: string, append = false) => {
-    if (!open) return
-    
-    if (append) {
-      setLoadingMore(true)
-    } else {
-      setLoading(true)
-    }
-    
+  const fetchFaculty = React.useCallback(async () => {
+    setLoading(true)
     try {
-      const role = isStudent ? "STUDENT" : "FACULTY"
-      let url = `/api/user?role=${role}&page=${pageNum}&limit=50`
-      
-      if (searchTerm.trim()) {
-        url += `&search=${encodeURIComponent(searchTerm)}`
-      }
-      
-      const res = await fetch(url)
-      const data = await res.json()
-      
-      if (append) {
-        setUsers(prev => [...prev, ...(data.data || [])])
-      } else {
-        setUsers(data.data || [])
-      }
-      
-      setHasMore(data.hasMore || false)
+      const faculty = await getFacultyList()
+      setAllFaculty(faculty)
+      setUsers(faculty)
     } catch (error) {
-      console.error("Error fetching users:", error)
+      console.error("Error loading faculty:", error)
       setUsers([])
-      setHasMore(false)
     } finally {
       setLoading(false)
-      setLoadingMore(false)
     }
-  }, [open, isStudent])
+  }, [])
+
+  // When the search term changes, filter the cached faculty list locally.
+  React.useEffect(() => {
+    if (isStudent) return
+    const term = debouncedSearch.trim().toLowerCase()
+    if (!term) {
+      setUsers(allFaculty)
+    } else {
+      setUsers(
+        allFaculty.filter(
+          (u) =>
+            u.name.toLowerCase().includes(term) ||
+            u.email.toLowerCase().includes(term)
+        )
+      )
+    }
+  }, [debouncedSearch, allFaculty, isStudent])
 
   /* -------------------------------------------
-     Initial fetch when popover opens
+     STUDENT path — API with sessionStorage cache
+  ------------------------------------------- */
+  const fetchStudents = React.useCallback(
+    async (pageNum: number, searchTerm: string, append = false) => {
+      if (!open) return
+
+      if (append) {
+        setLoadingMore(true)
+      } else {
+        setLoading(true)
+      }
+
+      try {
+        // For the initial page with no search term, check sessionStorage first
+        if (!append && !searchTerm.trim() && pageNum === 1) {
+          const cached = readStudentCache()
+          if (cached) {
+            setUsers(cached)
+            setHasMore(false)
+            return
+          }
+        }
+
+        let url = `/api/user?role=STUDENT&page=${pageNum}&limit=50`
+        if (searchTerm.trim()) {
+          url += `&search=${encodeURIComponent(searchTerm)}`
+        }
+
+        const res = await fetch(url)
+        const data = await res.json()
+        const fetched: User[] = data.data || []
+
+        if (append) {
+          setUsers((prev) => [...prev, ...fetched])
+        } else {
+          setUsers(fetched)
+          // Only cache when there's no search term applied
+          if (!searchTerm.trim() && pageNum === 1) {
+            writeStudentCache(fetched)
+          }
+        }
+
+        setHasMore(data.hasMore || false)
+      } catch (error) {
+        console.error("Error fetching students:", error)
+        setUsers([])
+        setHasMore(false)
+      } finally {
+        setLoading(false)
+        setLoadingMore(false)
+      }
+    },
+    [open]
+  )
+
+  /* -------------------------------------------
+     Load on popover open
   ------------------------------------------- */
   React.useEffect(() => {
-    if (open) {
+    if (!open) return
+    if (isStudent) {
       setPage(1)
-      fetchUsers(1, debouncedSearch, false)
+      fetchStudents(1, debouncedSearch, false)
+    } else {
+      fetchFaculty()
     }
-  }, [open, fetchUsers, debouncedSearch])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // Student search: re-fetch from API when search term changes
+  React.useEffect(() => {
+    if (!open || !isStudent) return
+    setPage(1)
+    fetchStudents(1, debouncedSearch, false)
+  }, [debouncedSearch, open, isStudent, fetchStudents])
 
   /* -------------------------------------------
-     Load more for pagination (faculty)
+     Load more — students only
   ------------------------------------------- */
   const loadMore = () => {
     const nextPage = page + 1
     setPage(nextPage)
-    fetchUsers(nextPage, debouncedSearch, true)
+    fetchStudents(nextPage, debouncedSearch, true)
   }
 
   const toggleUser = (user: User) => {
@@ -214,8 +311,8 @@ export function MultiSelectUsers({
                     )
                   })}
                   
-                  {/* Load More button for pagination (faculty) */}
-                  {!isStudent && hasMore && (
+                  {/* Load More — students only (faculty list is fully cached) */}
+                  {isStudent && hasMore && (
                     <div className="p-2 border-t">
                       <Button
                         variant="ghost"

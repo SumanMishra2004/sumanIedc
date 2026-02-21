@@ -3,6 +3,42 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { unstable_cache } from "next/cache";
+
+/* -----------------------------------------------------------------
+   Cached grants fetcher — cached per user for 5 minutes.
+   The cache is invalidated via revalidateTag("grants-sidebar-<userId>")
+   in the grant-in POST and DELETE route handlers so the sidebar stays
+   consistent without constantly hitting the database.
+----------------------------------------------------------------- */
+function getCachedGrants(userId: string, userRole: string) {
+  // Admins see ALL grants — use a shared tag so any grant mutation revalidates
+  // the admin's sidebar. Regular users get a per-user tag.
+  const cacheKey = userRole === "ADMIN" ? "grants-sidebar-all" : `grants-sidebar-${userId}`
+
+  return unstable_cache(
+    async () => {
+      const whereClause: Record<string, unknown> = {};
+      if (userRole === "FACULTY") {
+        whereClause.facultyAuthors = { some: { userId } };
+      } else if (userRole === "STUDENT") {
+        whereClause.studentAuthors = { some: { userId } };
+      }
+      // ADMIN — no filter, sees all grants
+
+      return prisma.grantIn.findMany({
+        where: whereClause,
+        select: { id: true, projectCode: true },
+        orderBy: { createdAt: "desc" },
+      });
+    },
+    [cacheKey],
+    {
+      revalidate: 300, // 5-minute fallback revalidation
+      tags: [cacheKey],
+    }
+  )();
+}
 
 export default async function Layout({
   children,
@@ -11,25 +47,10 @@ export default async function Layout({
 }>) {
   const session = await auth();
 
-  // Fetch user's grants for sidebar (role-based)
+  // Fetch user's grants for sidebar (cached per user, invalidated on grant mutations)
   let grants: { id: string; projectCode: string | null }[] = [];
   if (session?.user?.id) {
-    const userId = session.user.id;
-    const userRole = session.user.role;
-
-    const whereClause: Record<string, unknown> = {};
-    if (userRole === "FACULTY") {
-      whereClause.facultyAuthors = { some: { userId } };
-    } else if (userRole === "STUDENT") {
-      whereClause.studentAuthors = { some: { userId } };
-    }
-    // ADMIN sees all grants
-
-    grants = await prisma.grantIn.findMany({
-      where: whereClause,
-      select: { id: true, projectCode: true },
-      orderBy: { createdAt: "desc" },
-    });
+    grants = await getCachedGrants(session.user.id, session.user.role ?? "STUDENT");
   }
 
   return (

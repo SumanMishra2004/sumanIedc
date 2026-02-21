@@ -61,6 +61,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { Users } from "lucide-react"
+import { clearFacultyCache } from "@/lib/faculty-cache"
 
 
 type SpecialUser = {
@@ -107,6 +108,8 @@ export function SpecialUserTable({ data, onRefresh }: { data: SpecialUser[], onR
         description: "Special user updated successfully",
       })
       setEditUser(null)
+      // Invalidate the faculty list cookie — role may have changed
+      clearFacultyCache()
       onRefresh()
     } catch (error) {
       toast({
@@ -137,6 +140,8 @@ export function SpecialUserTable({ data, onRefresh }: { data: SpecialUser[], onR
         title: "Success",
         description: "Special user removed successfully",
       })
+      // Invalidate the faculty list cookie — a faculty may have been removed
+      clearFacultyCache()
       onRefresh()
     } catch (error) {
       toast({
