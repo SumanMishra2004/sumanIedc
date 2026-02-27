@@ -66,7 +66,7 @@ export default async function Layout({
       <AppSidebar variant="inset" grants={grants} />
       <SidebarInset className="min-w-0 overflow-hidden flex flex-col">
         <SiteHeader />
-        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-gradient">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-gradient" data-lenis-prevent>
           {children}
         </div>
       </SidebarInset>
