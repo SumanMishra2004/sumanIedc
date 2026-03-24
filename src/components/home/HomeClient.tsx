@@ -7,7 +7,7 @@ import Navbar from "@/components/home/Navbar";
 import VelocityMarquee from "@/components/home/ScrollMarquee";
 import LoadingScreen from "@/components/home/LoadingScreen";
 import LabCarousel from "./ViewImages";
-import FacultyCarousel from "./TeamHomePage";
+
 import Achievements from "./Achievements";
 import Footer from "./Footer";
 
@@ -94,7 +94,7 @@ export default function HomeClient() {
           <VelocityMarquee />
           <Achievements />
           <LabCarousel />
-          <FacultyCarousel />
+         
           <Footer />
         </div>
       </div>

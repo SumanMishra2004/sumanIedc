@@ -210,13 +210,13 @@ export default function CardCarousel() {
         overflowX: "clip",
         overflowY: "visible",
         userSelect: "none",
-        background: "#0c0c0c",
+        background: "url(https://res.cloudinary.com/dvky83edw/image/upload/v1774103669/iot/e7aa4373-5920-499d-af38-7d109e14ecef.png) center/cover no-repeat, #0c0c0c",
         fontFamily: "'DM Sans', sans-serif",
         width: "100%",
         perspective: 1400,
         perspectiveOrigin: "50% 100%",
       }}
-      className="md:mb-36 pt-22"
+      className="md:mb-36 pt-10"
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap');
@@ -225,250 +225,22 @@ export default function CardCarousel() {
         @keyframes pulseGlow { 0%,100%{opacity:0.5} 50%{opacity:1} }
       `}</style>
 
-      {/* ── Ambient lime blobs ── */}
+      {/* ── Left to Right Overlay ── */}
       <div
+        className="absolute inset-0 z-1 pointer-events-none"
         style={{
-          position: "absolute",
-          top: "-5%",
-          left: "-8%",
-          width: 700,
-          height: 700,
-          borderRadius: "50%",
           background:
-            "radial-gradient(circle,rgba(201,245,59,0.07) 0%,transparent 65%)",
-          pointerEvents: "none",
-          animation: "blobA 10s ease-in-out infinite",
-          zIndex: 0,
+            "linear-gradient(to right, rgba(12,12,12,1) 0%, rgba(12,12,12,0.95) 30%, rgba(12,12,12,0.65) 60%, rgba(12,12,12,0.1) 100%)",
         }}
       />
       <div
+        className="absolute inset-0 z-1 pointer-events-none"
         style={{
-          position: "absolute",
-          top: "30%",
-          right: "-5%",
-          width: 500,
-          height: 500,
-          borderRadius: "50%",
           background:
-            "radial-gradient(circle,rgba(168,214,42,0.06) 0%,transparent 65%)",
-          pointerEvents: "none",
-          animation: "blobB 13s ease-in-out infinite",
-          zIndex: 0,
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          bottom: "15%",
-          left: "35%",
-          width: 400,
-          height: 400,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle,rgba(201,245,59,0.05) 0%,transparent 65%)",
-          pointerEvents: "none",
-          animation: "blobA 16s ease-in-out infinite",
-          zIndex: 0,
+            "linear-gradient(to top, rgba(12,12,12,1) 0%, rgba(12,12,12,0.45) 30%, rgba(12,12,12,0.15) 60%, rgba(12,12,12,0) 100%)",
         }}
       />
 
-      {/* ── CAROUSEL STAGE — absolutely behind everything ── */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 100,
-          left: 0,
-          right: 0,
-          height: STAGE_H + 140,
-          zIndex: 3,
-          transformStyle: "preserve-3d",
-          pointerEvents: "none",
-        }} className="hidden md:block"
-      >
-        {JOBS.map((job, cardIndex) => (
-          <div
-            key={job.id}
-            ref={(el) => {
-              cardRefs.current[cardIndex] = el;
-            }}
-            onClick={() => {
-              const offset = getOffset(cardIndex);
-              setActive((a) => a + offset);
-              startAutoplay();
-            }}
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: "50%",
-              width: CARD_W,
-              height: CARD_H,
-              marginLeft: -CARD_W / 2,
-              cursor: "pointer",
-              transformOrigin: "bottom center",
-              willChange: "transform,opacity",
-              transformStyle: "preserve-3d",
-              pointerEvents: "auto",
-            }}
-          >
-            {/* Inner card */}
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                borderRadius: 24,
-                overflow: "hidden",
-                position: "relative",
-                boxShadow:
-                  cardIndex === activeJobIndex
-                    ? `0 28px 72px rgba(0,0,0,0.75), 0 0 0 2.5px ${job.accent}`
-                    : "0 10px 40px rgba(0,0,0,0.55)",
-                transition: "box-shadow 0.4s",
-              }}
-            >
-              <Image
-                src={job.image}
-                alt={job.title}
-                fill
-                style={{
-                  objectFit: "cover",
-                  filter:
-                    cardIndex === activeJobIndex
-                      ? "brightness(0.75) saturate(1.15)"
-                      : "brightness(0.38) saturate(0.65)",
-                  transition: "filter 0.5s",
-                }}
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background:
-                    "linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.35) 50%, rgba(0,0,0,0.05) 100%)",
-                }}
-              />
-              {cardIndex === activeJobIndex && (
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: `radial-gradient(ellipse at 50% 110%, ${job.accent}30, transparent 65%)`,
-                    pointerEvents: "none",
-                  }}
-                />
-              )}
-              {cardIndex === activeJobIndex && (
-                <div
-                  style={{
-                    position: "absolute",
-                    inset: 0,
-                    borderRadius: 24,
-                    border: `2px solid ${job.accent}`,
-                    pointerEvents: "none",
-                    boxShadow: `inset 0 0 20px ${job.accent}18`,
-                  }}
-                />
-              )}
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "flex-end",
-                  padding: "20px 18px 18px",
-                  gap: 7,
-                }}
-              >
-                <div
-                  style={{
-                    alignSelf: "flex-start",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    padding: "3px 10px",
-                    borderRadius: 99,
-                    background: `${job.accent}25`,
-                    color: job.accent,
-                    border: `1px solid ${job.accent}50`,
-                    backdropFilter: "blur(6px)",
-                    letterSpacing: "0.04em",
-                  }}
-                >
-                  {job.company}
-                </div>
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 17,
-                    color: "#fff",
-                    lineHeight: 1.25,
-                  }}
-                >
-                  {job.title}
-                </div>
-                <div
-                  style={{ fontSize: 12, fontWeight: 600, color: job.accent }}
-                >
-                  {job.salary}
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                  {job.tags.map((t) => (
-                    <span
-                      key={t}
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 500,
-                        padding: "3px 9px",
-                        borderRadius: 99,
-                        background: "rgba(255,255,255,0.11)",
-                        color: "rgba(255,255,255,0.8)",
-                        backdropFilter: "blur(4px)",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                      }}
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-                {cardIndex === activeJobIndex && (
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      marginTop: 4,
-                    }}
-                  >
-                    <span
-                      style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}
-                    >
-                      👥 {job.applicants}+ applied
-                    </span>
-                    <button
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: "6px 16px",
-                        borderRadius: 99,
-                        background: `linear-gradient(135deg,${job.accent},${job.accent}cc)`,
-                        color: "#fff",
-                        border: "none",
-                        cursor: "pointer",
-                        boxShadow: `0 4px 18px ${job.accent}55`,
-                      }}
-                    >
-                      Apply Now
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Scrim: dark where text lives → opens up over cards → solid at section seam ─────
-           bottom is -9rem (144px) so it covers the overflow zone that mb-36 exposes,*/}
     <div
   style={{
     position: "absolute",
@@ -522,7 +294,7 @@ export default function CardCarousel() {
           <h1
             style={{
               fontFamily: "'Bebas Neue', 'Arial Narrow', sans-serif",
-              fontSize: "clamp(3.2rem, 7.5vw, 7rem)",
+              fontSize: "clamp(3rem, 7vw, 6rem)",
               fontWeight: 400,
               lineHeight: 0.95,
               letterSpacing: "0.01em",
@@ -550,8 +322,8 @@ export default function CardCarousel() {
               display: "flex",
               alignItems: "center",
               gap: 14,
-              marginTop: 12,
-              marginBottom: 20,
+         
+              marginBottom: 12,
             }}
           >
             <span
@@ -584,7 +356,7 @@ export default function CardCarousel() {
               height: 1,
               background:
                 "linear-gradient(to right, rgba(201,245,59,0.4), transparent)",
-              marginBottom: 20,
+              marginBottom: 10,
               width: "70%",
             }}
           />
@@ -602,7 +374,10 @@ export default function CardCarousel() {
               marginBottom: 10,
             }}
           >
-            Department of Computer Science and Engineering
+            <span className="hidden md:block">
+              Department of
+              </span>
+               Computer Science and Engineering
           </h2>
 
           {/* Specialisations */}
@@ -611,7 +386,7 @@ export default function CardCarousel() {
               display: "flex",
               flexWrap: "wrap" as const,
               gap: 8,
-              marginBottom: 36,
+              marginBottom: 16,
             }}
           >
             {[
@@ -623,7 +398,7 @@ export default function CardCarousel() {
                 key={s}
                 style={{
                   fontFamily: "monospace",
-                  fontSize: "clamp(0.6rem, 1vw, 0.78rem)",
+                  fontSize: "clamp(0.45rem, 0.8vw, 0.6rem)",
                   letterSpacing: "0.06em",
                   textTransform: "uppercase" as const,
                   color: "#c9f53b",
@@ -642,9 +417,9 @@ export default function CardCarousel() {
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" as const }}>
             <button
               style={{
-                padding: "13px 34px",
+                padding: "10px 34px",
                 borderRadius: 4,
-                fontSize: 13,
+                fontSize: 10,
                 fontWeight: 700,
                 letterSpacing: "0.06em",
                 color: "#0c0c0c",
@@ -674,14 +449,52 @@ export default function CardCarousel() {
               Meet the Team
             </button>
           </div>
+
+          {/* Mobile tagline: horizontal below CTA buttons */}
+          <div
+            className="mt-6 flex items-center gap-3 md:hidden"
+            style={{ maxWidth: 420 }}
+          >
+            <div
+              style={{
+                height: 1,
+                flex: 1,
+                background:
+                  "linear-gradient(to right, rgba(201,245,59,0.5), rgba(201,245,59,0))",
+              }}
+            />
+            <span
+              style={{
+                fontFamily: "monospace",
+                fontSize: 11,
+                letterSpacing: "0.18em",
+                textTransform: "uppercase" as const,
+                color: "rgba(201,245,59,0.9)",
+                userSelect: "none",
+                whiteSpace: "nowrap",
+                fontWeight: 800,
+              }}
+            >
+              Innovate · Build · Disrupt
+            </span>
+            <div
+              style={{
+                height: 1,
+                flex: 1,
+                background:
+                  "linear-gradient(to left, rgba(201,245,59,0.5), rgba(201,245,59,0))",
+              }}
+            />
+          </div>
         </div>
 
         {/* ── RIGHT — Vertical tagline strip ── */}
         <div
+          className="hidden md:flex"
           style={{
             width: 56,
             flexShrink: 0,
-            display: "flex",
+            
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
@@ -689,6 +502,7 @@ export default function CardCarousel() {
             padding: "40px 0",
             gap: 32,
             position: "relative",
+           
           }}
         >
           {/* Vertical scrolling indicator line */}
@@ -713,12 +527,13 @@ export default function CardCarousel() {
               textOrientation: "mixed" as const,
               transform: "rotate(180deg)",
               fontFamily: "monospace",
-              fontSize: 10,
+              fontSize: 12,
               letterSpacing: "0.35em",
               textTransform: "uppercase" as const,
-              color: "rgba(201,245,59,0.7)",
+              color: "rgba(201,245,59,0.9)",
               userSelect: "none",
             }}
+            className="font-extrabold"
           >
             Innovate · Build · Disrupt
           </div>

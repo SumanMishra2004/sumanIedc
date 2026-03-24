@@ -69,11 +69,17 @@ export function ExportDialog({ triggerButton }: ExportDialogProps) {
 
   const activeFilterCount = React.useMemo(() => {
     let count = 0
-    if (filters.status) count++
+    if (filters.journalStatus) count++
+    if (filters.teacherStatus) count++
     if (filters.isPublic !== undefined) count++
-    if (filters.journalType) count++
+    if (filters.scope) count++
+    if (filters.reviewType) count++
+    if (filters.accessType) count++
+    if (filters.indexing) count++
+    if (filters.quartile) count++
+    if (filters.publicationMode) count++
     if (filters.keyword) count++
-    if (filters.journalPublisher) count++
+    if (filters.publisher) count++
     if (filters.search) count++
     if (filters.minRegistrationFees !== undefined) count++
     if (filters.maxRegistrationFees !== undefined) count++

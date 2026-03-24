@@ -30,7 +30,7 @@ export const AnimatedAvatarGroupTooltip = ({
   items: Item[];
   maxCount?: number;
 }) => {
-  const [hoveredId, setHoveredId] = useState<number | "overflow" | null>(null);
+  const [hoveredId, setHoveredId] = useState<Item["id"] | "overflow" | null>(null);
   const x = useMotionValue(0);
   const animationFrameRef = useRef<number | null>(null);
 
@@ -78,7 +78,7 @@ const handleMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
             {hoveredId === item.id && (
               <Tooltip
                 name={item.name}
-                email={item.email}
+                email={item.email ?? ""}
                 rotate={rotate}
                 translateX={translateX}
               />

@@ -169,32 +169,6 @@ const getScopeConfig = (scope: JournalScope) => {
   return configs[scope];
 };
 
-const getTeacherStatusConfig = (status: TeacherStatus) => {
-  const configs: Record<TeacherStatus, { bg: string; text: string; border: string }> = {
-    UPLOADED: {
-      bg: "bg-blue-50 dark:bg-blue-950/30",
-      text: "text-blue-700 dark:text-blue-400",
-      border: "border-blue-200 dark:border-blue-800",
-    },
-    ACCEPTED: {
-      bg: "bg-green-50 dark:bg-green-950/30",
-      text: "text-green-700 dark:text-green-400",
-      border: "border-green-200 dark:border-green-800",
-    },
-    PUBLISHED: {
-      bg: "bg-green-200 dark:bg-green-900/30",
-      text: "text-green-900 dark:text-green-200",
-      border: "border-green-400 dark:border-green-800",
-    },
-    UPDATE: {
-      bg: "bg-red-50 dark:bg-red-950/30",
-      text: "text-red-700 dark:text-red-400",
-      border: "border-red-200 dark:border-red-800",
-    },
-  };
-  return configs[status];
-};
-
 // --- Actions Component ---
 interface JournalActionsProps {
   journal: Journal;

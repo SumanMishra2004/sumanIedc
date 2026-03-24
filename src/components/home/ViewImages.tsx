@@ -25,7 +25,7 @@ const LAB_SLIDES: LabSlide[] = [
     year: "2024",
     color: "#c9f53b",
     imageUrl:
-      "https://images.unsplash.com/photo-1532187863486-abf9dbad1b69?w=1600&q=90",
+      "https://res.cloudinary.com/dvky83edw/image/upload/v1774103610/iot/2839f291-11e1-47bf-bf72-c56c2bc3b861.png",
   },
   {
     id: 2,
@@ -36,7 +36,7 @@ const LAB_SLIDES: LabSlide[] = [
     year: "2024",
     color: "#a8d62a",
     imageUrl:
-      "https://images.unsplash.com/photo-1576086213369-97a306d36557?w=1600&q=90",
+      "https://res.cloudinary.com/dvky83edw/image/upload/v1774104001/iot/08182265-1d07-4b60-ac81-72aed66b0956.png",
   },
   {
     id: 3,
@@ -47,7 +47,7 @@ const LAB_SLIDES: LabSlide[] = [
     year: "2023",
     color: "#c9f53b",
     imageUrl:
-      "https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=1600&q=90",
+      "https://res.cloudinary.com/dvky83edw/image/upload/v1774099272/iot/4c5adcf5-81ae-45d4-a989-71dd48f6b1aa_de6560.png",
   },
   {
     id: 4,
@@ -58,7 +58,7 @@ const LAB_SLIDES: LabSlide[] = [
     year: "2024",
     color: "#a8d62a",
     imageUrl:
-      "https://images.unsplash.com/photo-1530026405186-ed1f139313f8?w=1600&q=90",
+      "https://res.cloudinary.com/dvky83edw/image/upload/v1774099485/iot/630b65d2-c9eb-46dc-81a0-afde5664f0ee.png",
   },
   {
     id: 5,
@@ -69,7 +69,7 @@ const LAB_SLIDES: LabSlide[] = [
     year: "2024",
     color: "#c9f53b",
     imageUrl:
-      "https://images.unsplash.com/photo-1518152006812-edab29b069ac?w=1600&q=90",
+      "https://res.cloudinary.com/dvky83edw/image/upload/v1774103669/iot/e7aa4373-5920-499d-af38-7d109e14ecef.png",
   },
 ];
 //───────────────────────────────────────────────────

@@ -4,16 +4,29 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 import gsap from "gsap";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const ALL_LINKS = [
-  { label: "Home",         href: "#home" },
-  { label: "About Us",     href: "#about" },
-  { label: "Courses",      href: "#courses" },
-  { label: "Research",     href: "#research" },
-  { label: "Achievements", href: "#achievements" },
-  { label: "Gallery",      href: "#gallery" },
-  { label: "Team",         href: "#team" },
-  { label: "Contact",      href: "#contact" },
+  { label: "Home",         href: "/" },
+  { label: "About Us",     href: "/about" },
+  { label: "Research",     href: "#" },
+  { label: "Achievements", href: "/achievements" },
+  { label: "Gallery",      href: "/gallery" },
+  { label: "Team",         href: "/team" },
+  { label: "Contact",      href: "/contact" },
+];
+
+const RESEARCH_CHILD_LINKS = [
+  { label: "Journal", href: "/research/journal" },
+  { label: "Conference", href: "/research/conferences" },
+  { label: "Patent", href: "/research/patent" },
+  { label: "Copyright", href: "/research/copyright" },
+  { label: "Book Chapter", href: "/research/book-chapters" },
 ];
 
 // Desktop nav link
@@ -41,6 +54,86 @@ function NavLink({
         <span className="absolute right-0 top-1/2 -translate-y-1/2 w-px h-3 bg-white/10 pointer-events-none" />
       )}
     </Link>
+  );
+}
+
+function ResearchDropdown({ withSep = false }: { withSep?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearCloseTimer = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+
+  const handleEnter = () => {
+    clearCloseTimer();
+    setOpen(true);
+  };
+
+  const handleLeave = () => {
+    closeTimerRef.current = setTimeout(() => setOpen(false), 120);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
+
+  return (
+    <div onMouseEnter={handleEnter} onMouseLeave={handleLeave} className="relative shrink-0">
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="relative group flex items-center gap-1 px-3 py-2.5 text-[12px] lg:text-[13px] font-medium text-white/55 hover:text-[#c9f53b] transition-colors duration-200 select-none"
+            style={{ fontFamily: "'Space Grotesk', 'Inter', sans-serif", letterSpacing: "0.05em" }}
+            aria-label="Research menu"
+          >
+            Research
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="transition-transform duration-200"
+              style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+            <span className="absolute bottom-0 left-1/2 -translate-x-1/2 h-0.5 w-0 bg-[#c9f53b] rounded-full transition-all duration-300 group-hover:w-4/5" />
+            {withSep && (
+              <span className="absolute right-0 top-1/2 -translate-y-1/2 w-px h-3 bg-white/10 pointer-events-none" />
+            )}
+          </button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent
+          align="start"
+          sideOffset={10}
+          className="w-52 rounded-xl border-[#c9f53b]/20 bg-[#0c0c0c]/95 p-1.5 backdrop-blur-xl"
+          onMouseEnter={handleEnter}
+          onMouseLeave={handleLeave}
+        >
+          {RESEARCH_CHILD_LINKS.map((item) => (
+            <DropdownMenuItem
+              key={item.href}
+              asChild
+              className="rounded-md px-3 py-2 text-[12px] text-white/70 transition-colors duration-150 focus:bg-[#c9f53b]/10 focus:text-[#c9f53b]"
+            >
+              <Link href={item.href}>{item.label}</Link>
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 
@@ -194,7 +287,6 @@ export default function Navbar() {
   const navbarRef   = useRef<HTMLElement>(null);
   const isCollapsed = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
   const { data: session, status } = useSession();
   const isAuthed = status === "authenticated";
 
@@ -224,7 +316,6 @@ export default function Navbar() {
 
     const onScroll = () => {
       const scrollY = window.scrollY;
-      setScrolled(scrollY > SCROLL_THRESHOLD);
 
       if (scrollY > SCROLL_THRESHOLD && !isCollapsed.current) {
         isCollapsed.current = true;
@@ -267,7 +358,7 @@ export default function Navbar() {
 
       <header
         ref={navbarRef}
-        className="fixed top-0 left-0 right-0 z-[100] w-full"
+        className="fixed top-0 left-0 right-0 z-100 w-full"
         style={{
           background: "linear-gradient(180deg,rgba(12,12,12,0.98) 0%,rgba(12,12,12,0.92) 100%)",
           borderBottom: "1px solid rgba(201,245,59,0.12)",
@@ -317,7 +408,7 @@ export default function Navbar() {
                   style={{ fontFamily: "'Space Grotesk',sans-serif" }}
                 >
                   Dept. of Computer Science &amp; Engineering
-                  <span className="hidden lg:inline"> · <span className="text-[#c9f53b]/65">IoT, Cyber Security &amp; Blockchain</span></span>
+                  <span className="hidden lg:inline"> · <span className="text-[#c9f53b]/65">IoT, Cyber Security &amp; Blockchain Technology</span></span>
                 </span>
               </div>
             </div>
@@ -350,26 +441,101 @@ export default function Navbar() {
 
         {/* ── ROW 2 · Navigation bar ── */}
         <div className="w-full" style={{ background: "rgba(10,10,10,0.96)" }}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 flex items-center h-11">
-
-            {/* Desktop nav – hidden on mobile */}
-            <nav className="hidden md:flex flex-1 items-center">
-              {/* Home on the left */}
-              <NavLink href="#home" label="Home" />
-              {/* Separator */}
-              <span className="w-px h-3 bg-white/10 mx-1" />
-              {/* Rest centered */}
-              <div className="flex-1 flex items-center justify-center">
-                {ALL_LINKS.slice(1).map((link, i) => (
-                  <NavLink
-                    key={link.href}
-                    href={link.href}
-                    label={link.label}
-                    withSep={i < ALL_LINKS.length - 2}
-                  />
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 flex items-center h-11 gap-3">
+            {/* Desktop row: links left, search right */}
+            <div className="hidden md:flex flex-1 items-center min-w-0 gap-3">
+              <nav className="flex items-center min-w-0 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                {ALL_LINKS.map((link, i) => (
+                  link.label === "Research" ? (
+                    <ResearchDropdown
+                      key={link.href}
+                      withSep={i < ALL_LINKS.length - 1}
+                    />
+                  ) : (
+                    <NavLink
+                      key={link.href}
+                      href={link.href}
+                      label={link.label}
+                      withSep={i < ALL_LINKS.length - 1}
+                    />
+                  )
                 ))}
+              </nav>
+
+              <div className="ml-auto flex items-center gap-3 shrink-0">
+                <div
+                  className="flex items-center gap-2 rounded-md px-2.5 h-8"
+                  style={{
+                    border: "1px solid rgba(201,245,59,0.2)",
+                    background: "rgba(201,245,59,0.04)",
+                  }}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="rgba(201,245,59,0.75)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search"
+                    className="w-24 lg:w-32 xl:w-40 bg-transparent text-[12px] text-white/80 placeholder:text-white/35 outline-none"
+                    style={{ fontFamily: "'Space Grotesk',sans-serif", letterSpacing: "0.03em" }}
+                    aria-label="Search"
+                  />
+                </div>
+
+                <div className="shrink-0 hidden md:flex items-center">
+                  {status === "loading" ? (
+                    <div className="w-8 h-8 rounded-full bg-white/5 animate-pulse" />
+                  ) : isAuthed ? (
+                    <UserMenu
+                      name={session.user?.name}
+                      email={session.user?.email}
+                      image={session.user?.image}
+                    />
+                  ) : (
+                    <Link
+                      href="/auth/signin"
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 text-[12px] font-semibold rounded-full transition-all duration-200"
+                      style={{
+                        fontFamily: "'Space Grotesk',sans-serif",
+                        letterSpacing: "0.05em",
+                        border: "1.5px solid rgba(201,245,59,0.55)",
+                        color: "#c9f53b",
+                        background: "rgba(201,245,59,0.06)",
+                      }}
+                      onMouseEnter={e => {
+                        const el = e.currentTarget as HTMLAnchorElement;
+                        el.style.background = "#c9f53b";
+                        el.style.color = "#0c0c0c";
+                        el.style.borderColor = "#c9f53b";
+                      }}
+                      onMouseLeave={e => {
+                        const el = e.currentTarget as HTMLAnchorElement;
+                        el.style.background = "rgba(201,245,59,0.06)";
+                        el.style.color = "#c9f53b";
+                        el.style.borderColor = "rgba(201,245,59,0.55)";
+                      }}
+                    >
+                      Sign In
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                        <polyline points="10 17 15 12 10 7" />
+                        <line x1="15" y1="12" x2="3" y2="12" />
+                      </svg>
+                    </Link>
+                  )}
+                </div>
               </div>
-            </nav>
+            </div>
 
             {/* Mobile: logo name shorthand + spacer */}
             <div className="flex md:hidden flex-1 items-center">
@@ -384,50 +550,6 @@ export default function Navbar() {
               >
                 I.E.D.C
               </span>
-            </div>
-
-            {/* Auth area – desktop */}
-            <div className="shrink-0 pl-3 hidden md:flex items-center">
-              {status === "loading" ? (
-                <div className="w-8 h-8 rounded-full bg-white/5 animate-pulse" />
-              ) : isAuthed ? (
-                <UserMenu
-                  name={session.user?.name}
-                  email={session.user?.email}
-                  image={session.user?.image}
-                />
-              ) : (
-                <Link
-                  href="/auth/signin"
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 text-[12px] font-semibold rounded-full transition-all duration-200"
-                  style={{
-                    fontFamily: "'Space Grotesk',sans-serif",
-                    letterSpacing: "0.05em",
-                    border: "1.5px solid rgba(201,245,59,0.55)",
-                    color: "#c9f53b",
-                    background: "rgba(201,245,59,0.06)",
-                  }}
-                  onMouseEnter={e => {
-                    const el = e.currentTarget as HTMLAnchorElement;
-                    el.style.background = "#c9f53b";
-                    el.style.color = "#0c0c0c";
-                    el.style.borderColor = "#c9f53b";
-                  }}
-                  onMouseLeave={e => {
-                    const el = e.currentTarget as HTMLAnchorElement;
-                    el.style.background = "rgba(201,245,59,0.06)";
-                    el.style.color = "#c9f53b";
-                    el.style.borderColor = "rgba(201,245,59,0.55)";
-                  }}
-                >
-                  Sign In
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                    <polyline points="10 17 15 12 10 7" />
-                    <line x1="15" y1="12" x2="3" y2="12" />
-                  </svg>
-                </Link>
-              )}
             </div>
 
             {/* Hamburger – mobile only */}
@@ -453,20 +575,48 @@ export default function Navbar() {
         >
           <nav className="flex flex-col px-4 py-4 gap-1">
             {ALL_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={closeMenu}
-                className="flex items-center gap-3 px-3 py-3 rounded-lg text-[14px] font-medium text-white/60 hover:text-[#c9f53b] hover:bg-[#c9f53b]/5 transition-all duration-150 select-none"
-                style={{ fontFamily: "'Space Grotesk',sans-serif", letterSpacing: "0.04em" }}
-              >
-                <span className="w-1 h-1 rounded-full bg-[#c9f53b]/40 shrink-0" />
-                {link.label}
-              </Link>
+              link.label === "Research" ? (
+                <div key={link.href} className="rounded-lg border border-white/8 bg-white/2">
+                  <Link
+                    href={link.href}
+                    onClick={closeMenu}
+                    className="flex items-center gap-3 px-3 py-3 text-[14px] font-medium text-white/70 hover:text-[#c9f53b] transition-all duration-150 select-none"
+                    style={{ fontFamily: "'Space Grotesk',sans-serif", letterSpacing: "0.04em" }}
+                  >
+                    <span className="w-1 h-1 rounded-full bg-[#c9f53b]/50 shrink-0" />
+                    {link.label}
+                  </Link>
+                  <div className="pb-2">
+                    {RESEARCH_CHILD_LINKS.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={closeMenu}
+                        className="ml-7 mr-2 flex items-center gap-2 px-3 py-2 rounded-md text-[12px] text-white/60 hover:text-[#c9f53b] hover:bg-[#c9f53b]/5 transition-all duration-150"
+                        style={{ fontFamily: "'Space Grotesk',sans-serif", letterSpacing: "0.03em" }}
+                      >
+                        <span className="w-1 h-1 rounded-full bg-[#c9f53b]/35 shrink-0" />
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={closeMenu}
+                  className="flex items-center gap-3 px-3 py-3 rounded-lg text-[14px] font-medium text-white/60 hover:text-[#c9f53b] hover:bg-[#c9f53b]/5 transition-all duration-150 select-none"
+                  style={{ fontFamily: "'Space Grotesk',sans-serif", letterSpacing: "0.04em" }}
+                >
+                  <span className="w-1 h-1 rounded-full bg-[#c9f53b]/40 shrink-0" />
+                  {link.label}
+                </Link>
+              )
             ))}
 
             {/* Auth area – mobile drawer */}
-            <div className="mt-3 pt-3 border-t border-white/[0.06]">
+            <div className="mt-3 pt-3 border-t border-white/6">
               {isAuthed ? (
                 <>
                   {/* User info strip */}
