@@ -336,3 +336,58 @@ export const updateJournalTeacherStatus = async (
 ): Promise<ApiResponse<{ journal: Journal }>> => {
   return updateJournal(id, { teacherStatus: teacherStatus as any })
 }
+
+const BASE_URL = "/api/public/journal"
+
+/**
+ * Fetch a paginated, filtered list of public journals.
+ */
+export async function fetchJournals(
+  filters: JournalFilters = {}
+): Promise<JournalListResponse> {
+  const params: Record<string, string | number | boolean | undefined> = {}
+
+  if (filters.page !== undefined) params.page = filters.page
+  if (filters.limit !== undefined) params.limit = filters.limit
+  if (filters.sortBy) params.sortBy = filters.sortBy
+  if (filters.sortOrder) params.sortOrder = filters.sortOrder
+  if (filters.journalStatus) params.journalStatus = filters.journalStatus
+  if (filters.teacherStatus) params.teacherStatus = filters.teacherStatus
+  if (filters.isPublic !== undefined) params.isPublic = String(filters.isPublic)
+  if (filters.scope) params.scope = filters.scope
+  if (filters.reviewType) params.reviewType = filters.reviewType
+  if (filters.accessType) params.accessType = filters.accessType
+  if (filters.indexing) params.indexing = filters.indexing
+  if (filters.quartile) params.quartile = filters.quartile
+  if (filters.publicationMode) params.publicationMode = filters.publicationMode
+  if (filters.keyword) params.keyword = filters.keyword
+  if (filters.publisher) params.publisher = filters.publisher
+  if (filters.search) params.search = filters.search
+  if (filters.createdFrom) params.createdFrom = filters.createdFrom
+  if (filters.createdTo) params.createdTo = filters.createdTo
+  if (filters.publishedFrom) params.publishedFrom = filters.publishedFrom
+  if (filters.publishedTo) params.publishedTo = filters.publishedTo
+  if (filters.minRegistrationFees !== undefined)
+    params.minRegistrationFees = filters.minRegistrationFees
+  if (filters.maxRegistrationFees !== undefined)
+    params.maxRegistrationFees = filters.maxRegistrationFees
+  if (filters.minReimbursement !== undefined)
+    params.minReimbursement = filters.minReimbursement
+  if (filters.maxReimbursement !== undefined)
+    params.maxReimbursement = filters.maxReimbursement
+  if (filters.minImpactFactor !== undefined)
+    params.minImpactFactor = filters.minImpactFactor
+  if (filters.maxImpactFactor !== undefined)
+    params.maxImpactFactor = filters.maxImpactFactor
+
+  const { data } = await axios.get<JournalListResponse>(BASE_URL, { params })
+  return data
+}
+
+/**
+ * Fetch a single journal by ID.
+ */
+export async function fetchJournalById(id: string): Promise<Journal> {
+  const { data } = await axios.get<Journal>(`${BASE_URL}/${id}`)
+  return data
+}

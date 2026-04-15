@@ -46,14 +46,20 @@ export default function SpecialUsersManagement() {
   }, [])
 
   const fetchSpecialUsers = async () => {
+    setIsLoading(true)
     try {
       const response = await fetch('/api/admin/special-users')
       const data = await response.json()
+      console.log('Fetched special users:', data)
       if (response.ok) {
-        setSpecialUsers(data.specialUsers)
+        setSpecialUsers(data.all_user || [])
+      } else {
+        console.error('Failed to fetch special users:', data)
       }
     } catch (error) {
       console.error('Error fetching special users:', error)
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -192,11 +198,11 @@ export default function SpecialUsersManagement() {
           <CardHeader>
             <CardTitle>Current Special Users</CardTitle>
             <CardDescription>
-              Users with pre-assigned roles ({specialUsers.length})
+              Users with pre-assigned roles ({specialUsers?.length || 0})
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {specialUsers.length === 0 ? (
+            {!specialUsers || specialUsers.length === 0 ? (
               <p className="text-center text-sm text-muted-foreground">
                 No special users added yet
               </p>

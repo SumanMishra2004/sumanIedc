@@ -50,8 +50,8 @@ const journalSchema = z.object({
   documentUrl: z.string().nullable().optional(),
   scope: z.enum(["NATIONAL", "INTERNATIONAL"]),
   reviewType: z.enum(["PEER_REVIEWED", "NON_PEER_REVIEWED"]),
-  accessType: z.enum(["OPEN_ACCESS", "SUBSCRIPTION_BASED"]),
-  indexing: z.enum([
+  JournalAccessType: z.enum(["OPEN_ACCESS", "SUBSCRIPTION_BASED"]),
+  JournalIndexing: z.enum([
     "SCI",
     "SCIE",
     "SCOPUS",
@@ -106,8 +106,8 @@ interface Journal {
   documentUrl?: string | null;
   scope: "NATIONAL" | "INTERNATIONAL";
   reviewType: "PEER_REVIEWED" | "NON_PEER_REVIEWED";
-  accessType: "OPEN_ACCESS" | "SUBSCRIPTION_BASED";
-  indexing: "SCI" | "SCIE" | "SCOPUS" | "WEB_OF_SCIENCE" | "PUBMED" | "IEEE_XPLORE" | "SPRINGER" | "ELSEVIER" | "GOOGLE_SCHOLAR" | "UGC_CARE" | "OTHERS";
+  JournalAccessType: "OPEN_ACCESS" | "SUBSCRIPTION_BASED";
+  JournalIndexing: "SCI" | "SCIE" | "SCOPUS" | "WEB_OF_SCIENCE" | "PUBMED" | "IEEE_XPLORE" | "SPRINGER" | "ELSEVIER" | "GOOGLE_SCHOLAR" | "UGC_CARE" | "OTHERS";
   quartile?: "Q1" | "Q2" | "Q3" | "Q4" | null;
   publicationMode: "PRINT" | "ONLINE" | "BOTH";
   impactFactor?: number | null;
@@ -186,8 +186,8 @@ export default function EditJournalDialog({
       documentUrl: null,
       scope: "NATIONAL",
       reviewType: "PEER_REVIEWED",
-      accessType: "OPEN_ACCESS",
-      indexing: "SCOPUS",
+      JournalAccessType: "OPEN_ACCESS",
+      JournalIndexing: "SCOPUS",
       quartile: null,
       publicationMode: "ONLINE",
       impactFactor: null,
@@ -229,8 +229,8 @@ export default function EditJournalDialog({
         documentUrl: journal.documentUrl || null,
         scope: journal.scope,
         reviewType: journal.reviewType,
-        accessType: journal.accessType,
-        indexing: journal.indexing,
+        JournalAccessType: journal.JournalAccessType,
+        JournalIndexing: journal.JournalIndexing,
         quartile: journal.quartile || null,
         publicationMode: journal.publicationMode,
         impactFactor: journal.impactFactor || null,
@@ -612,7 +612,7 @@ export default function EditJournalDialog({
                     />
                     <FormField
                       control={form.control}
-                      name="accessType"
+                      name="JournalAccessType"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm mb-1">
@@ -665,11 +665,11 @@ export default function EditJournalDialog({
                     />
                     <FormField
                       control={form.control}
-                      name="indexing"
+                      name="JournalIndexing"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm mb-1">
-                            Indexing <span className="text-destructive">*</span>
+                            JournalIndexing <span className="text-destructive">*</span>
                           </FormLabel>
                           <Select
                             onValueChange={field.onChange}
@@ -677,7 +677,7 @@ export default function EditJournalDialog({
                           >
                             <FormControl>
                               <SelectTrigger className="h-12 w-full">
-                                <SelectValue placeholder="Select indexing" />
+                                <SelectValue placeholder="Select JournalIndexing" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>

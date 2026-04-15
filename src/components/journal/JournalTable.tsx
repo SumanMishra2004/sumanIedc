@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useState } from "react";
 import {
   flexRender,
   getCoreRowModel,
@@ -31,6 +32,7 @@ import {
   DollarSign,
   Funnel,
 } from "lucide-react";
+import type { Session } from "next-auth";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -77,13 +79,8 @@ import JournalDialog from "./journalAddForm";
 import {
   TeacherStatus,
   JournalScope,
-  JournalReviewType,
-  JournalAccessType,
-  JournalIndexing,
-  JournalQuartile,
-  JournalPublicationMode,
+ 
   JournalStatus,
-
 } from "@prisma/client";
 import { toast } from "sonner";
 import {
@@ -93,6 +90,7 @@ import {
   exportJournalsToCSV,
   searchJournals,
   getJournalsByTeacherStatus,
+  updateJournalTeacherStatus,
 } from "@/lib/research/journalApi";
 import {
   Card,
@@ -102,49 +100,48 @@ import {
   CardTitle,
 } from "../ui/card";
 import { AnimatedAvatarGroupTooltip } from "../ui/animated-tooltip";
-import { useState } from "react";
 import EditJournalDialog from "./journalEditForm";
-
 
 // --- Types & Data ---
 
 const getJournalStatus = (status: JournalStatus) => {
-  const statusMap: Record<JournalStatus, { bg: string; text: string; border: string ,dot: string}> = {
+  const statusMap: Record<
+    JournalStatus,
+    { bg: string; text: string; border: string; dot: string }
+  > = {
     PUBLISHED: {
       bg: "bg-emerald-50 dark:bg-emerald-950/30",
       text: "text-emerald-700 dark:text-emerald-400",
       border: "border-emerald-200 dark:border-emerald-800",
       dot: "bg-emerald-500",
-      
     },
     APPROVED: {
       bg: "bg-blue-50 dark:bg-blue-950/30",
       text: "text-blue-700 dark:text-blue-400",
       border: "border-blue-200 dark:border-blue-800",
       dot: "bg-blue-500",
-     
     },
     SUBMITTED: {
       bg: "bg-purple-50 dark:bg-purple-950/30",
       text: "text-purple-700 dark:text-purple-400",
       border: "border-purple-200 dark:border-purple-800",
       dot: "bg-purple-500",
-      
     },
     UNDER_REVIEW: {
       bg: "bg-amber-50 dark:bg-amber-950/30",
       text: "text-amber-700 dark:text-amber-400",
       border: "border-amber-200 dark:border-amber-800",
       dot: "bg-amber-500",
-      
     },
-    
-  }
+  };
 
-return statusMap[status];
-}
+  return statusMap[status];
+};
 const getScopeConfig = (scope: JournalScope) => {
-  const configs: Record<JournalScope, { bg: string; text: string; border: string }> = {
+  const configs: Record<
+    JournalScope,
+    { bg: string; text: string; border: string }
+  > = {
     INTERNATIONAL: {
       bg: "bg-violet-50 dark:bg-violet-950/30",
       text: "text-violet-700 dark:text-violet-400",
@@ -165,7 +162,7 @@ const getScopeConfig = (scope: JournalScope) => {
       text: "text-emerald-700 dark:text-emerald-400",
       border: "border-emerald-200 dark:border-emerald-800",
     },
-     };
+  };
   return configs[scope];
 };
 
@@ -175,13 +172,56 @@ interface JournalActionsProps {
   onDelete: (id: string) => void;
   onEdit?: (id: string) => void;
   onView?: (id: string) => void;
+  onTeacherStatusChange?: (id: string, status: TeacherStatus) => void;
+  session?: Session | null;
 }
+
+const getTeacherStatusConfig = (status: TeacherStatus) => {
+  const configs: Record<
+    TeacherStatus,
+    { bg: string; text: string; border: string; dot: string }
+  > = {
+    UPLOADED: {
+      bg: "bg-slate-50 dark:bg-slate-950/30",
+      text: "text-slate-700 dark:text-slate-400",
+      border: "border-slate-200 dark:border-slate-800",
+      dot: "bg-slate-500",
+    },
+    ACCEPTED: {
+      bg: "bg-green-50 dark:bg-green-950/30",
+      text: "text-green-700 dark:text-green-400",
+      border: "border-green-200 dark:border-green-800",
+      dot: "bg-green-500",
+    },
+    PUBLISHED: {
+      bg: "bg-blue-50 dark:bg-blue-950/30",
+      text: "text-blue-700 dark:text-blue-400",
+      border: "border-blue-200 dark:border-blue-800",
+      dot: "bg-blue-500",
+    },
+    UPDATE: {
+      bg: "bg-amber-50 dark:bg-amber-950/30",
+      text: "text-amber-700 dark:text-amber-400",
+      border: "border-amber-200 dark:border-amber-800",
+      dot: "bg-amber-500",
+    },
+    REJECTED: {
+      bg: "bg-red-50 dark:bg-red-950/30",
+      text: "text-red-700 dark:text-red-400",
+      border: "border-red-200 dark:border-red-800",
+      dot: "bg-red-500",
+    },
+  };
+  return configs[status];
+};
 
 const JournalActions = ({
   journal,
   onDelete,
   onEdit,
   onView,
+  onTeacherStatusChange,
+  session,
 }: JournalActionsProps) => (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
@@ -190,7 +230,7 @@ const JournalActions = ({
         <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
       </Button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="w-[160px]">
+    <DropdownMenuContent align="end" className="w-50">
       <DropdownMenuLabel>Actions</DropdownMenuLabel>
       <DropdownMenuItem
         onClick={() => navigator.clipboard.writeText(journal.id)}
@@ -202,18 +242,77 @@ const JournalActions = ({
         <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
         View details
       </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => onEdit?.(journal.id)}>
-        <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
-        Edit journal
-      </DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem
-        className="text-red-600 focus:text-red-600 focus:bg-red-50"
-        onClick={() => onDelete(journal.id)}
-      >
-        <Trash className="mr-2 h-4 w-4" />
-        Delete
-      </DropdownMenuItem>
+      {journal.teacherStatus !== "PUBLISHED" && (
+        <>
+          <DropdownMenuItem onClick={() => onEdit?.(journal.id)}>
+            <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+            Edit journal
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+        </>
+      )}
+      {journal.teacherStatus === "PUBLISHED" &&
+        session?.user.role === "ADMIN" && (
+          <>
+            <DropdownMenuItem onClick={() => onEdit?.(journal.id)}>
+              <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+              Edit journal
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+
+      {session?.user.role != "STUDENT" && (
+        <>
+          <p className="text-xs text-muted-foreground mb-1">Teacher Status</p>
+
+          <Select
+            defaultValue={journal.teacherStatus}
+            onValueChange={(value) =>
+              onTeacherStatusChange?.(journal.id, value as TeacherStatus)
+            }
+          >
+            <SelectTrigger className="w-45">
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+
+            <SelectContent>
+              {["ACCEPTED", "PUBLISHED", "UPDATE", "REJECTED"].map((status) => {
+                const config = getTeacherStatusConfig(status as TeacherStatus);
+
+                return (
+                  <SelectItem key={status} value={status}>
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${config.dot}`} />
+                      <span className="text-sm capitalize">
+                        {status.toLowerCase()}
+                      </span>
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </>
+      )}
+
+    {(
+    journal.teacherStatus === "UPLOADED"
+      ? session?.user.role !== "STUDENT"
+      : journal.teacherStatus === "ACCEPTED"
+      ? session?.user.role === "TEACHER" || session?.user.role === "ADMIN"
+      : journal.teacherStatus === "PUBLISHED"
+      ? session?.user.role === "ADMIN"
+      : session?.user.role === "TEACHER" || session?.user.role === "ADMIN"
+  ) && (
+    <DropdownMenuItem
+      className="text-red-600 focus:text-red-600 focus:bg-red-50"
+      onClick={() => onDelete(journal.id)}
+    >
+      <Trash className="mr-2 h-4 w-4" />
+      Delete
+    </DropdownMenuItem>
+  )}
     </DropdownMenuContent>
   </DropdownMenu>
 );
@@ -224,12 +323,16 @@ interface ColumnProps {
   onDelete: (id: string) => void;
   onEdit?: (id: string) => void;
   onView?: (id: string) => void;
+  onTeacherStatusChange?: (id: string, status: TeacherStatus) => void;
+  session?: Session | null;
 }
 
 export const createColumns = ({
   onDelete,
   onEdit,
   onView,
+  onTeacherStatusChange,
+  session,
 }: ColumnProps): ColumnDef<Journal>[] => [
   {
     id: "select",
@@ -260,11 +363,7 @@ export const createColumns = ({
     header: "Serial No",
     cell: ({ row }) => {
       const serialNo = row.getValue("serialNo") as string;
-      return (
-        <div className="font-mono text-sm font-medium">
-          {serialNo}
-        </div>
-      );
+      return <div className="font-mono text-sm font-medium">{serialNo}</div>;
     },
   },
   {
@@ -290,7 +389,9 @@ export const createColumns = ({
             {title.length > 60 ? title.slice(0, 60) + "..." : title}
           </span>
           <span className="text-xs text-muted-foreground truncate max-w-60">
-            {row.original.abstract?.length ? row.original.abstract.slice(0, 60) + "..." : "No abstract"}
+            {row.original.abstract?.length
+              ? row.original.abstract.slice(0, 60) + "..."
+              : "No abstract"}
           </span>
         </div>
       );
@@ -313,11 +414,7 @@ export const createColumns = ({
     },
     cell: ({ row }) => {
       const journalName = row.getValue("journalName") as string;
-      return (
-        <div className="font-medium truncate max-w-48">
-          {journalName}
-        </div>
-      );
+      return <div className="font-medium truncate max-w-48">{journalName}</div>;
     },
   },
   {
@@ -372,6 +469,26 @@ export const createColumns = ({
     },
   },
   {
+    accessorKey: "teacherStatus",
+    header: "Teacher Status",
+    cell: ({ row }) => {
+      const status = row.getValue("teacherStatus") as TeacherStatus;
+      const config = getTeacherStatusConfig(status);
+      return (
+        <Badge
+          variant="outline"
+          className={`${config.bg} ${config.text} ${config.border} font-medium px-2.5 py-1`}
+        >
+          <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${config.dot}`} />
+          {status.replace(/_/g, " ")}
+        </Badge>
+      );
+    },
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id));
+    },
+  },
+  {
     accessorKey: "Authors",
     header: "Authors",
     cell: ({ row }) => {
@@ -381,7 +498,7 @@ export const createColumns = ({
         name: author.user.name || "Unknown",
         email: author.user.email || "No email",
         image: author.user.image || undefined,
-        id: index
+        id: index,
       }));
       return (
         <div className="flex items-center gap-2">
@@ -408,7 +525,9 @@ export const createColumns = ({
     cell: ({ row }) => {
       return (
         <div className="text-sm text-muted-foreground">
-          {row.getValue("publicationDate") ? new Date(row.getValue("publicationDate")).toLocaleDateString() : "—"}
+          {row.getValue("publicationDate")
+            ? new Date(row.getValue("publicationDate")).toLocaleDateString()
+            : "—"}
         </div>
       );
     },
@@ -419,9 +538,7 @@ export const createColumns = ({
     cell: ({ row }) => {
       const publisher = row.getValue("publisher") as string | null;
       return (
-        <div className="text-sm truncate max-w-32">
-          {publisher || "—"}
-        </div>
+        <div className="text-sm truncate max-w-32">{publisher || "—"}</div>
       );
     },
   },
@@ -433,6 +550,8 @@ export const createColumns = ({
         onDelete={onDelete}
         onEdit={onEdit}
         onView={onView}
+        onTeacherStatusChange={onTeacherStatusChange}
+        session={session}
       />
     ),
   },
@@ -444,12 +563,14 @@ interface JournalTableProps {
   initialData?: Journal[];
   initialTotal?: number;
   onRefresh?: () => void;
+  session: Session | null;
 }
 
 export default function JournalTable({
   initialData = [],
   initialTotal = 0,
   onRefresh,
+  session,
 }: JournalTableProps) {
   const [data, setData] = React.useState<Journal[]>(initialData);
   const [totalRecords, setTotalRecords] = React.useState(initialTotal);
@@ -465,7 +586,6 @@ export default function JournalTable({
   const [searchTerm, setSearchTerm] = React.useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingJournalId, setEditingJournalId] = useState<string | null>(null);
-
   const [filters, setFilters] = React.useState<JournalFilters>({
     page: 1,
     limit: 10,
@@ -564,6 +684,30 @@ export default function JournalTable({
     }
   };
 
+  // Handle teacher status change
+  const handleTeacherStatusChange = async (
+    id: string,
+    status: TeacherStatus,
+  ) => {
+    try {
+      const response = await updateJournalTeacherStatus(id, status);
+      if (response.data) {
+        toast.success(
+          `Teacher status updated to ${status.replace(/_/g, " ").toLowerCase()}`,
+        );
+        fetchData();
+        onRefresh?.();
+      } else if (response.error) {
+        toast.error("Failed to update teacher status", {
+          description: response.error,
+        });
+      }
+    } catch (error) {
+      console.error("Error updating teacher status:", error);
+      toast.error("Failed to update teacher status");
+    }
+  };
+
   // Handle bulk delete
   const handleBulkDelete = async () => {
     const selectedIds = Object.keys(rowSelection);
@@ -582,9 +726,7 @@ export default function JournalTable({
     try {
       const response = await bulkDeleteJournals(selectedIds);
       if (response.data) {
-        toast.success(
-          `Successfully deleted ${response.data.count} journal(s)`,
-        );
+        toast.success(`Successfully deleted ${response.data.count} journal(s)`);
         setRowSelection({});
         fetchData();
         onRefresh?.();
@@ -611,6 +753,8 @@ export default function JournalTable({
         onView: (id) => {
           toast.info("View functionality coming soon");
         },
+        onTeacherStatusChange: handleTeacherStatusChange,
+        session
       }),
     [],
   );
@@ -658,506 +802,590 @@ export default function JournalTable({
 
   return (
     <>
-    <Card className="w-full p-3! border-dashed border-2 border-chart-2 gap-3! ">
-      {/* Header Section */}
-      <CardHeader className="space-y-4 border-b p-0!">
-        <div className="flex flex-col gap-4 sm:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-white/20 backdrop-blur-sm">
-                <FileText className="h-6 w-6 text-chart-2" />
+      <Card className="w-full p-3! border-dashed border-2 border-chart-2 gap-3! ">
+        {/* Header Section */}
+        <CardHeader className="space-y-4 border-b p-0!">
+          <div className="flex flex-col gap-4 sm:flex-row lg:items-center lg:justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-white/20 backdrop-blur-sm">
+                  <FileText className="h-6 w-6 text-chart-2" />
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+                  Journal Publications
+                </h2>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-                Journal Publications
-              </h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {Object.keys(rowSelection).length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  className="shadow-lg"
+                >
+                  <Trash className="mr-2 h-4 w-4" />
+                  Delete ({Object.keys(rowSelection).length})
+                </Button>
+              )}
+              <ExportDialog
+                triggerButton={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="shadow-lg bg-white/20 hover:bg-white/30 text-white border-white/30"
+                  >
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Export
+                  </Button>
+                }
+              />
+              <JournalDialog
+                onSuccess={fetchData}
+                onClose={() => fetchData()}
+              />
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {Object.keys(rowSelection).length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleBulkDelete}
-                className="shadow-lg"
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                Delete ({Object.keys(rowSelection).length})
-              </Button>
-            )}
-            <ExportDialog
-              triggerButton={
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="shadow-lg bg-white/20 hover:bg-white/30 text-white border-white/30"
-                >
-                  <FileDown className="mr-2 h-4 w-4" />
-                  Export
-                </Button>
-              }
-            />
-            <JournalDialog 
-              onSuccess={fetchData}
-              onClose={() => fetchData()}
-            />
-          </div>
-        </div>
-      </CardHeader>
+        </CardHeader>
 
-      {/* Toolbar */}
-      <CardContent
-        className="
+        {/* Toolbar */}
+        <CardContent
+          className="
           rounded-lg border bg-card p-4 shadow-sm
           flex flex-col gap-4
           lg:flex-row lg:items-center lg:justify-between
         "
-      >
-        {/* LEFT SECTION */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center flex-1">
-          {/* Search */}
-          <div className="relative w-full lg:w-78">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search titles..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              disabled={isLoading}
-              className="h-9 pl-9 bg-background "
-            />
-          </div>
-
-          <Separator orientation="vertical" className="hidden sm:block h-6" />
-
-          {/* Status Filter */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
+        >
+          {/* LEFT SECTION */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center flex-1">
+            {/* Search */}
+            <div className="relative w-full lg:w-78">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search titles..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 disabled={isLoading}
-                className="
+                className="h-9 pl-9 bg-background "
+              />
+            </div>
+
+            <Separator orientation="vertical" className="hidden sm:block h-6" />
+
+            {/* Status Filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isLoading}
+                  className="
                   h-9 gap-2
                   border-dashed
                   bg-muted/40 hover:bg-muted
                 "
-              >
-                <ChevronDown className="h-4 w-4" />
-                <span className="whitespace-nowrap">
-                  Status {filters.journalStatus && `(${filters.journalStatus  })`}
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent align="start" className="w-52">
-              <DropdownMenuLabel>Status</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-
-              <DropdownMenuItem
-                onClick={() => {
-                  const { journalStatus, ...rest } = filters;
-                  setFilters({ ...rest, page: 1 });
-                }}
-              >
-                All Statuses
-              </DropdownMenuItem>
-
-              {[
-               
-                "SUBMITTED",
-                "UNDER_REVIEW",
-                "APPROVED",
-                "PUBLISHED",
-               
-              ].map((status) => (
-                <DropdownMenuItem
-                  key={status}
-                  onClick={() => setFilters(prev => ({ ...prev, journalStatus: status as any, page: 1 }))}
-                  className="flex items-center gap-2"
                 >
-                  <span
-                    className={`h-2 w-2 rounded-full ${getJournalStatus(status as JournalStatus).dot}`}
-                  />
-                  <span className="capitalize text-sm">
-                    {status.replace(/_/g, " ").toLowerCase()}
+                  <ChevronDown className="h-4 w-4" />
+                  <span className="whitespace-nowrap">
+                    Status{" "}
+                    {filters.journalStatus && `(${filters.journalStatus})`}
                   </span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </Button>
+              </DropdownMenuTrigger>
 
-          {/* Journal Type Filter */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isLoading}
-                className="
-                  h-9 gap-2
-                  border-dashed
-                  bg-muted/40 hover:bg-muted
-                "
-              >
-                <ChevronDown className="h-4 w-4" />
-                <span className="whitespace-nowrap">
-                  Type {filters.indexing && `(${filters.indexing})`}
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuLabel>Status</DropdownMenuLabel>
+                <DropdownMenuSeparator />
 
-            <DropdownMenuContent align="start" className="w-52">
-              <DropdownMenuLabel>Journal Type</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-
-              <DropdownMenuItem
-                onClick={() => {
-                  const { indexing, ...rest } = filters;
-                  setFilters({ ...rest, page: 1 });
-                }}
-              >
-                All Types
-              </DropdownMenuItem>
-
-              {[
-                "SCOPUS",
-                "WEB_OF_SCIENCE",
-                "SCI",
-                "SCIE",
-                "SSCI", 
-                "AHCI",
-                "UGC_CARE",
-                "DOAJ",
-                "PUBMED",
-                "IEEE_XPLORE"
-              ].map((type) => (
                 <DropdownMenuItem
-                  key={type}
-                  onClick={() => setFilters(prev => ({ ...prev, journalType: type as any, page: 1 }))}
-                  className="flex items-center gap-2"
+                  onClick={() => {
+                    const {  ...rest } = filters;
+                    setFilters({ ...rest, page: 1 });
+                  }}
                 >
-                  <span className="text-sm">
-                    {type.replace(/_/g, " ")}
-                  </span>
+                  All Statuses
                 </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
 
-        {/* RIGHT SECTION */}
-        <div className="flex flex-wrap items-center gap-2 justify-between">
-          <FilterDialog
-            filters={filters}
-            onFiltersChange={updateFilters}
-            onClearFilters={clearFilters}
-          />
-
-          {/* View Toggle */}
-          <div className="flex items-center rounded-md border bg-background p-1 shadow-sm">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setViewMode("table")}
-              className={`h-7 w-7 ${
-                viewMode === "table"
-                  ? "bg-muted shadow-sm"
-                  : "hover:bg-transparent"
-              }`}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setViewMode("card")}
-              className={`h-7 w-7 ${
-                viewMode === "card"
-                  ? "bg-muted shadow-sm"
-                  : "hover:bg-transparent"
-              }`}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {/* Columns (Desktop only) */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex h-9 gap-2 bg-muted/40 hover:bg-muted"
-              >
-                Columns
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent align="end">
-              {table
-                .getAllColumns()
-                .filter((column) => column.getCanHide())
-                .map((column) => (
-                  <DropdownMenuCheckboxItem
-                    key={column.id}
-                    checked={column.getIsVisible()}
-                    onCheckedChange={(value) =>
-                      column.toggleVisibility(!!value)
-                    }
-                    className="capitalize"
-                  >
-                    {column.id}
-                  </DropdownMenuCheckboxItem>
-                ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardContent>
-
-      {/* Content Area */}
-      <CardContent className="h-fit p-0!">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="text-muted-foreground">Loading...</div>
-          </div>
-        ) : viewMode === "table" ? (
-          <div className="rounded-md border bg-card shadow-sm overflow-x-auto scroll-m-1 scrollbar-gradient">
-            <Table>
-              <TableHeader>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <TableRow
-                    key={headerGroup.id}
-                    className="bg-muted/50 hover:bg-muted/50"
-                  >
-                    {headerGroup.headers.map((header) => {
-                      return (
-                        <TableHead key={header.id} className="h-10">
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext(),
-                              )}
-                        </TableHead>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableHeader>
-              <TableBody>
-                {table.getRowModel().rows?.length ? (
-                  table.getRowModel().rows.map((row) => (
-                    <TableRow
-                      key={row.id}
-                      data-state={row.getIsSelected() && "selected"}
-                      className="cursor-pointer hover:bg-muted/30"
+                {["SUBMITTED", "UNDER_REVIEW", "APPROVED", "PUBLISHED"].map(
+                  (status) => (
+                    <DropdownMenuItem
+                      key={status}
+                      onClick={() =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          journalStatus: status as any,
+                          page: 1,
+                        }))
+                      }
+                      className="flex items-center gap-2"
                     >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-3">
-                          {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext(),
-                          )}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell
-                      colSpan={columns.length}
-                      className="h-24 text-center text-muted-foreground"
-                    >
-                      No results found.
-                    </TableCell>
-                  </TableRow>
+                      <span
+                        className={`h-2 w-2 rounded-full ${getJournalStatus(status as JournalStatus).dot}`}
+                      />
+                      <span className="capitalize text-sm">
+                        {status.replace(/_/g, " ").toLowerCase()}
+                      </span>
+                    </DropdownMenuItem>
+                  ),
                 )}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {table.getRowModel().rows.map((row) => {
-              const journal = row.original;
-              const students = journal.studentAuthors || [];
-              const teachers = journal.facultyAuthors || [];
-              const typeConfig = getJournalStatus(journal.journalStatus);
-              return (
-                <div
-                  key={row.id}
-                  className="group relative flex flex-col justify-between overflow-hidden rounded-xl border bg-muted p-5 shadow-sm transition-all hover:shadow-2xl hover:border-primary/20 hover:scale-105 duration-400"
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Journal Type Filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isLoading}
+                  className="
+                  h-9 gap-2
+                  border-dashed
+                  bg-muted/40 hover:bg-muted
+                "
                 >
-                  <div className="absolute right-3 top-3 opacity-0 transition-opacity group-hover:opacity-100">
-                    <JournalActions
-                      journal={journal}
-                      onDelete={handleDelete}
-                      onEdit={(id) =>
-                        toast.info("Edit functionality coming soon")
-                      }
-                      onView={(id) =>
-                        toast.info("View functionality coming soon")
-                      }
+                  <ChevronDown className="h-4 w-4" />
+                  <span className="whitespace-nowrap">
+                    Type {filters.indexing && `(${filters.indexing})`}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuLabel>Journal Type</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem
+                  onClick={() => {
+                    const { ...rest } = filters;
+                    setFilters({ ...rest, page: 1 });
+                  }}
+                >
+                  All Types
+                </DropdownMenuItem>
+
+                {[
+                  "SCOPUS",
+                  "WEB_OF_SCIENCE",
+                  "SCI",
+                  "SCIE",
+                  "SSCI",
+                  "AHCI",
+                  "UGC_CARE",
+                  "DOAJ",
+                  "PUBMED",
+                  "IEEE_XPLORE",
+                ].map((type) => (
+                  <DropdownMenuItem
+                    key={type}
+                    onClick={() =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        journalType: type as any,
+                        page: 1,
+                      }))
+                    }
+                    className="flex items-center gap-2"
+                  >
+                    <span className="text-sm">{type.replace(/_/g, " ")}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Teacher Status Filter */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isLoading}
+                  className="
+                  h-9 gap-2
+                  border-dashed
+                  bg-muted/40 hover:bg-muted
+                "
+                >
+                  <ChevronDown className="h-4 w-4" />
+                  <span className="whitespace-nowrap">
+                    Teacher{" "}
+                    {filters.teacherStatus && `(${filters.teacherStatus})`}
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent align="start" className="w-52">
+                <DropdownMenuLabel>Teacher Status</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+
+                <DropdownMenuItem
+                  onClick={() => {
+                    const {  ...rest } = filters;
+                    setFilters({ ...rest, page: 1 });
+                  }}
+                >
+                  All Statuses
+                </DropdownMenuItem>
+
+                {[
+                  "UPLOADED",
+                  "ACCEPTED",
+                  "PUBLISHED",
+                  "UPDATE",
+                  "REJECTED",
+                ].map((status) => (
+                  <DropdownMenuItem
+                    key={status}
+                    onClick={() =>
+                      setFilters((prev) => ({
+                        ...prev,
+                        teacherStatus: status as any,
+                        page: 1,
+                      }))
+                    }
+                    className="flex items-center gap-2"
+                  >
+                    <span
+                      className={`h-2 w-2 rounded-full ${getTeacherStatusConfig(status as TeacherStatus).dot}`}
                     />
-                  </div>
+                    <span className="capitalize text-sm">
+                      {status.toLowerCase()}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
 
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <Badge
-                        variant="outline"
-                        className={`font-medium border ${getJournalStatus(journal.journalStatus).bg} ${getJournalStatus(journal.journalStatus).text} ${getJournalStatus(journal.journalStatus).border}`}
+          {/* RIGHT SECTION */}
+          <div className="flex flex-wrap items-center gap-2 justify-between">
+            <FilterDialog
+              filters={filters}
+              onFiltersChange={updateFilters}
+              onClearFilters={clearFilters}
+            />
+
+            {/* View Toggle */}
+            <div className="flex items-center rounded-md border bg-background p-1 shadow-sm">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setViewMode("table")}
+                className={`h-7 w-7 ${
+                  viewMode === "table"
+                    ? "bg-muted shadow-sm"
+                    : "hover:bg-transparent"
+                }`}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setViewMode("card")}
+                className={`h-7 w-7 ${
+                  viewMode === "card"
+                    ? "bg-muted shadow-sm"
+                    : "hover:bg-transparent"
+                }`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Columns (Desktop only) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex h-9 gap-2 bg-muted/40 hover:bg-muted"
+                >
+                  Columns
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+
+              <DropdownMenuContent align="end">
+                {table
+                  .getAllColumns()
+                  .filter((column) => column.getCanHide())
+                  .map((column) => (
+                    <DropdownMenuCheckboxItem
+                      key={column.id}
+                      checked={column.getIsVisible()}
+                      onCheckedChange={(value) =>
+                        column.toggleVisibility(!!value)
+                      }
+                      className="capitalize"
+                    >
+                      {column.id}
+                    </DropdownMenuCheckboxItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardContent>
+
+        {/* Content Area */}
+        <CardContent className="h-fit p-0!">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-muted-foreground">Loading...</div>
+            </div>
+          ) : viewMode === "table" ? (
+            <div className="rounded-md border bg-card shadow-sm overflow-x-auto scroll-m-1 scrollbar-gradient">
+              <Table>
+                <TableHeader>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow
+                      key={headerGroup.id}
+                      className="bg-muted/50 hover:bg-muted/50"
+                    >
+                      {headerGroup.headers.map((header) => {
+                        return (
+                          <TableHead key={header.id} className="h-10">
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext(),
+                                )}
+                          </TableHead>
+                        );
+                      })}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows?.length ? (
+                    table.getRowModel().rows.map((row) => (
+                      <TableRow
+                        key={row.id}
+                        data-state={row.getIsSelected() && "selected"}
+                        className="cursor-pointer hover:bg-muted/30"
                       >
-                        {journal.journalStatus.replace(/_/g, " ")}
-                      </Badge>
-                      <Badge
-                        variant="outline"
-                        className={`font-medium border ${typeConfig.bg} ${typeConfig.text} ${typeConfig.border} text-xs`}
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id} className="py-3">
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell
+                        colSpan={columns.length}
+                        className="h-24 text-center text-muted-foreground"
                       >
-                        {journal.journalStatus.replace(/_/g, " ")}
-                      </Badge>
+                        No results found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {table.getRowModel().rows.map((row) => {
+                const journal = row.original;
+                const students = journal.studentAuthors || [];
+                const teachers = journal.facultyAuthors || [];
+                const typeConfig = getJournalStatus(journal.journalStatus);
+                return (
+                  <div
+                    key={row.id}
+                    className="group relative flex flex-col justify-between overflow-hidden rounded-xl border bg-muted p-5 shadow-sm transition-all hover:shadow-2xl hover:border-primary/20 hover:scale-105 duration-400"
+                  >
+                    <div className="absolute right-3 top-3 opacity-0 transition-opacity group-hover:opacity-100">
+                      <JournalActions
+                        journal={journal}
+                        onDelete={handleDelete}
+                        onEdit={(id) => {
+                          setEditingJournalId(id);
+                          setEditDialogOpen(true);
+                        }}
+                        onView={(id) =>
+                          toast.info("View functionality coming soon")
+                        }
+                        onTeacherStatusChange={handleTeacherStatusChange}
+                        session={session}
+                      />
                     </div>
 
-                    <div className="space-y-1">
-                      <h3 className="line-clamp-2 font-semibold leading-tight text-foreground">
-                        {journal.title}
-                      </h3>
-                      <p className="text-xs text-muted-foreground line-clamp-1">
-                        {journal.journalName}
-                      </p>
-                      <p className="line-clamp-2 text-sm text-muted-foreground">
-                        {journal.abstract || "No description provided."}
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Users className="h-3.5 w-3.5" />
-                        <span>{students.length + teachers.length} Authors</span>
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <Badge
+                          variant="outline"
+                          className={`font-medium border ${getJournalStatus(journal.journalStatus).bg} ${getJournalStatus(journal.journalStatus).text} ${getJournalStatus(journal.journalStatus).border}`}
+                        >
+                          {journal.journalStatus.replace(/_/g, " ")}
+                        </Badge>
+                        <Badge
+                          variant="outline"
+                          className={`font-medium border ${typeConfig.bg} ${typeConfig.text} ${typeConfig.border} text-xs`}
+                        >
+                          {journal.journalStatus.replace(/_/g, " ")}
+                        </Badge>
                       </div>
-                      <div className="flex items-center gap-1.5 text-muted-foreground">
-                        <Calendar className="h-3.5 w-3.5" />
-                        <span>
-                          {journal.publicationDate 
-                            ? new Date(journal.publicationDate).toLocaleDateString() 
-                            : "Not published"}
+
+                      <div className="space-y-1">
+                        <h3 className="line-clamp-2 font-semibold leading-tight text-foreground">
+                          {journal.title}
+                        </h3>
+                        <p className="text-xs text-muted-foreground line-clamp-1">
+                          {journal.journalName}
+                        </p>
+                        <p className="line-clamp-2 text-sm text-muted-foreground">
+                          {journal.abstract || "No description provided."}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Users className="h-3.5 w-3.5" />
+                          <span>
+                            {students.length + teachers.length} Authors
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <Calendar className="h-3.5 w-3.5" />
+                          <span>
+                            {journal.publicationDate
+                              ? new Date(
+                                  journal.publicationDate,
+                                ).toLocaleDateString()
+                              : "Not published"}
+                          </span>
+                        </div>
+                      </div>
+
+                      {journal.impactFactor && (
+                        <div className="flex items-center gap-2 pt-2 border-t">
+                          <span className="text-xs text-muted-foreground">
+                            Impact Factor:
+                          </span>
+                          <span className="font-mono font-semibold text-sm">
+                            {journal.impactFactor.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t pt-4">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] uppercase font-semibold text-muted-foreground">
+                          Publisher
+                        </span>
+                        <span className="text-xs font-medium truncate max-w-32">
+                          {journal.publisher || "—"}
                         </span>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 text-xs bg-accent hover:bg-accent/80"
+                      >
+                        View Details
+                      </Button>
                     </div>
-
-                    {journal.impactFactor && (
-                      <div className="flex items-center gap-2 pt-2 border-t">
-                        <span className="text-xs text-muted-foreground">Impact Factor:</span>
-                        <span className="font-mono font-semibold text-sm">{journal.impactFactor.toFixed(2)}</span>
-                      </div>
-                    )}
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
 
-                  <div className="mt-4 flex items-center justify-between border-t pt-4">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] uppercase font-semibold text-muted-foreground">
-                        Publisher
-                      </span>
-                      <span className="text-xs font-medium truncate max-w-32">
-                        {journal.publisher || "—"}
-                      </span>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs bg-accent hover:bg-accent/80"
-                    >
-                      View Details
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-
-      {/* Pagination */}
-      <CardFooter className="flex flex-col-reverse items-center justify-between gap-4 border-t pt-4 sm:flex-row">
-        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <span>
-            {Object.keys(rowSelection).length} of {data.length} row(s) selected
-          </span>
-          <span className="text-xs">
-            (Showing {(currentPage - 1) * (filters.limit || 10) + 1} to{" "}
-            {Math.min(currentPage * (filters.limit || 10), totalRecords)} of{" "}
-            {totalRecords})
-          </span>
-        </div>
-
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-muted-foreground hidden sm:block">
-              Rows per page
-            </p>
-            <Select
-              value={`${filters.limit || 10}`}
-              onValueChange={(value) => handlePageSizeChange(Number(value))}
-              disabled={isLoading}
-            >
-              <SelectTrigger className="h-8 w-16 bg-accent text-black ">
-                <SelectValue className="text-xs" placeholder={filters.limit || 10} />
-              </SelectTrigger>
-              <SelectContent side="top">
-                {[5, 10, 20, 30, 50].map((pageSize) => (
-                  <SelectItem
-                    key={pageSize}
-                    value={`${pageSize}`}
-                    className="text-black!"
-                  >
-                    {pageSize}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0 bg-accent"
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage <= 1 || isLoading}
-            >
-              <span className="sr-only">Go to previous page</span>
-              <ChevronDown className="h-4 w-4 rotate-90 " />
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
+        {/* Pagination */}
+        <CardFooter className="flex flex-col-reverse items-center justify-between gap-4 border-t pt-4 sm:flex-row">
+          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+            <span>
+              {Object.keys(rowSelection).length} of {data.length} row(s)
+              selected
             </span>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0 bg-accent"
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage >= totalPages || isLoading}
-            >
-              <ChevronDown className="h-4 w-4 -rotate-90" />
-            </Button>
+            <span className="text-xs">
+              (Showing {(currentPage - 1) * (filters.limit || 10) + 1} to{" "}
+              {Math.min(currentPage * (filters.limit || 10), totalRecords)} of{" "}
+              {totalRecords})
+            </span>
           </div>
-        </div>
-      </CardFooter>
-    </Card>
-    {editingJournalId && (
-      <EditJournalDialog
-        journalId={editingJournalId}
-        open={editDialogOpen}
-        onOpenChange={(open) => {
-          setEditDialogOpen(open);
-          if (!open) setEditingJournalId(null);
-        }}
-        onSuccess={() => {
-          fetchData();
-          onRefresh?.();
-          toast.success("Journal updated successfully");
-        }}
-      />
-    )}
-  </>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-muted-foreground hidden sm:block">
+                Rows per page
+              </p>
+              <Select
+                value={`${filters.limit || 10}`}
+                onValueChange={(value) => handlePageSizeChange(Number(value))}
+                disabled={isLoading}
+              >
+                <SelectTrigger className="h-8 w-16 bg-accent text-black ">
+                  <SelectValue
+                    className="text-xs"
+                    placeholder={filters.limit || 10}
+                  />
+                </SelectTrigger>
+                <SelectContent side="top">
+                  {[5, 10, 20, 30, 50].map((pageSize) => (
+                    <SelectItem
+                      key={pageSize}
+                      value={`${pageSize}`}
+                      className="text-black!"
+                    >
+                      {pageSize}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 bg-accent"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage <= 1 || isLoading}
+              >
+                <span className="sr-only">Go to previous page</span>
+                <ChevronDown className="h-4 w-4 rotate-90 " />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 bg-accent"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages || isLoading}
+              >
+                <ChevronDown className="h-4 w-4 -rotate-90" />
+              </Button>
+            </div>
+          </div>
+        </CardFooter>
+      </Card>
+      {editingJournalId && (
+        <EditJournalDialog
+          journalId={editingJournalId}
+          open={editDialogOpen}
+          onOpenChange={(open) => {
+            setEditDialogOpen(open);
+            if (!open) setEditingJournalId(null);
+          }}
+          onSuccess={() => {
+            fetchData();
+            onRefresh?.();
+            toast.success("Journal updated successfully");
+          }}
+        />
+      )}
+    </>
   );
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { BookchapterStatus, TeacherStatus, UserRole } from '@prisma/client'
+import { UserRole } from '@prisma/client'
 
 // GET - Get single book chapter by ID
 export async function GET(

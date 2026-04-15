@@ -17,7 +17,7 @@ export async function middleware(request: NextRequest) {
     if (!session) {
       return NextResponse.redirect(new URL('/auth/signin', request.url))
     }
-    if (session.user.role !== 'FACULTY') {
+    if (session.user.role !== 'ADMIN') {
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }

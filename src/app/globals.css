@@ -180,3 +180,21 @@ body {
     );
   }
 }
+
+/* Navbar-specific utilities */
+@layer utilities {
+  /* Ensure pages with navbar take full viewport height */
+  .min-h-screen-with-navbar {
+    min-height: 100vh;
+  }
+
+  /* For content that should fill remaining space after navbar */
+  .content-below-navbar {
+    min-height: calc(100vh - var(--navbar-height, 140px));
+  }
+
+  /* Smooth transitions for navbar height changes */
+  .navbar-transition {
+    transition: height 0.45s cubic-bezier(0.65, 0, 0.35, 1);
+  }
+}

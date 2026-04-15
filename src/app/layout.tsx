@@ -4,6 +4,7 @@ import "./globals.css";
 import AuthProvider from "@/providers/auth-provider";
 import LenisProvider from "@/providers/lenis-provider";
 import { Toaster } from "@/components/ui/sonner";
+import ConditionalNavbar from "@/components/home/ConditionalNavbar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,7 +32,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <AuthProvider>
-          <LenisProvider>{children}</LenisProvider>
+          <LenisProvider>
+            <ConditionalNavbar>{children}</ConditionalNavbar>
+          </LenisProvider>
         </AuthProvider>
         <Toaster />
       </body>

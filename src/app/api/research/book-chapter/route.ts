@@ -85,10 +85,11 @@ export async function GET(req: NextRequest) {
         mode: 'insensitive'
       }
     }
-
-    // Search across multiple fields
-    if (search) {
-      where.OR = [
+if (search) {
+  where.AND = [
+    ...(where.AND || []),
+    {
+      OR: [
         { title: { contains: search, mode: 'insensitive' } },
         { abstract: { contains: search, mode: 'insensitive' } },
         { publisher: { contains: search, mode: 'insensitive' } },
@@ -96,6 +97,8 @@ export async function GET(req: NextRequest) {
         { doi: { contains: search, mode: 'insensitive' } }
       ]
     }
+  ]
+}
 
     // Date range filters
     if (createdFrom || createdTo) {

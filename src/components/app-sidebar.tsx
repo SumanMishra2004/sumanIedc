@@ -30,7 +30,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
   const { data: session } = useSession()
   const userRole = session?.user?.role
-
+  console.log("User Role:", userRole) // Debugging line to check the user role
   const researchItems = [
     { title: "Book Chapters", url: "/dashboard/book-chapters" },
     { title: "Copyright", url: "/dashboard/copyright" },

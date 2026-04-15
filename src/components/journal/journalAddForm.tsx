@@ -1017,7 +1017,7 @@ export default function JournalDialog({
                         </FormControl>
                         <FormDescription className="text-xs text-center pt-2">
                           {imageFile && (
-                            <div className="flex items-center justify-center gap-1 text-xs bg-muted/50 p-2 rounded max-w-full">
+                            <span className="flex items-center justify-center gap-1 text-xs bg-muted/50 p-2 rounded max-w-full">
                               <Upload className="h-3 w-3 flex-shrink-0" />
                               <span className="truncate flex-1">
                                 {imageFile.name}
@@ -1035,12 +1035,12 @@ export default function JournalDialog({
                               >
                                 <X className="h-3 w-3" />
                               </Button>
-                            </div>
+                            </span>
                           )}
                           {field.value && !imageFile && (
-                            <p className="text-xs text-green-600 font-medium flex items-center gap-1 justify-center">
+                            <span className="text-xs text-green-600 font-medium flex items-center gap-1 justify-center block mt-2">
                               ✓ Image uploaded
-                            </p>
+                            </span>
                           )}
                         </FormDescription>
                         <FormMessage />
@@ -1090,7 +1090,7 @@ export default function JournalDialog({
                         </FormControl>
                         <FormDescription className="text-xs text-center pt-2 block">
                           {documentFile && (
-                            <div className="flex items-center justify-center gap-1 text-xs bg-muted/50 p-2 rounded overflow-hidden">
+                            <span className="flex items-center justify-center gap-1 text-xs bg-muted/50 p-2 rounded overflow-hidden">
                               <Upload className="h-3 w-3" />
                               <span className="truncate flex-1">
                                 {documentFile.name}
@@ -1107,12 +1107,12 @@ export default function JournalDialog({
                               >
                                 <X className="h-3 w-3" />
                               </Button>
-                            </div>
+                            </span>
                           )}
                           {field.value && !documentFile && (
-                            <p className="text-xs text-green-600 font-medium">
+                            <span className="text-xs text-green-600 font-medium block mt-2">
                               ✓ Uploaded
-                            </p>
+                            </span>
                           )}
                         </FormDescription>
                         <FormMessage />
