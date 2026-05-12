@@ -2,12 +2,13 @@ import { Client, Storage, ID } from 'appwrite';
 
 const client = new Client();
 
-if (!process.env.NEXT_PUBLIC_APPWRITE_PUBLIC_ENDPOINT || !process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID) {
-  throw new Error('Appwrite environment variables are not defined');
+if (process.env.NEXT_PUBLIC_APPWRITE_PUBLIC_ENDPOINT && process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID) {
+  client
+    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_PUBLIC_ENDPOINT)
+    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID);
+} else {
+  console.warn('Appwrite environment variables are missing during build phase.');
 }
-client
-  .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_PUBLIC_ENDPOINT!)
-  .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID!);
 
 const storage = new Storage(client);
 

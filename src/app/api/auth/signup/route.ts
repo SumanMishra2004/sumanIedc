@@ -1,66 +1,79 @@
 import { NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
+import argon2 from 'argon2'
 import prisma from '@/lib/prisma'
+import { SignUpSchema } from '@/lib/validations/auth'
 
+const DEFAULT_NAME = 'New User'
 
 export async function POST(request: Request) {
   try {
-    const { email, password, name } = await request.json()
+    const body = await request.json()
 
-    if (!email || !password) {
+    // ── 1. Zod validation ─────────────────────────────────────────────────
+    const parsed = SignUpSchema.safeParse(body)
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
-        { status: 400 }
+        { error: parsed.error.issues[0]?.message ?? 'Invalid input' },
+        { status: 422 },
       )
     }
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    })
+    const { name, email, password } = parsed.data
 
+    // ── 2. Check for existing user ─────────────────────────────────────────
+    // Use a generic error message to prevent user enumeration
+    const existingUser = await prisma.user.findUnique({ where: { email } })
     if (existingUser) {
       return NextResponse.json(
-        { error: 'User already exists' },
-        { status: 400 }
+        { error: 'User allready exist' },
+        { status: 409 },
       )
     }
 
-    // Get role from special users or default to STUDENT
-    const role = await prisma.specialUser.findUnique({
-      where: { email },
-    }).then(specialUser => specialUser ? specialUser.role : 'STUDENT')
+    // ── 3. Role resolution from SpecialUser table ─────────────────────────
+    const specialUser = await prisma.specialUser.findUnique({ where: { email } })
+    const role = specialUser?.role ?? 'STUDENT'
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10)
+    // ── 4. Hash password with Argon2id ────────────────────────────────────
+    const hashedPassword = await argon2.hash(password, {
+      type: argon2.argon2id,
+      memoryCost: 65536, // 64 MiB
+      timeCost: 3,
+      parallelism: 4,
+    })
 
-    // Create user
+    // ── 5. Derive fallback image from initials ────────────────────────────
+    const displayName = name ?? DEFAULT_NAME
+    const fallbackImage = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`
+
+    // ── 6. Create user ────────────────────────────────────────────────────
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
-        name: name || email.split('@')[0],
+        name: displayName,
+        image: fallbackImage,
         role,
+        profileCompleted: false,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        profileCompleted: true,
       },
     })
 
     return NextResponse.json(
-      {
-        message: 'User created successfully',
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-        },
-      },
-      { status: 201 }
+      { message: 'Account created successfully', user },
+      { status: 201 },
     )
   } catch (error) {
-    console.error('Signup error:', error)
+    console.error('[signup]', error)
     return NextResponse.json(
       { error: 'Internal server error' },
-      { status: 500 }
+      { status: 500 },
     )
   }
 }
