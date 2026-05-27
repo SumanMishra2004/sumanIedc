@@ -102,3 +102,30 @@ To update the database schema:
 ## License
 
 MIT
+
+
+## the env are 
+
+DATABASE_URL = "postgresql://Suman:PSCZrDbvlaufGOaDZWbeNA@hiding-piglet-26836.j77.aws-ap-south-1.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full"
+
+
+
+NEXTAUTH_SECRET = "my-website-secret"
+NEXTAUTH_URL = "http://localhost:3000"
+
+
+UPSTASH_REDIS_REST_URL="https://relaxed-stud-77461.upstash.io"
+UPSTASH_REDIS_REST_TOKEN="gQAAAAAAAS6VAAIgcDJiODBmMTUyOGQxYmM0NGU0OTVhMWQyMjRkYTIwZTI5Yw"
+
+
+NEXT_PUBLIC_TURNSTILE_SITE_KEY="0x4AAAAAADNpRRgc962y0Rao"
+TURNSTILE_SECRET_KEY = "0x4AAAAAADNpRWlfqDeF1vEhz3VG6vYwy6I"
+RESEND_API_KEY = "re_FV4TP1m3_FLKDZ9g9GQjHKRBRc36W64vu"
+
+
+
+NEXT_PUBLIC_APPWRITE_PROJECT_ID = "682cb2010021cd83858b"
+NEXT_PUBLIC_APPWRITE_BUCKET_ID = "682cb2fa0017d5694f11"
+NEXT_PUBLIC_APPWRITE_PROJECT_NAME = "iedc"
+NEXT_PUBLIC_APPWRITE_PUBLIC_ENDPOINT = "https://fra.cloud.appwrite.io/v1"
+        
