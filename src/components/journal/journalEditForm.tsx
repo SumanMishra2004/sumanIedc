@@ -4,8 +4,9 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { journalSchema } from "@/lib/validations/journal";
 import axios from "axios";
-import { Loader2, Upload, X } from "lucide-react";
+import { Loader2, Upload, X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,52 +41,10 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { uploadFile } from "@/lib/appwrite";
+import { Journal } from "@/types/journal";
+import type { Session } from "next-auth";
 
-const journalSchema = z.object({
-  serialNo: z.string().min(1, "Serial number is required"),
-  title: z.string().min(1, "Title is required").max(200, "Title is too long"),
-  journalName: z.string().min(1, "Journal name is required"),
-  abstract: z.string().nullable().optional(),
-  imageUrl: z.string().nullable().optional(),
-  documentUrl: z.string().nullable().optional(),
-  scope: z.enum(["NATIONAL", "INTERNATIONAL"]),
-  reviewType: z.enum(["PEER_REVIEWED", "NON_PEER_REVIEWED"]),
-  JournalAccessType: z.enum(["OPEN_ACCESS", "SUBSCRIPTION_BASED"]),
-  JournalIndexing: z.enum([
-    "SCI",
-    "SCIE",
-    "SCOPUS",
-    "WEB_OF_SCIENCE",
-    "PUBMED",
-    "IEEE_XPLORE",
-    "SPRINGER",
-    "ELSEVIER",
-    "GOOGLE_SCHOLAR",
-    "UGC_CARE",
-    "OTHERS",
-  ]),
-  quartile: z.enum(["Q1", "Q2", "Q3", "Q4"]).nullable().optional(),
-  publicationMode: z.enum(["PRINT", "ONLINE", "BOTH"]),
-  impactFactor: z.number().nullable().optional(),
-  impactFactorDate: z.string().nullable().optional(),
-  publisher: z.string().nullable().optional(),
-  publicationDate: z.string().nullable().optional(),
-  doi: z.string().nullable().optional(),
-  paperLink: z.string().nullable().optional(),
-  keywords: z.array(z.string()).min(3, "At least 3 keywords are required").max(10, "No more than 10 keywords are allowed"),
-  registrationFees: z.number().nullable().optional(),
-  reimbursement: z.number().nullable().optional(),
-  journalStatus: z.enum([
-    "SUBMITTED",
-    "UNDER_REVIEW",
-    "ACCEPTED",
-    "PUBLISHED",
-    "REJECTED",
-  ]),
-  isPublic: z.boolean(),
-  studentAuthorIds: z.array(z.string()),
-  facultyAuthorIds: z.array(z.string()),
-});
+// Use imported journalSchema from @/lib/validations/journal
 
 type JournalFormValues = z.infer<typeof journalSchema>;
 
@@ -96,45 +55,26 @@ interface SelectedUser {
   image?: string;
 }
 
-interface Journal {
-  id: string;
-  serialNo: string;
-  title: string;
-  journalName: string;
-  abstract?: string | null;
-  imageUrl?: string | null;
-  documentUrl?: string | null;
-  scope: "NATIONAL" | "INTERNATIONAL";
-  reviewType: "PEER_REVIEWED" | "NON_PEER_REVIEWED";
-  JournalAccessType: "OPEN_ACCESS" | "SUBSCRIPTION_BASED";
-  JournalIndexing: "SCI" | "SCIE" | "SCOPUS" | "WEB_OF_SCIENCE" | "PUBMED" | "IEEE_XPLORE" | "SPRINGER" | "ELSEVIER" | "GOOGLE_SCHOLAR" | "UGC_CARE" | "OTHERS";
-  quartile?: "Q1" | "Q2" | "Q3" | "Q4" | null;
-  publicationMode: "PRINT" | "ONLINE" | "BOTH";
-  impactFactor?: number | null;
-  impactFactorDate?: string | null;
-  publisher?: string | null;
-  publicationDate?: string | null;
-  doi?: string | null;
-  paperLink?: string | null;
-  keywords: string[];
-  registrationFees?: number | null;
-  reimbursement?: number | null;
-  journalStatus: "SUBMITTED" | "UNDER_REVIEW" | "ACCEPTED" | "PUBLISHED" | "REJECTED";
-  isPublic: boolean;
-  facultyAuthors?: Array<{ id: string; user: { id: string; name: string | null; email: string | null; image?: string | null } }>;
-  studentAuthors?: Array<{ id: string; user: { id: string; name: string | null; email: string | null; image?: string | null } }>;
-}
+const formatDateForInput = (val: string | Date | null | undefined): string => {
+  if (!val) return "";
+  if (val instanceof Date) {
+    return val.toISOString().split("T")[0];
+  }
+  return typeof val === "string" ? val.split("T")[0] : "";
+};
 
 export default function EditJournalDialog({
   journalId,
   open,
   onOpenChange,
   onSuccess,
+  session,
 }: {
   journalId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  session: Session | null;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -150,6 +90,7 @@ export default function EditJournalDialog({
 
   const [showCustomPublisher, setShowCustomPublisher] = useState(false);
   const [customPublisher, setCustomPublisher] = useState<string>("");
+  const [updateComment, setUpdateComment] = useState<string | null>(null);
 
   const publishers = [
     "Elsevier",
@@ -181,14 +122,14 @@ export default function EditJournalDialog({
       serialNo: "",
       title: "",
       journalName: "",
-      abstract: null,
+      abstract: "",
       imageUrl: null,
       documentUrl: null,
-      scope: "NATIONAL",
+      scope: "INTERNATIONAL",
       reviewType: "PEER_REVIEWED",
-      JournalAccessType: "OPEN_ACCESS",
-      JournalIndexing: "SCOPUS",
-      quartile: null,
+      accessType: "OPEN_ACCESS",
+      indexing: "NONE",
+      quartile: "NOT_APPLICABLE",
       publicationMode: "ONLINE",
       impactFactor: null,
       impactFactorDate: null,
@@ -206,6 +147,14 @@ export default function EditJournalDialog({
     },
   });
 
+  const indexing = form.watch("indexing");
+
+  useEffect(() => {
+    if (indexing === "NONE") {
+      form.setValue("quartile", "NOT_APPLICABLE");
+    }
+  }, [indexing, form]);
+
   // Load journal data when dialog opens
   useEffect(() => {
     if (open && journalId) {
@@ -213,30 +162,37 @@ export default function EditJournalDialog({
     }
   }, [open, journalId]);
 
+  const formatDate = (dateVal: any) => {
+    if (!dateVal) return null;
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().split("T")[0];
+  };
+
   const loadJournalData = async () => {
     setIsLoading(true);
     try {
       const response = await axios.get(`/api/research/journal/${journalId}`);
-      const journal: Journal = response.data.journal;
+      const journal = response.data.journal;
 
       // Populate form with existing data
       form.reset({
         serialNo: journal.serialNo,
         title: journal.title,
         journalName: journal.journalName,
-        abstract: journal.abstract || null,
+        abstract: journal.abstract || "",
         imageUrl: journal.imageUrl || null,
         documentUrl: journal.documentUrl || null,
         scope: journal.scope,
         reviewType: journal.reviewType,
-        JournalAccessType: journal.JournalAccessType,
-        JournalIndexing: journal.JournalIndexing,
-        quartile: journal.quartile || null,
+        accessType: journal.accessType,
+        indexing: journal.indexing,
+        quartile: journal.quartile || "NOT_APPLICABLE",
         publicationMode: journal.publicationMode,
         impactFactor: journal.impactFactor || null,
-        impactFactorDate: journal.impactFactorDate || null,
+        impactFactorDate: formatDate(journal.impactFactorDate),
         publisher: journal.publisher || null,
-        publicationDate: journal.publicationDate || null,
+        publicationDate: formatDate(journal.publicationDate),
         doi: journal.doi || null,
         paperLink: journal.paperLink || null,
         keywords: journal.keywords,
@@ -244,13 +200,13 @@ export default function EditJournalDialog({
         reimbursement: journal.reimbursement || null,
         journalStatus: journal.journalStatus,
         isPublic: journal.isPublic,
-        facultyAuthorIds: journal.facultyAuthors?.map(a => a.user.id) || [],
-        studentAuthorIds: journal.studentAuthors?.map(a => a.user.id) || [],
+        facultyAuthorIds: journal.facultyAuthors?.map((a: any) => a.user.id) || [],
+        studentAuthorIds: journal.studentAuthors?.map((a: any) => a.user.id) || [],
       });
 
       // Set selected users for display
       if (journal.facultyAuthors) {
-        setSelectedFaculty(journal.facultyAuthors.map(a => ({
+        setSelectedFaculty(journal.facultyAuthors.map((a: any) => ({
           id: a.user.id,
           name: a.user.name || '',
           email: a.user.email || '',
@@ -259,7 +215,7 @@ export default function EditJournalDialog({
       }
 
       if (journal.studentAuthors) {
-        setSelectedStudents(journal.studentAuthors.map(a => ({
+        setSelectedStudents(journal.studentAuthors.map((a: any) => ({
           id: a.user.id,
           name: a.user.name || '',
           email: a.user.email || '',
@@ -273,6 +229,7 @@ export default function EditJournalDialog({
         setCustomPublisher(journal.publisher);
       }
 
+      setUpdateComment(journal.updateComment || null);
       toast.success("Journal loaded successfully");
     } catch (error: any) {
       console.error("Error loading journal:", error);
@@ -287,8 +244,9 @@ export default function EditJournalDialog({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
+    const allowedImageTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedImageTypes.includes(file.type)) {
+      toast.error("Allowed image formats: jpg, jpeg, png, webp");
       return;
     }
 
@@ -318,8 +276,14 @@ export default function EditJournalDialog({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Document size should be less than 10MB");
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      toast.error("Only PDF files are allowed for documents");
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("Document size should be less than 25MB");
       return;
     }
 
@@ -400,6 +364,20 @@ export default function EditJournalDialog({
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4 pb-6"
               >
+                {updateComment && (
+                  <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-xl p-4 flex gap-3 text-amber-800 dark:text-amber-300 shadow-sm mb-4">
+                    <div className="h-9 w-9 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+                      <AlertCircle className="h-5 w-5 animate-pulse" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-semibold tracking-tight">Reviewer Correction Feedback</h4>
+                      <p className="text-sm text-amber-700/90 dark:text-amber-300/80 mt-1 whitespace-pre-wrap leading-relaxed">
+                        {updateComment}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Basic Information */}
                 <Card className="border-dashed border-border overflow-hidden">
                   <CardHeader className="p-4 pb-2">
@@ -531,15 +509,23 @@ export default function EditJournalDialog({
                         render={({ field }) => (
                           <FormItem className="lg:col-span-2">
                             <FormLabel className="text-base font-semibold mb-1">
-                              Abstract
+                              Abstract <span className="text-destructive">*</span>
                             </FormLabel>
                             <FormControl>
-                              <Textarea
-                                placeholder="Write abstract"
-                                className="min-h-[100px] text-base border focus-visible:ring-1 resize-vertical"
-                                {...field}
-                                value={field.value ?? ""}
-                              />
+                              <div className="space-y-1">
+                                <Textarea
+                                  placeholder="Write abstract (at least 100 characters)"
+                                  className="min-h-[100px] text-base border focus-visible:ring-1 resize-vertical"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                />
+                                <div className="flex justify-between text-xs text-muted-foreground">
+                                  <span>Minimum 100, Maximum 5000 characters</span>
+                                  <span className={((field.value ?? "").length < 100 || (field.value ?? "").length > 5000) ? "text-destructive font-semibold" : "text-emerald-500"}>
+                                    {(field.value ?? "").length} / 5000
+                                  </span>
+                                </div>
+                              </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -576,8 +562,10 @@ export default function EditJournalDialog({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="NATIONAL">National</SelectItem>
-                              <SelectItem value="INTERNATIONAL">International</SelectItem>
+                              <SelectItem value="INTERNATIONAL">🌍 International</SelectItem>
+                              <SelectItem value="NATIONAL">🏛️ National</SelectItem>
+                              <SelectItem value="REGIONAL">🗺️ Regional</SelectItem>
+                              <SelectItem value="LOCAL">🏘️ Local</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -603,6 +591,9 @@ export default function EditJournalDialog({
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="PEER_REVIEWED">Peer Reviewed</SelectItem>
+                              <SelectItem value="DOUBLE_BLIND">Double Blind</SelectItem>
+                              <SelectItem value="SINGLE_BLIND">Single Blind</SelectItem>
+                              <SelectItem value="EDITORIAL_REVIEWED">Editorial Reviewed</SelectItem>
                               <SelectItem value="NON_PEER_REVIEWED">Non-Peer Reviewed</SelectItem>
                             </SelectContent>
                           </Select>
@@ -612,7 +603,7 @@ export default function EditJournalDialog({
                     />
                     <FormField
                       control={form.control}
-                      name="JournalAccessType"
+                      name="accessType"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm mb-1">
@@ -629,7 +620,9 @@ export default function EditJournalDialog({
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="OPEN_ACCESS">Open Access</SelectItem>
-                              <SelectItem value="SUBSCRIPTION_BASED">Subscription Based</SelectItem>
+                              <SelectItem value="SUBSCRIPTION">Subscription</SelectItem>
+                              <SelectItem value="HYBRID">Hybrid</SelectItem>
+                              <SelectItem value="DIAMOND_OPEN_ACCESS">Diamond Open Access</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -654,9 +647,9 @@ export default function EditJournalDialog({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="PRINT">Print</SelectItem>
                               <SelectItem value="ONLINE">Online</SelectItem>
-                              <SelectItem value="BOTH">Both</SelectItem>
+                              <SelectItem value="PRINT">Print</SelectItem>
+                              <SelectItem value="PRINT_AND_ONLINE">Print & Online</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -665,11 +658,11 @@ export default function EditJournalDialog({
                     />
                     <FormField
                       control={form.control}
-                      name="JournalIndexing"
+                      name="indexing"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-sm mb-1">
-                            JournalIndexing <span className="text-destructive">*</span>
+                            Indexing <span className="text-destructive">*</span>
                           </FormLabel>
                           <Select
                             onValueChange={field.onChange}
@@ -677,21 +670,21 @@ export default function EditJournalDialog({
                           >
                             <FormControl>
                               <SelectTrigger className="h-12 w-full">
-                                <SelectValue placeholder="Select JournalIndexing" />
+                                <SelectValue placeholder="Select indexing" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="SCI">SCI</SelectItem>
-                              <SelectItem value="SCIE">SCIE</SelectItem>
-                              <SelectItem value="SCOPUS">Scopus</SelectItem>
-                              <SelectItem value="WEB_OF_SCIENCE">Web of Science</SelectItem>
-                              <SelectItem value="PUBMED">PubMed</SelectItem>
-                              <SelectItem value="IEEE_XPLORE">IEEE Xplore</SelectItem>
-                              <SelectItem value="SPRINGER">Springer</SelectItem>
-                              <SelectItem value="ELSEVIER">Elsevier</SelectItem>
-                              <SelectItem value="GOOGLE_SCHOLAR">Google Scholar</SelectItem>
-                              <SelectItem value="UGC_CARE">UGC CARE</SelectItem>
-                              <SelectItem value="OTHERS">Others</SelectItem>
+                              <SelectItem value="SCOPUS">📊 Scopus</SelectItem>
+                              <SelectItem value="WEB_OF_SCIENCE">🕸️ Web of Science</SelectItem>
+                              <SelectItem value="SCI">🔬 SCI</SelectItem>
+                              <SelectItem value="SCIE">⚗️ SCIE</SelectItem>
+                              <SelectItem value="SSCI">📚 SSCI</SelectItem>
+                              <SelectItem value="AHCI">🎨 AHCI</SelectItem>
+                              <SelectItem value="UGC_CARE">🏛️ UGC CARE</SelectItem>
+                              <SelectItem value="DOAJ">📖 DOAJ</SelectItem>
+                              <SelectItem value="PUBMED">🏥 PubMed</SelectItem>
+                              <SelectItem value="IEEE_XPLORE">⚡ IEEE Xplore</SelectItem>
+                              <SelectItem value="NONE">❌ None</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -708,7 +701,8 @@ export default function EditJournalDialog({
                           </FormLabel>
                           <Select
                             onValueChange={field.onChange}
-                            value={field.value ?? "none"}
+                            value={field.value || "NOT_APPLICABLE"}
+                            disabled={indexing === "NONE"}
                           >
                             <FormControl>
                               <SelectTrigger className="h-12 w-full">
@@ -716,11 +710,11 @@ export default function EditJournalDialog({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="none">None</SelectItem>
                               <SelectItem value="Q1">Q1</SelectItem>
                               <SelectItem value="Q2">Q2</SelectItem>
                               <SelectItem value="Q3">Q3</SelectItem>
                               <SelectItem value="Q4">Q4</SelectItem>
+                              <SelectItem value="NOT_APPLICABLE">Not Applicable</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -767,7 +761,7 @@ export default function EditJournalDialog({
                               type="date"
                               className="h-10"
                               {...field}
-                              value={field.value ?? ""}
+                              value={formatDateForInput(field.value)}
                             />
                           </FormControl>
                           <FormMessage />
@@ -852,7 +846,7 @@ export default function EditJournalDialog({
                               type="date"
                               className="h-10"
                               {...field}
-                              value={field.value ?? ""}
+                              value={formatDateForInput(field.value)}
                             />
                           </FormControl>
                           <FormMessage />
@@ -982,6 +976,7 @@ export default function EditJournalDialog({
                               <Select
                                 onValueChange={field.onChange}
                                 value={field.value}
+                                disabled={session?.user.role === "STUDENT"}
                               >
                                 <FormControl>
                                   <SelectTrigger className="h-12 w-full">
@@ -995,14 +990,11 @@ export default function EditJournalDialog({
                                   <SelectItem value="UNDER_REVIEW">
                                     🔍 Under Review
                                   </SelectItem>
-                                  <SelectItem value="ACCEPTED">
-                                    ✅ Accepted
+                                  <SelectItem value="APPROVED">
+                                    ✅ Approved
                                   </SelectItem>
                                   <SelectItem value="PUBLISHED">
                                     📚 Published
-                                  </SelectItem>
-                                  <SelectItem value="REJECTED">
-                                    ❌ Rejected
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
@@ -1086,6 +1078,7 @@ export default function EditJournalDialog({
                               <Switch
                                 checked={field.value}
                                 onCheckedChange={field.onChange}
+                                disabled={session?.user.role !== "ADMIN"}
                               />
                             </FormControl>
                           </FormItem>

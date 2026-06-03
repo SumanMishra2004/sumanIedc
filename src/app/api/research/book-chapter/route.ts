@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { BookchapterStatus, TeacherStatus, UserRole } from '@prisma/client'
+import { bookChapterSchema } from '@/lib/validations/book-chapter'
 
 // GET - List all book chapters with filtering, pagination, and search
 export async function GET(req: NextRequest) {
@@ -197,13 +198,21 @@ export async function POST(request: Request) {
 
     const body = await request.json()
 
+    // Enforce validation using Zod
+    const validation = bookChapterSchema.safeParse(body)
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message, details: validation.error.issues },
+        { status: 400 }
+      )
+    }
+
     const {
       title,
       abstract,
       imageUrl,
       documentUrl,
       bookChapterStatus,
-      teacherStatus,
       isbnIssn,
       registrationFees,
       reimbursement,
@@ -212,55 +221,11 @@ export async function POST(request: Request) {
       doi,
       publicationDate,
       publisher,
-      studentAuthorIds = [],
-      facultyAuthorIds = []
-    } = body
-
-    /* -------------------- Basic validation -------------------- */
-
-    if (!title || typeof title !== "string") {
-      return NextResponse.json(
-        { error: "Title is required" },
-        { status: 400 }
-      )
-    }
-
-    if (!Array.isArray(facultyAuthorIds) || facultyAuthorIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one faculty author is required" },
-        { status: 400 }
-      )
-    }
-    if (!Array.isArray(studentAuthorIds) || studentAuthorIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one student author is required" },
-        { status: 400 }
-      )
-    }
-
-    if (keywords && !Array.isArray(keywords)) {
-      return NextResponse.json(
-        { error: "Keywords must be an array of strings" },
-        { status: 400 }
-      )
-    }
-
-    if (bookChapterStatus && !Object.values(BookchapterStatus).includes(bookChapterStatus)) {
-      return NextResponse.json(
-        { error: "Invalid book chapter status" },
-        { status: 400 }
-      )
-    }
-
-    if (teacherStatus && !Object.values(TeacherStatus).includes(teacherStatus)) {
-      return NextResponse.json(
-        { error: "Invalid teacher status" },
-        { status: 400 }
-      )
-    }
+      studentAuthorIds,
+      facultyAuthorIds
+    } = validation.data
 
     /* -------------------- Validate faculty authors -------------------- */
-
     const facultyAuthors = await prisma.user.findMany({
       where: {
         id: { in: facultyAuthorIds },
@@ -275,26 +240,22 @@ export async function POST(request: Request) {
       )
     }
 
-    /* -------------------- Validate student authors (optional) -------------------- */
-
-    if (studentAuthorIds.length > 0) {
-      const studentAuthors = await prisma.user.findMany({
-        where: {
-          id: { in: studentAuthorIds },
-          role: UserRole.STUDENT
-        }
-      })
-
-      if (studentAuthors.length !== studentAuthorIds.length) {
-        return NextResponse.json(
-          { error: "One or more student authors are invalid" },
-          { status: 400 }
-        )
+    /* -------------------- Validate student authors -------------------- */
+    const studentAuthors = await prisma.user.findMany({
+      where: {
+        id: { in: studentAuthorIds },
+        role: UserRole.STUDENT
       }
+    })
+
+    if (studentAuthors.length !== studentAuthorIds.length) {
+      return NextResponse.json(
+        { error: "One or more student authors are invalid" },
+        { status: 400 }
+      )
     }
 
     /* -------------------- Create BookChapter -------------------- */
-
     const bookChapter = await prisma.bookChapter.create({
       data: {
         title,
@@ -302,33 +263,25 @@ export async function POST(request: Request) {
         imageUrl,
         documentUrl,
         bookChapterStatus: bookChapterStatus ?? BookchapterStatus.SUBMITTED,
-        teacherStatus: teacherStatus ?? TeacherStatus.UPLOADED,
         isbnIssn,
-        registrationFees:
-          registrationFees !== undefined ? Number(registrationFees) : null,
-        reimbursement:
-          reimbursement !== undefined ? Number(reimbursement) : null,
-        isPublic: Boolean(isPublic),
-        keywords: keywords ?? [],
+        registrationFees,
+        reimbursement,
+        isPublic,
+        keywords,
         doi,
-        publicationDate: publicationDate
-          ? new Date(publicationDate)
-          : null,
+        publicationDate: publicationDate ? new Date(publicationDate) : null,
         publisher,
-
         studentAuthors: {
           create: studentAuthorIds.map((userId: string) => ({
             userId
           }))
         },
-
         facultyAuthors: {
           create: facultyAuthorIds.map((userId: string) => ({
             userId
           }))
         }
       },
-
       include: {
         studentAuthors: {
           include: { user: true }
@@ -338,6 +291,23 @@ export async function POST(request: Request) {
         }
       }
     })
+
+    // Trigger Notifications for faculty co-authors
+    for (const faculty of facultyAuthors) {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: faculty.id,
+            title: "New Book Chapter Co-Authored",
+            message: `A new book chapter submission '${bookChapter.title}' has been uploaded and lists you as co-author.`,
+            type: "BOOK_CHAPTER_SUBMITTED",
+            link: `/dashboard/book-chapters`,
+          }
+        })
+      } catch (err) {
+        console.error("Failed to notify faculty co-author:", err)
+      }
+    }
 
     return NextResponse.json(
       { bookChapter },

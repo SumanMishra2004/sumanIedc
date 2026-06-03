@@ -6,9 +6,423 @@ datasource db {
   provider = "cockroachdb"
 }
 
-// --------------------------------------
-// ENUMS
-// --------------------------------------
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model SpecialUser {
+  id    String   @id @default(cuid())
+  email String   @unique
+  role  UserRole @default(FACULTY)
+
+  @@map("special_users")
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model PasswordResetToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("password_reset_tokens")
+}
+
+model User {
+  id                  String                     @id @default(cuid())
+  name                String?
+  email               String?                    @unique
+  emailVerified       DateTime?                  @map("email_verified")
+  image               String?
+  password            String?
+  role                UserRole                   @default(STUDENT)
+  profileCompleted    Boolean                    @default(false)
+  bio                 String?
+  department          String?
+  phone               String?
+  studentBookChapters BookChapterStudentAuthor[] @relation("studentAuthors")
+  facultyBookChapters BookChapterTeacherAuthor[] @relation("facultyAuthors")
+  certification       Certificate[]              @relation("userCertificates")
+  studentConferences  ConferenceStudentAuthor[]  @relation("studentConferenceAuthors")
+  facultyConferences  ConferenceTeacherAuthor[]  @relation("facultyConferenceAuthors")
+  studentCopyrights   CopyrightStudentAuthor[]   @relation("studentCopyrightAuthors")
+  facultyCopyrights   CopyrightTeacherAuthor[]   @relation("facultyCopyrightAuthors")
+  fdp                 FDP[]                      @relation("userFDPs")
+  studentGrantIns     GrantInStudentAuthor[]     @relation("studentGrantInAuthors")
+  facultyGrantIns     GrantInTeacherAuthor[]     @relation("facultyGrantInAuthors")
+  studentPatents      PatentStudentAuthor[]      @relation("studentPatentAuthors")
+  facultyPatents      PatentTeacherAuthor[]      @relation("facultyPatentAuthors")
+  accounts            Account[]
+  bills               GrantInBill[]
+  studentJournals     JournalStudentAuthor[]     @relation("studentJournalAuthors")
+  facultyJournals     JournalTeacherAuthor[]     @relation("facultyJournalAuthors")
+  sessions            Session[]
+  notifications       Notification[]
+
+  @@map("users")
+}
+
+model BookChapter {
+  id                String                     @id @default(cuid())
+  title             String
+  abstract          String?
+  imageUrl          String?
+  documentUrl       String?
+  bookChapterStatus BookchapterStatus          @default(SUBMITTED)
+  teacherStatus     TeacherStatus              @default(UPLOADED)
+  isbnIssn          String?
+  registrationFees  Float?
+  reimbursement     Float?
+  isPublic          Boolean                    @default(false)
+  updateComment     String?
+  keywords          String[]
+  doi               String?
+  publicationDate   DateTime?
+  publisher         String?
+  createdAt         DateTime                   @default(now()) @map("created_at")
+  updatedAt         DateTime                   @updatedAt @map("updated_at")
+  studentAuthors    BookChapterStudentAuthor[] @relation("studentAuthors")
+  facultyAuthors    BookChapterTeacherAuthor[] @relation("facultyAuthors")
+  grantMappings     GrantInMapping[]
+}
+
+model BookChapterStudentAuthor {
+  id            String      @id @default(cuid())
+  bookChapterId String      @map("book_chapter_id")
+  userId        String      @map("user_id")
+  bookChapter   BookChapter @relation("studentAuthors", fields: [bookChapterId], references: [id], onDelete: Cascade)
+  user          User        @relation("studentAuthors", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model BookChapterTeacherAuthor {
+  id            String      @id @default(cuid())
+  bookChapterId String      @map("book_chapter_id")
+  userId        String      @map("user_id")
+  bookChapter   BookChapter @relation("facultyAuthors", fields: [bookChapterId], references: [id], onDelete: Cascade)
+  user          User        @relation("facultyAuthors", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Copyright {
+  id               String                   @id @default(cuid())
+  regNo            String
+  title            String
+  abstract         String?
+  imageUrl         String?
+  documentUrl      String?
+  dateOfFiling     DateTime?
+  dateOfSubmission DateTime?
+  dateOfPublished  DateTime?
+  dateOfGrant      DateTime?
+  registrationFees Float?
+  reimbursement    Float?
+  copyrightStatus  CopyrightStatus          @default(SUBMITTED)
+  teacherStatus    TeacherStatus            @default(UPLOADED)
+  isPublic         Boolean                  @default(false)
+  createdAt        DateTime                 @default(now()) @map("created_at")
+  updatedAt        DateTime                 @updatedAt @map("updated_at")
+  studentAuthors   CopyrightStudentAuthor[] @relation("studentCopyrightAuthors")
+  facultyAuthors   CopyrightTeacherAuthor[] @relation("facultyCopyrightAuthors")
+  grantMappings    GrantInMapping[]
+}
+
+model CopyrightStudentAuthor {
+  id          String    @id @default(cuid())
+  copyrightId String    @map("copyright_id")
+  userId      String    @map("user_id")
+  copyright   Copyright @relation("studentCopyrightAuthors", fields: [copyrightId], references: [id], onDelete: Cascade)
+  user        User      @relation("studentCopyrightAuthors", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CopyrightTeacherAuthor {
+  id          String    @id @default(cuid())
+  copyrightId String    @map("copyright_id")
+  userId      String    @map("user_id")
+  copyright   Copyright @relation("facultyCopyrightAuthors", fields: [copyrightId], references: [id], onDelete: Cascade)
+  user        User      @relation("facultyCopyrightAuthors", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Journal {
+  id               String                 @id @default(cuid())
+  serialNo         String                 @unique
+  title            String
+  journalName      String
+  imageUrl         String?
+  documentUrl      String?
+  abstract         String?
+  scope            JournalScope
+  reviewType       JournalReviewType
+  accessType       JournalAccessType
+  indexing         JournalIndexing
+  quartile         JournalQuartile        @default(NOT_APPLICABLE)
+  impactFactor     Float?
+  impactFactorDate DateTime?
+  publisher        String?
+  publicationMode  JournalPublicationMode
+  publicationDate  DateTime?
+  doi              String?
+  paperLink        String?
+  keywords         String[]
+  registrationFees Float?
+  reimbursement    Float?
+  journalStatus    JournalStatus          @default(SUBMITTED)
+  teacherStatus    TeacherStatus          @default(UPLOADED)
+  isPublic         Boolean                @default(false)
+  updateComment    String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  grantMappings    GrantInMapping[]
+  studentAuthors   JournalStudentAuthor[] @relation("studentJournalAuthors")
+  facultyAuthors   JournalTeacherAuthor[] @relation("facultyJournalAuthors")
+
+  @@map("journals")
+}
+
+model JournalStudentAuthor {
+  id        String  @id @default(cuid())
+  journalId String  @map("journal_id")
+  userId    String  @map("user_id")
+  journal   Journal @relation("studentJournalAuthors", fields: [journalId], references: [id], onDelete: Cascade)
+  user      User    @relation("studentJournalAuthors", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("journal_student_authors")
+}
+
+model JournalTeacherAuthor {
+  id        String  @id @default(cuid())
+  journalId String  @map("journal_id")
+  userId    String  @map("user_id")
+  journal   Journal @relation("facultyJournalAuthors", fields: [journalId], references: [id], onDelete: Cascade)
+  user      User    @relation("facultyJournalAuthors", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("journal_teacher_authors")
+}
+
+model Patent {
+  id              String                @id @default(cuid())
+  title           String
+  keywords        String[]
+  grantedPatentNo String?
+  abstract        String?
+  imageUrl        String?
+  documentUrl     String?
+  filingDate      DateTime?
+  submissionDate  DateTime?
+  publicationDate DateTime?
+  grantDate       DateTime?
+  applicationNo   String?
+  isPublic        Boolean               @default(false)
+  patentLink      String?
+  teacherStatus   TeacherStatus         @default(UPLOADED)
+  patentStatus    PatentStatus          @default(SUBMITTED)
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  studentAuthors  PatentStudentAuthor[] @relation("studentPatentAuthors")
+  facultyAuthors  PatentTeacherAuthor[] @relation("facultyPatentAuthors")
+  grantMappings   GrantInMapping[]
+}
+
+model PatentStudentAuthor {
+  id       String @id @default(cuid())
+  patentId String @map("patent_id")
+  userId   String @map("user_id")
+  patent   Patent @relation("studentPatentAuthors", fields: [patentId], references: [id], onDelete: Cascade)
+  user     User   @relation("studentPatentAuthors", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PatentTeacherAuthor {
+  id       String @id @default(cuid())
+  patentId String @map("patent_id")
+  userId   String @map("user_id")
+  patent   Patent @relation("facultyPatentAuthors", fields: [patentId], references: [id], onDelete: Cascade)
+  user     User   @relation("facultyPatentAuthors", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Conference {
+  id                  String                    @id @default(cuid())
+  conferenceName      String
+  mode                ConferenceMode            @default(OFFLINE)
+  abstract            String?
+  keywords            String[]
+  imageUrl            String?
+  documentUrl         String?
+  registrationFees    Float?
+  reimbursement       Float?
+  isPublic            Boolean                   @default(false)
+  teacherStatus       TeacherStatus             @default(UPLOADED)
+  conferencePublisher String?
+  conferenceDate      DateTime?
+  conferenceStatus    ConferenceStatus          @default(SUBMITTED)
+  statusDate          DateTime?
+  paperDoi            String?
+  paperLink           String?
+  paperName           String?
+  createdAt           DateTime                  @default(now()) @map("created_at")
+  updatedAt           DateTime                  @updatedAt @map("updated_at")
+  studentAuthors      ConferenceStudentAuthor[] @relation("studentConferenceAuthors")
+  facultyAuthors      ConferenceTeacherAuthor[] @relation("facultyConferenceAuthors")
+  grantMappings       GrantInMapping[]
+
+  @@map("conferences")
+}
+
+model ConferenceStudentAuthor {
+  id           String     @id @default(cuid())
+  conferenceId String     @map("conference_id")
+  userId       String     @map("user_id")
+  conference   Conference @relation("studentConferenceAuthors", fields: [conferenceId], references: [id], onDelete: Cascade)
+  user         User       @relation("studentConferenceAuthors", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ConferenceTeacherAuthor {
+  id           String     @id @default(cuid())
+  conferenceId String     @map("conference_id")
+  userId       String     @map("user_id")
+  conference   Conference @relation("facultyConferenceAuthors", fields: [conferenceId], references: [id], onDelete: Cascade)
+  user         User       @relation("facultyConferenceAuthors", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GrantIn {
+  id                  String                 @id @default(cuid())
+  projectCode         String?
+  grantInStatus       GrantInStatus          @default(APPLIED)
+  applicationDate     DateTime?
+  grantDate           DateTime?
+  durationOfProject   String?
+  amountGranted       Float?
+  usedAmount          Float?
+  isPublic            Boolean                @default(false)
+  createdAt           DateTime               @default(now()) @map("created_at")
+  updatedAt           DateTime               @updatedAt @map("updated_at")
+  studentAuthors      GrantInStudentAuthor[] @relation("studentGrantInAuthors")
+  facultyAuthors      GrantInTeacherAuthor[] @relation("facultyGrantInAuthors")
+  bills               GrantInBill[]
+  publicationMappings GrantInMapping[]
+
+  @@map("grant_ins")
+}
+
+model GrantInBill {
+  id          String     @id @default(cuid())
+  fileId      String     @unique
+  fileUrl     String?
+  billType    BillType   @default(OTHER)
+  isMasterPdf Boolean    @default(false)
+  billStatus  BillStatus @default(PENDING)
+  billDate    DateTime   @default(now())
+  amount      Float?
+  userId      String
+  grantInId   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  grantIn     GrantIn    @relation(fields: [grantInId], references: [id], onDelete: Cascade)
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("grant_in_bills")
+}
+
+model GrantInMapping {
+  id              String          @id @default(cuid())
+  publicationType PublicationType
+  grantInId       String
+  patentId        String?
+  journalId       String?
+  conferenceId    String?
+  bookChapterId   String?
+  copyrightId     String?
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  bookChapter     BookChapter?    @relation(fields: [bookChapterId], references: [id], onDelete: Cascade)
+  conference      Conference?     @relation(fields: [conferenceId], references: [id], onDelete: Cascade)
+  copyright       Copyright?      @relation(fields: [copyrightId], references: [id], onDelete: Cascade)
+  grantIn         GrantIn         @relation(fields: [grantInId], references: [id], onDelete: Cascade)
+  journal         Journal?        @relation(fields: [journalId], references: [id], onDelete: Cascade)
+  patent          Patent?         @relation(fields: [patentId], references: [id], onDelete: Cascade)
+
+  @@map("grant_in_mappings")
+}
+
+model GrantInStudentAuthor {
+  id        String  @id @default(cuid())
+  grantInId String  @map("grant_in_id")
+  userId    String  @map("user_id")
+  grantIn   GrantIn @relation("studentGrantInAuthors", fields: [grantInId], references: [id], onDelete: Cascade)
+  user      User    @relation("studentGrantInAuthors", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GrantInTeacherAuthor {
+  id        String      @id @default(cuid())
+  grantInId String      @map("grant_in_id")
+  userId    String      @map("user_id")
+  role      GrantInRole
+  grantIn   GrantIn     @relation("facultyGrantInAuthors", fields: [grantInId], references: [id], onDelete: Cascade)
+  user      User        @relation("facultyGrantInAuthors", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Certificate {
+  id               String   @id @default(cuid())
+  title            String
+  description      String?
+  keywords         String[]
+  documentUrl      String?
+  offeredBy        String?
+  dateOfCompletion DateTime
+  remark           String?
+  isPublic         Boolean  @default(true)
+  userId           String   @map("user_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  user             User     @relation("userCertificates", fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FDP {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  keywords    String[]
+  organizedBy String?
+  startDate   DateTime?
+  endDate     DateTime?
+  topic       String?
+  duration    String?
+  remark      String?
+  userId      String    @map("user_id")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  user        User      @relation("userFDPs", fields: [userId], references: [id], onDelete: Cascade)
+}
 
 enum crdb_internal_region {
   aws_ap_south_1 @map("aws-ap-south-1")
@@ -25,7 +439,7 @@ enum TeacherStatus {
   ACCEPTED
   PUBLISHED
   UPDATE
-  REJECTED // Added REJECTED for better workflow
+  REJECTED
 }
 
 enum JournalScope {
@@ -124,7 +538,7 @@ enum GrantInStatus {
   APPLIED
   GRANTED
   REJECTED
-  COMPLETED // Added completed
+  COMPLETED
 }
 
 enum PublicationType {
@@ -157,482 +571,16 @@ enum BillStatus {
   PAID
 }
 
-// --------------------------------------
-// AUTH & USERS
-// --------------------------------------
-
-model Account {
-  id                String  @id @default(cuid())
-  userId            String  @map("user_id")
-  type              String
-  provider          String
-  providerAccountId String  @map("provider_account_id")
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@map("accounts")
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique @map("session_token")
-  userId       String   @map("user_id")
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("sessions")
-}
-
-model SpecialUser {
-  id    String   @id @default(cuid())
-  email String   @unique
-  role  UserRole @default(FACULTY)
-
-  @@map("special_users")
-}
-
-model VerificationToken {
-  identifier String
-  token      String
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("verification_tokens")
-}
-
-model PasswordResetToken {
-  identifier String
-  token      String
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("password_reset_tokens")
-}
-
-model User {
-  id               String    @id @default(cuid())
-  name             String?
-  email            String?   @unique
-  emailVerified    DateTime? @map("email_verified")
-  image            String?
-  password         String?
-  role             UserRole  @default(STUDENT)
-  profileCompleted Boolean   @default(false)
-  bio              String?
-  department       String?
-  phone            String?
-
-  // Auth Relations
-  accounts Account[]
-  sessions Session[]
-
-  // Direct Relations
-  certification Certificate[] @relation("userCertificates")
-  fdp           FDP[]         @relation("userFDPs")
-  bills         GrantInBill[] // User who uploaded the bill
-
-  // Student Authorships
-  studentBookChapters BookChapterStudentAuthor[] @relation("studentAuthors")
-  studentCopyrights   CopyrightStudentAuthor[]   @relation("studentCopyrightAuthors")
-  studentJournals     JournalStudentAuthor[]     @relation("studentJournalAuthors")
-  studentPatents      PatentStudentAuthor[]      @relation("studentPatentAuthors")
-  studentConferences  ConferenceStudentAuthor[]  @relation("studentConferenceAuthors") // NEW
-  studentGrantIns     GrantInStudentAuthor[]     @relation("studentGrantInAuthors")
-
-  // Faculty Authorships
-  facultyBookChapters BookChapterTeacherAuthor[] @relation("facultyAuthors")
-  facultyCopyrights   CopyrightTeacherAuthor[]   @relation("facultyCopyrightAuthors")
-  facultyJournals     JournalTeacherAuthor[]     @relation("facultyJournalAuthors")
-  facultyPatents      PatentTeacherAuthor[]      @relation("facultyPatentAuthors")
-  facultyConferences  ConferenceTeacherAuthor[]  @relation("facultyConferenceAuthors") // NEW
-  facultyGrantIns     GrantInTeacherAuthor[]     @relation("facultyGrantInAuthors")
-
-  @@map("users")
-}
-
-// --------------------------------------
-// PUBLICATIONS
-// --------------------------------------
-
-model BookChapter {
-  id                String            @id @default(cuid())
-  title             String
-  abstract          String?
-  imageUrl          String?
-  documentUrl       String?
-  bookChapterStatus BookchapterStatus @default(SUBMITTED)
-  teacherStatus     TeacherStatus     @default(UPLOADED)
-  isbnIssn          String?
-  registrationFees  Float?
-  reimbursement     Float?
-  isPublic          Boolean           @default(false)
-  keywords          String[]
-  doi               String?
-  publicationDate   DateTime?
-  publisher         String?
-  
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
-
-  studentAuthors BookChapterStudentAuthor[] @relation("studentAuthors")
-  facultyAuthors BookChapterTeacherAuthor[] @relation("facultyAuthors")
-  grantMappings  GrantInMapping[] // Relation back to Grant Mapping
-}
-
-model BookChapterStudentAuthor {
-  id            String      @id @default(cuid())
-  bookChapter   BookChapter @relation("studentAuthors", fields: [bookChapterId], references: [id], onDelete: Cascade)
-  bookChapterId String      @map("book_chapter_id")
-  user          User        @relation("studentAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId        String      @map("user_id")
-}
-
-model BookChapterTeacherAuthor {
-  id            String      @id @default(cuid())
-  bookChapter   BookChapter @relation("facultyAuthors", fields: [bookChapterId], references: [id], onDelete: Cascade)
-  bookChapterId String      @map("book_chapter_id")
-  user          User        @relation("facultyAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId        String      @map("user_id")
-}
-
-model Copyright {
-  id               String          @id @default(cuid())
-  regNo            String
-  title            String
-  abstract         String?
-  imageUrl         String?
-  documentUrl      String?
-  dateOfFiling     DateTime?
-  dateOfSubmission DateTime?
-  dateOfPublished  DateTime?
-  dateOfGrant      DateTime?
-  registrationFees Float?
-  reimbursement    Float?
-  copyrightStatus  CopyrightStatus @default(SUBMITTED)
-  teacherStatus    TeacherStatus   @default(UPLOADED)
-  isPublic         Boolean         @default(false)
-  createdAt        DateTime        @default(now()) @map("created_at")
-  updatedAt        DateTime        @updatedAt @map("updated_at")
-
-  studentAuthors CopyrightStudentAuthor[] @relation("studentCopyrightAuthors")
-  facultyAuthors CopyrightTeacherAuthor[] @relation("facultyCopyrightAuthors")
-  grantMappings  GrantInMapping[]
-}
-
-model CopyrightStudentAuthor {
-  id          String    @id @default(cuid())
-  copyright   Copyright @relation("studentCopyrightAuthors", fields: [copyrightId], references: [id], onDelete: Cascade)
-  copyrightId String    @map("copyright_id")
-  user        User      @relation("studentCopyrightAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId      String    @map("user_id")
-}
-
-model CopyrightTeacherAuthor {
-  id          String    @id @default(cuid())
-  copyright   Copyright @relation("facultyCopyrightAuthors", fields: [copyrightId], references: [id], onDelete: Cascade)
-  copyrightId String    @map("copyright_id")
-  user        User      @relation("facultyCopyrightAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId      String    @map("user_id")
-}
-
-model Journal {
-  id          String  @id @default(cuid())
-  serialNo    String  @unique
-  title       String
-  journalName String
-  imageUrl    String?
-  documentUrl String?
-  abstract    String?
-
-  scope      JournalScope
-  reviewType JournalReviewType
-  accessType JournalAccessType
-  indexing   JournalIndexing
-  quartile   JournalQuartile   @default(NOT_APPLICABLE)
-
-  impactFactor     Float?
-  impactFactorDate DateTime?
-
-  publisher       String?
-  publicationMode JournalPublicationMode
-  publicationDate DateTime?
-
-  doi       String?
-  paperLink String?
-  keywords  String[]
-
-  registrationFees Float?
-  reimbursement    Float?
-
-  journalStatus JournalStatus @default(SUBMITTED)
-  teacherStatus TeacherStatus @default(UPLOADED)
-  isPublic      Boolean       @default(false)
-
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String
+  link      String?
+  read      Boolean  @default(false)
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-  studentAuthors JournalStudentAuthor[] @relation("studentJournalAuthors")
-  facultyAuthors JournalTeacherAuthor[] @relation("facultyJournalAuthors")
-  grantMappings  GrantInMapping[]
-
-  @@map("journals")
-}
-
-model JournalStudentAuthor {
-  id        String  @id @default(cuid())
-  journal   Journal @relation("studentJournalAuthors", fields: [journalId], references: [id], onDelete: Cascade)
-  journalId String  @map("journal_id")
-  user      User    @relation("studentJournalAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId    String  @map("user_id")
-
-  @@map("journal_student_authors")
-}
-
-model JournalTeacherAuthor {
-  id        String  @id @default(cuid())
-  journal   Journal @relation("facultyJournalAuthors", fields: [journalId], references: [id], onDelete: Cascade)
-  journalId String  @map("journal_id")
-  user      User    @relation("facultyJournalAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId    String  @map("user_id")
-
-  @@map("journal_teacher_authors")
-}
-
-model Patent {
-  id              String       @id @default(cuid())
-  title           String
-  keywords        String[]
-  grantedPatentNo String?
-  abstract        String?
-  imageUrl        String?
-  documentUrl     String?
-  filingDate      DateTime?
-  submissionDate  DateTime?
-  publicationDate DateTime?
-  grantDate       DateTime?
-  applicationNo   String?
-  isPublic        Boolean      @default(false)
-  patentLink      String?
-  teacherStatus   TeacherStatus @default(UPLOADED)
-  patentStatus    PatentStatus  @default(SUBMITTED)
-  
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
-
-  studentAuthors PatentStudentAuthor[] @relation("studentPatentAuthors")
-  facultyAuthors PatentTeacherAuthor[] @relation("facultyPatentAuthors")
-  grantMappings  GrantInMapping[]
-}
-
-model PatentStudentAuthor {
-  id       String @id @default(cuid())
-  patent   Patent @relation("studentPatentAuthors", fields: [patentId], references: [id], onDelete: Cascade)
-  patentId String @map("patent_id")
-  user     User   @relation("studentPatentAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId   String @map("user_id")
-}
-
-model PatentTeacherAuthor {
-  id       String @id @default(cuid())
-  patent   Patent @relation("facultyPatentAuthors", fields: [patentId], references: [id], onDelete: Cascade)
-  patentId String @map("patent_id")
-  user     User   @relation("facultyPatentAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId   String @map("user_id")
-}
-
-// Fixed Naming to PascalCase 'Conference'
-model Conference {
-  id                  String           @id @default(cuid())
-  conferenceName      String
-  mode                ConferenceMode   @default(OFFLINE)
-  abstract            String?
-  keywords            String[]
-  imageUrl            String?
-  documentUrl         String?
-  registrationFees    Float?
-  reimbursement       Float?
-  isPublic            Boolean          @default(false)
-  teacherStatus       TeacherStatus    @default(UPLOADED)
-  conferencePublisher String?
-  conferenceDate      DateTime?
-  conferenceStatus    ConferenceStatus @default(SUBMITTED)
-  statusDate          DateTime?
-  paperDoi            String?
-  paperLink           String?
-  paperName           String?
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Added missing Authors and Mapping relations
-  studentAuthors ConferenceStudentAuthor[] @relation("studentConferenceAuthors")
-  facultyAuthors ConferenceTeacherAuthor[] @relation("facultyConferenceAuthors")
-  grantMappings  GrantInMapping[]
-
-  @@map("conferences")
-}
-
-// Added Missing Conference Author Models
-model ConferenceStudentAuthor {
-  id           String     @id @default(cuid())
-  conference   Conference @relation("studentConferenceAuthors", fields: [conferenceId], references: [id], onDelete: Cascade)
-  conferenceId String     @map("conference_id")
-  user         User       @relation("studentConferenceAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId       String     @map("user_id")
-}
-
-model ConferenceTeacherAuthor {
-  id           String     @id @default(cuid())
-  conference   Conference @relation("facultyConferenceAuthors", fields: [conferenceId], references: [id], onDelete: Cascade)
-  conferenceId String     @map("conference_id")
-  user         User       @relation("facultyConferenceAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId       String     @map("user_id")
-}
-
-// --------------------------------------
-// GRANT IN AID SYSTEM
-// --------------------------------------
-
-model GrantIn {
-  id                String  @id @default(cuid())
-  projectCode       String?
-  grantInStatus     GrantInStatus @default(APPLIED)
-  applicationDate   DateTime?
-  grantDate         DateTime?
-  durationOfProject String?
-  amountGranted     Float?
-  usedAmount        Float?
-  isPublic          Boolean @default(false)
-  
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-
-  studentAuthors GrantInStudentAuthor[] @relation("studentGrantInAuthors")
-  facultyAuthors GrantInTeacherAuthor[] @relation("facultyGrantInAuthors")
-  
-  // Relations to track outputs and bills
-  publicationMappings GrantInMapping[]
-  bills               GrantInBill[]
-
-  @@map("grant_ins")
-}
-model GrantInBill {
-  id           String   @id @default(cuid())
-
-  // Appwrite file
-  fileId       String   @unique
-  fileUrl      String?
-
-  billType     BillType @default(OTHER)
-
-  // ✅ Master PDF Marker
-  isMasterPdf  Boolean  @default(false)
-
-  billStatus   BillStatus @default(PENDING)
-
-  billDate     DateTime @default(now())
-  amount       Float?
-
-  // Uploaded by
-  userId       String
-  user         User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // Relation
-  grantInId    String
-  grantIn      GrantIn @relation(fields: [grantInId], references: [id], onDelete: Cascade)
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@map("grant_in_bills")
-}
-
-
-model GrantInMapping {
-  id              String          @id @default(cuid())
-  publicationType PublicationType
-  
-  grantInId String
-  grantIn   GrantIn @relation(fields: [grantInId], references: [id], onDelete: Cascade)
-
-  // Optional relations to the specific publication
-  patentId      String?
-  journalId     String?
-  conferenceId  String?
-  bookChapterId String?
-  copyrightId   String?
-
-  patent      Patent?      @relation(fields: [patentId], references: [id], onDelete: Cascade)
-  journal     Journal?     @relation(fields: [journalId], references: [id], onDelete: Cascade)
-  conference  Conference?  @relation(fields: [conferenceId], references: [id], onDelete: Cascade)
-  bookChapter BookChapter? @relation(fields: [bookChapterId], references: [id], onDelete: Cascade)
-  copyright   Copyright?   @relation(fields: [copyrightId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("grant_in_mappings")
-}
-
-model GrantInStudentAuthor {
-  id        String  @id @default(cuid())
-  grantIn   GrantIn @relation("studentGrantInAuthors", fields: [grantInId], references: [id], onDelete: Cascade)
-  grantInId String  @map("grant_in_id")
-  user      User    @relation("studentGrantInAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId    String  @map("user_id")
-}
-
-model GrantInTeacherAuthor {
-  id        String      @id @default(cuid())
-  grantIn   GrantIn     @relation("facultyGrantInAuthors", fields: [grantInId], references: [id], onDelete: Cascade)
-  grantInId String      @map("grant_in_id")
-  user      User        @relation("facultyGrantInAuthors", fields: [userId], references: [id], onDelete: Cascade)
-  userId    String      @map("user_id")
-  role      GrantInRole
-}
-
-// --------------------------------------
-// OTHER
-// --------------------------------------
-
-model Certificate {
-  id               String   @id @default(cuid())
-  title            String
-  description      String?
-  keywords         String[]
-  documentUrl      String?
-  offeredBy        String?
-  dateOfCompletion DateTime
-  remark           String?
-  isPublic         Boolean  @default(true)
-  userId           String   @map("user_id")
-  user             User     @relation("userCertificates", fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-}
-
-model FDP {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  keywords    String[]
-  organizedBy String?
-  startDate   DateTime?
-  endDate     DateTime?
-  topic       String?
-  duration    String?
-  remark      String?
-  userId      String    @map("user_id")
-  user        User      @relation("userFDPs", fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  @@map("notifications")
 }

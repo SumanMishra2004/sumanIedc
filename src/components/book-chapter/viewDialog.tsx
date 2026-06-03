@@ -18,7 +18,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Loader2
+  Loader2,
+  MessageSquare
 } from "lucide-react"
 
 import {
@@ -58,6 +59,7 @@ export function BookChapterViewDialog({
 }: BookChapterViewDialogProps) {
   const [chapter, setChapter] = React.useState<BookChapter | null>(null)
   const [loading, setLoading] = React.useState(false)
+  const [coverImageLoading, setCoverImageLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
@@ -65,6 +67,7 @@ export function BookChapterViewDialog({
 
     const fetchChapter = async () => {
       setLoading(true)
+      setCoverImageLoading(true)
       setError(null)
 
       try {
@@ -165,19 +168,36 @@ export function BookChapterViewDialog({
 
               {chapter && (
                 <div className="space-y-8 max-w-6xl mx-auto">
+                  {chapter.updateComment && (
+                    <div className="bg-amber-500/5 border-2 border-dashed border-amber-500/20 text-amber-800 p-4 rounded-xl flex items-start gap-3">
+                      <MessageSquare className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-bold text-sm text-amber-700">Revision Requested by Reviewer</h4>
+                        <p className="text-xs font-semibold mt-1 leading-relaxed whitespace-pre-wrap">{chapter.updateComment}</p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Hero Section with Poster & Actions */}
                   <section className="grid grid-cols-1 xl:grid-cols-4 gap-8 items-start">
                     {/* Enhanced Poster */}
                     <div className="xl:col-span-1">
                       <div className="group relative aspect-[3/4] rounded-3xl overflow-hidden border-4 border-primary/20 bg-gradient-to-br from-card/50 to-muted shadow-2xl hover:shadow-3xl transition-all duration-500 hover:-translate-y-2">
                         {chapter.imageUrl ? (
-                          <Image
-                            src={chapter.imageUrl}
-                            alt={`${chapter.title} Poster`}
-                            fill
-                            className="object-cover group-hover:scale-110 transition-transform duration-700"
-                            priority
-                          />
+                          <>
+                            {coverImageLoading && (
+                              <div className="absolute inset-0 bg-muted/80 animate-pulse" />
+                            )}
+                            <Image
+                              src={chapter.imageUrl}
+                              alt={`${chapter.title} Poster`}
+                              fill
+                              className="object-cover group-hover:scale-110 transition-transform duration-700"
+                              priority
+                              onLoad={() => setCoverImageLoading(false)}
+                              onError={() => setCoverImageLoading(false)}
+                            />
+                          </>
                         ) : (
                           <div className="flex h-full items-center justify-center flex-col gap-4 text-muted-foreground bg-gradient-to-br from-muted/50 to-card">
                             <BookOpen className="w-20 h-20 opacity-30 animate-pulse" />

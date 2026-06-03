@@ -74,7 +74,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import JournalDialog from "./journalAddForm";
 import {
   TeacherStatus,
@@ -101,6 +103,8 @@ import {
 } from "../ui/card";
 import { AnimatedAvatarGroupTooltip } from "../ui/animated-tooltip";
 import EditJournalDialog from "./journalEditForm";
+import { JournalViewDialog } from "./viewDialog";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // --- Types & Data ---
 
@@ -242,7 +246,7 @@ const JournalActions = ({
         <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
         View details
       </DropdownMenuItem>
-      {journal.teacherStatus !== "PUBLISHED" && (
+      {journal.teacherStatus !== "PUBLISHED" && session?.user.role !== "TEACHER" && (
         <>
           <DropdownMenuItem onClick={() => onEdit?.(journal.id)}>
             <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -268,6 +272,7 @@ const JournalActions = ({
 
           <Select
             defaultValue={journal.teacherStatus}
+            disabled={journal.teacherStatus === "PUBLISHED"}
             onValueChange={(value) =>
               onTeacherStatusChange?.(journal.id, value as TeacherStatus)
             }
@@ -279,9 +284,12 @@ const JournalActions = ({
             <SelectContent>
               {["ACCEPTED", "PUBLISHED", "UPDATE", "REJECTED"].map((status) => {
                 const config = getTeacherStatusConfig(status as TeacherStatus);
+                const isDisabled = 
+                  journal.teacherStatus === "REJECTED" && 
+                  (status === "PUBLISHED" || status === "UPDATE");
 
                 return (
-                  <SelectItem key={status} value={status}>
+                  <SelectItem key={status} value={status} disabled={isDisabled}>
                     <div className="flex items-center gap-2">
                       <span className={`h-2 w-2 rounded-full ${config.dot}`} />
                       <span className="text-sm capitalize">
@@ -586,6 +594,11 @@ export default function JournalTable({
   const [searchTerm, setSearchTerm] = React.useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingJournalId, setEditingJournalId] = useState<string | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewingJournalId, setViewingJournalId] = useState<string | null>(null);
+  const [updateCommentDialogOpen, setUpdateCommentDialogOpen] = useState(false);
+  const [targetJournalId, setTargetJournalId] = useState<string | null>(null);
+  const [updateComment, setUpdateComment] = useState("");
   const [filters, setFilters] = React.useState<JournalFilters>({
     page: 1,
     limit: 10,
@@ -689,22 +702,62 @@ export default function JournalTable({
     id: string,
     status: TeacherStatus,
   ) => {
+    if (status === "UPDATE") {
+      setTargetJournalId(id);
+      setUpdateComment("");
+      setUpdateCommentDialogOpen(true);
+      return;
+    }
+
+    const toastId = toast.loading("Updating teacher status...");
     try {
       const response = await updateJournalTeacherStatus(id, status);
       if (response.data) {
         toast.success(
           `Teacher status updated to ${status.replace(/_/g, " ").toLowerCase()}`,
+          { id: toastId }
         );
         fetchData();
         onRefresh?.();
       } else if (response.error) {
         toast.error("Failed to update teacher status", {
+          id: toastId,
           description: response.error,
         });
       }
     } catch (error) {
       console.error("Error updating teacher status:", error);
-      toast.error("Failed to update teacher status");
+      toast.error("Failed to update teacher status", { id: toastId });
+    }
+  };
+
+  // Confirm update request with comment
+  const handleConfirmUpdateComment = async () => {
+    if (!updateComment.trim()) {
+      toast.error("Please enter a comment explaining the requested corrections");
+      return;
+    }
+    setUpdateCommentDialogOpen(false);
+    const toastId = toast.loading("Updating status and sending notification...");
+    try {
+      if (targetJournalId) {
+        const response = await updateJournalTeacherStatus(targetJournalId, "UPDATE", updateComment);
+        if (response.data) {
+          toast.success("Teacher status updated to update requested", { id: toastId });
+          setTargetJournalId(null);
+          setUpdateComment("");
+          fetchData();
+          onRefresh?.();
+        } else if (response.error) {
+          toast.error("Failed to update teacher status", {
+            id: toastId,
+            description: response.error,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error requesting update:", error);
+      toast.error("Failed to request update", { id: toastId });
     }
   };
 
@@ -751,12 +804,13 @@ export default function JournalTable({
           setEditDialogOpen(true);
         },
         onView: (id) => {
-          toast.info("View functionality coming soon");
+          setViewingJournalId(id);
+          setViewDialogOpen(true);
         },
         onTeacherStatusChange: handleTeacherStatusChange,
         session
       }),
-    [],
+    [session],
   );
 
   const table = useReactTable({
@@ -1131,12 +1185,74 @@ export default function JournalTable({
         {/* Content Area */}
         <CardContent className="h-fit p-0!">
           {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="text-muted-foreground">Loading...</div>
-            </div>
+            viewMode === "table" ? (
+              <div className="w-full overflow-x-auto max-w-full rounded-md border bg-card shadow-sm scroll-m-1 scrollbar-gradient">
+                <div className="min-w-max divide-y divide-border">
+                  {/* Table Header skeleton */}
+                  <div className="flex items-center bg-muted/50 h-10 px-4">
+                    <div className="w-6 h-4 bg-muted-foreground/10 rounded mr-4" />
+                    <div className="w-24 h-4 bg-muted-foreground/10 rounded mr-6" />
+                    <div className="w-48 h-4 bg-muted-foreground/10 rounded mr-6" />
+                    <div className="w-36 h-4 bg-muted-foreground/10 rounded mr-6" />
+                    <div className="w-24 h-4 bg-muted-foreground/10 rounded mr-6" />
+                    <div className="w-20 h-4 bg-muted-foreground/10 rounded mr-6" />
+                    <div className="w-28 h-4 bg-muted-foreground/10 rounded mr-6" />
+                    <div className="w-28 h-4 bg-muted-foreground/10 rounded mr-6" />
+                    <div className="w-24 h-4 bg-muted-foreground/10 rounded" />
+                  </div>
+                  {/* Table Rows skeleton */}
+                  {[1, 2, 3, 4, 5].map((idx) => (
+                    <div key={idx} className="flex items-center h-16 px-4 animate-pulse">
+                      <div className="w-4 h-4 bg-muted-foreground/10 rounded mr-4" />
+                      <Skeleton className="w-20 h-4 mr-6" />
+                      <div className="flex flex-col gap-1.5 mr-6 w-48">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                      <Skeleton className="w-32 h-4 mr-6" />
+                      <Skeleton className="w-24 h-6 mr-6 rounded-full" />
+                      <Skeleton className="w-16 h-4 mr-6" />
+                      <Skeleton className="w-24 h-6 mr-6 rounded-full" />
+                      <Skeleton className="w-24 h-6 mr-6 rounded-full" />
+                      <div className="flex items-center gap-1 mr-6">
+                        <Skeleton className="w-6 h-6 rounded-full" />
+                        <Skeleton className="w-6 h-6 rounded-full" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {[1, 2, 3, 4].map((idx) => (
+                  <div key={idx} className="flex flex-col justify-between rounded-xl border bg-muted p-5 shadow-sm space-y-4 animate-pulse">
+                    <div className="flex items-start justify-between gap-2">
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                      <Skeleton className="h-12 w-full" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                    </div>
+                    <div className="pt-2 border-t flex items-center justify-between">
+                      <div className="space-y-1">
+                        <Skeleton className="h-3 w-12" />
+                        <Skeleton className="h-4 w-20" />
+                      </div>
+                      <Skeleton className="h-8 w-24 rounded-md" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           ) : viewMode === "table" ? (
-            <div className="rounded-md border bg-card shadow-sm overflow-x-auto scroll-m-1 scrollbar-gradient">
-              <Table>
+            <div className="w-full overflow-x-auto max-w-full rounded-md border bg-card shadow-sm scroll-m-1 scrollbar-gradient">
+              <Table className="min-w-max">
                 <TableHeader>
                   {table.getHeaderGroups().map((headerGroup) => (
                     <TableRow
@@ -1209,9 +1325,10 @@ export default function JournalTable({
                           setEditingJournalId(id);
                           setEditDialogOpen(true);
                         }}
-                        onView={(id) =>
-                          toast.info("View functionality coming soon")
-                        }
+                        onView={(id) => {
+                          setViewingJournalId(id);
+                          setViewDialogOpen(true);
+                        }}
                         onTeacherStatusChange={handleTeacherStatusChange}
                         session={session}
                       />
@@ -1289,6 +1406,10 @@ export default function JournalTable({
                         variant="ghost"
                         size="sm"
                         className="h-8 text-xs bg-accent hover:bg-accent/80"
+                        onClick={() => {
+                          setViewingJournalId(journal.id);
+                          setViewDialogOpen(true);
+                        }}
                       >
                         View Details
                       </Button>
@@ -1375,6 +1496,7 @@ export default function JournalTable({
         <EditJournalDialog
           journalId={editingJournalId}
           open={editDialogOpen}
+          session={session}
           onOpenChange={(open) => {
             setEditDialogOpen(open);
             if (!open) setEditingJournalId(null);
@@ -1386,6 +1508,56 @@ export default function JournalTable({
           }}
         />
       )}
+      {viewingJournalId && (
+        <JournalViewDialog
+          journalId={viewingJournalId}
+          open={viewDialogOpen}
+          setOpen={setViewDialogOpen}
+          setViewingJournalId={setViewingJournalId}
+        />
+      )}
+      <Dialog open={updateCommentDialogOpen} onOpenChange={(open) => {
+        setUpdateCommentDialogOpen(open);
+        if (!open) {
+          setTargetJournalId(null);
+          setUpdateComment("");
+          fetchData(); // Reset select state in table rows by refreshing data
+        }
+      }}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Reason for Update Request</DialogTitle>
+            <DialogDescription>
+              Provide detailed feedback on what changes the student co-author needs to make.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <Textarea
+              id="update-comment"
+              placeholder="E.g., Please fix the publication date and provide a valid DOI link."
+              value={updateComment}
+              onChange={(e) => setUpdateComment(e.target.value)}
+              className="min-h-[100px]"
+            />
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setUpdateCommentDialogOpen(false);
+                setTargetJournalId(null);
+                setUpdateComment("");
+                fetchData();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmUpdateComment}>
+              Send Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

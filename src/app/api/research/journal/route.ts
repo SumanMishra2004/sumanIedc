@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import prisma from '@/lib/prisma'
+import { NextRequest, NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import prisma from "@/lib/prisma"
 import { 
   TeacherStatus, 
   UserRole, 
@@ -11,7 +11,8 @@ import {
   JournalIndexing,
   JournalQuartile,
   JournalPublicationMode
-} from '@prisma/client'
+} from "@prisma/client"
+import { journalSchema } from "@/lib/validations/journal"
 
 // GET - List all journals with filtering, pagination, and search
 export async function GET(req: NextRequest) {
@@ -19,44 +20,44 @@ export async function GET(req: NextRequest) {
     const session = await auth()
     const searchParams = req.nextUrl.searchParams
 
-    // Pagination
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
+    // Pagination (Default 10, Maximum 100)
+    const page = parseInt(searchParams.get("page") || "1")
+    const limit = Math.min(parseInt(searchParams.get("limit") || "10"), 100)
     const skip = (page - 1) * limit
 
     // Sorting
-    const sortBy = searchParams.get('sortBy') || 'createdAt'
-    const sortOrder = searchParams.get('sortOrder') || 'desc'
+    const sortBy = searchParams.get("sortBy") || "createdAt"
+    const sortOrder = searchParams.get("sortOrder") || "desc"
 
     // Filters
-    const journalStatus = searchParams.get('journalStatus')
-    const teacherStatus = searchParams.get('teacherStatus')
-    const isPublic = searchParams.get('isPublic')
-    const scope = searchParams.get('scope')
-    const reviewType = searchParams.get('reviewType')
-    const accessType = searchParams.get('accessType')
-    const indexing = searchParams.get('indexing')
-    const quartile = searchParams.get('quartile')
-    const publicationMode = searchParams.get('publicationMode')
-    const keyword = searchParams.get('keyword')
-    const publisher = searchParams.get('publisher')
-    const search = searchParams.get('search')
+    const journalStatus = searchParams.get("journalStatus")
+    const teacherStatus = searchParams.get("teacherStatus")
+    const isPublic = searchParams.get("isPublic")
+    const scope = searchParams.get("scope")
+    const reviewType = searchParams.get("reviewType")
+    const accessType = searchParams.get("accessType")
+    const indexing = searchParams.get("indexing")
+    const quartile = searchParams.get("quartile")
+    const publicationMode = searchParams.get("publicationMode")
+    const keyword = searchParams.get("keyword")
+    const publisher = searchParams.get("publisher")
+    const search = searchParams.get("search")
 
     // Date range filters
-    const createdFrom = searchParams.get('createdFrom')
-    const createdTo = searchParams.get('createdTo')
-    const publishedFrom = searchParams.get('publishedFrom')
-    const publishedTo = searchParams.get('publishedTo')
+    const createdFrom = searchParams.get("createdFrom")
+    const createdTo = searchParams.get("createdTo")
+    const publishedFrom = searchParams.get("publishedFrom")
+    const publishedTo = searchParams.get("publishedTo")
 
     // Fee range filters
-    const minRegistrationFees = searchParams.get('minRegistrationFees')
-    const maxRegistrationFees = searchParams.get('maxRegistrationFees')
-    const minReimbursement = searchParams.get('minReimbursement')
-    const maxReimbursement = searchParams.get('maxReimbursement')
+    const minRegistrationFees = searchParams.get("minRegistrationFees")
+    const maxRegistrationFees = searchParams.get("maxRegistrationFees")
+    const minReimbursement = searchParams.get("minReimbursement")
+    const maxReimbursement = searchParams.get("maxReimbursement")
 
     // Impact factor range filters
-    const minImpactFactor = searchParams.get('minImpactFactor')
-    const maxImpactFactor = searchParams.get('maxImpactFactor')
+    const minImpactFactor = searchParams.get("minImpactFactor")
+    const maxImpactFactor = searchParams.get("maxImpactFactor")
 
     // Build where clause
     const where: any = {}
@@ -68,11 +69,13 @@ export async function GET(req: NextRequest) {
     } else if (session.user.role === UserRole.STUDENT) {
       // Students see: public journals OR journals where they are authors
       where.OR = [
+        { isPublic: true },
         { studentAuthors: { some: { userId: session.user.id } } }
       ]
     } else if (session.user.role === UserRole.FACULTY) {
-      // Faculty see: public journals OR journals where they are authors
+      // Faculty see: public journals OR journals where they are reviewers/authors
       where.OR = [
+        { isPublic: true },
         { facultyAuthors: { some: { userId: session.user.id } } }
       ]
     }
@@ -87,8 +90,8 @@ export async function GET(req: NextRequest) {
       where.teacherStatus = teacherStatus as TeacherStatus
     }
 
-    if (isPublic !== null && isPublic !== undefined) {
-      where.isPublic = isPublic === 'true'
+    if (isPublic !== null && isPublic !== undefined && isPublic !== "") {
+      where.isPublic = isPublic === "true"
     }
 
     if (scope) {
@@ -124,20 +127,31 @@ export async function GET(req: NextRequest) {
     if (publisher) {
       where.publisher = {
         contains: publisher,
-        mode: 'insensitive'
+        mode: "insensitive"
       }
     }
 
     // Search across multiple fields
     if (search) {
-      where.OR = [
-        { title: { contains: search, mode: 'insensitive' } },
-        { journalName: { contains: search, mode: 'insensitive' } },
-        { abstract: { contains: search, mode: 'insensitive' } },
-        { publisher: { contains: search, mode: 'insensitive' } },
-        { serialNo: { contains: search, mode: 'insensitive' } },
-        { doi: { contains: search, mode: 'insensitive' } }
+      const searchConditions = [
+        { title: { contains: search, mode: "insensitive" } },
+        { journalName: { contains: search, mode: "insensitive" } },
+        { abstract: { contains: search, mode: "insensitive" } },
+        { publisher: { contains: search, mode: "insensitive" } },
+        { serialNo: { contains: search, mode: "insensitive" } },
+        { doi: { contains: search, mode: "insensitive" } }
       ]
+      
+      // If we already have filters or access rules on where, combine them
+      if (where.OR) {
+        where.AND = [
+          { OR: where.OR },
+          { OR: searchConditions }
+        ]
+        delete where.OR
+      } else {
+        where.OR = searchConditions
+      }
     }
 
     // Date range filters
@@ -222,15 +236,15 @@ export async function GET(req: NextRequest) {
       }
     })
   } catch (error) {
-    console.error('Error fetching journals:', error)
+    console.error("Error fetching journals:", error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Internal server error" },
       { status: 500 }
     )
   }
 }
 
-
+// POST - Create a new journal
 export async function POST(request: Request) {
   try {
     const session = await auth()
@@ -244,138 +258,34 @@ export async function POST(request: Request) {
 
     const body = await request.json()
 
-    const {
-      serialNo,
-      title,
-      journalName,
-      imageUrl,
-      documentUrl,
-      abstract,
-      scope,
-      reviewType,
-      accessType,
-      indexing,
-      quartile,
-      publicationMode,
-      impactFactor,
-      impactFactorDate,
-      publisher,
-      publicationDate,
-      doi,
-      paperLink,
-      keywords,
-      registrationFees,
-      reimbursement,
-      journalStatus,
-      teacherStatus,
-      isPublic,
-      studentAuthorIds = [],
-      facultyAuthorIds = []
-    } = body
+    // Students have forced default parameters:
+    if (session.user.role === UserRole.STUDENT) {
+      body.teacherStatus = TeacherStatus.UPLOADED
+      body.journalStatus = JournalStatus.SUBMITTED
+      body.isPublic = false
 
-    /* -------------------- Basic validation -------------------- */
+      // Auto-assign creating student if not present in the payload
+      if (!body.studentAuthorIds || body.studentAuthorIds.length === 0) {
+        body.studentAuthorIds = [session.user.id]
+      } else if (!body.studentAuthorIds.includes(session.user.id)) {
+        body.studentAuthorIds.push(session.user.id)
+      }
+    }
 
-    if (!serialNo || typeof serialNo !== "string") {
+    // Validate request body with Zod
+    const validation = journalSchema.safeParse(body)
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Serial number is required" },
+        { error: validation.error.issues[0].message, details: validation.error.issues },
         { status: 400 }
       )
     }
 
-    if (!title || typeof title !== "string") {
-      return NextResponse.json(
-        { error: "Title is required" },
-        { status: 400 }
-      )
-    }
+    const data = validation.data
 
-    if (!journalName || typeof journalName !== "string") {
-      return NextResponse.json(
-        { error: "Journal name is required" },
-        { status: 400 }
-      )
-    }
-
-    if (!scope || !Object.values(JournalScope).includes(scope)) {
-      return NextResponse.json(
-        { error: "Valid scope is required" },
-        { status: 400 }
-      )
-    }
-
-    if (!reviewType || !Object.values(JournalReviewType).includes(reviewType)) {
-      return NextResponse.json(
-        { error: "Valid review type is required" },
-        { status: 400 }
-      )
-    }
-
-    if (!accessType || !Object.values(JournalAccessType).includes(accessType)) {
-      return NextResponse.json(
-        { error: "Valid access type is required" },
-        { status: 400 }
-      )
-    }
-
-    if (!indexing || !Object.values(JournalIndexing).includes(indexing)) {
-      return NextResponse.json(
-        { error: "Valid indexing is required" },
-        { status: 400 }
-      )
-    }
-
-    if (!publicationMode || !Object.values(JournalPublicationMode).includes(publicationMode)) {
-      return NextResponse.json(
-        { error: "Valid publication mode is required" },
-        { status: 400 }
-      )
-    }
-
-    if (!Array.isArray(facultyAuthorIds) || facultyAuthorIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one faculty author is required" },
-        { status: 400 }
-      )
-    }
-
-    if (!Array.isArray(studentAuthorIds) || studentAuthorIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one student author is required" },
-        { status: 400 }
-      )
-    }
-
-    if (keywords && !Array.isArray(keywords)) {
-      return NextResponse.json(
-        { error: "Keywords must be an array of strings" },
-        { status: 400 }
-      )
-    }
-
-    if (journalStatus && !Object.values(JournalStatus).includes(journalStatus)) {
-      return NextResponse.json(
-        { error: "Invalid journal status" },
-        { status: 400 }
-      )
-    }
-
-    if (teacherStatus && !Object.values(TeacherStatus).includes(teacherStatus)) {
-      return NextResponse.json(
-        { error: "Invalid teacher status" },
-        { status: 400 }
-      )
-    }
-
-    if (quartile && !Object.values(JournalQuartile).includes(quartile)) {
-      return NextResponse.json(
-        { error: "Invalid quartile" },
-        { status: 400 }
-      )
-    }
-
-    // Check for duplicate serial number
+    // Double-check duplicate serial number
     const existingJournal = await prisma.journal.findUnique({
-      where: { serialNo }
+      where: { serialNo: data.serialNo }
     })
 
     if (existingJournal) {
@@ -385,82 +295,76 @@ export async function POST(request: Request) {
       )
     }
 
-    /* -------------------- Validate faculty authors -------------------- */
-
+    // Validate faculty authors exist
     const facultyAuthors = await prisma.user.findMany({
       where: {
-        id: { in: facultyAuthorIds },
+        id: { in: data.facultyAuthorIds },
         role: UserRole.FACULTY
       }
     })
 
-    if (facultyAuthors.length !== facultyAuthorIds.length) {
+    if (facultyAuthors.length !== data.facultyAuthorIds.length) {
       return NextResponse.json(
         { error: "One or more faculty authors are invalid" },
         { status: 400 }
       )
     }
 
-    /* -------------------- Validate student authors (optional) -------------------- */
-
-    if (studentAuthorIds.length > 0) {
-      const studentAuthors = await prisma.user.findMany({
-        where: {
-          id: { in: studentAuthorIds },
-          role: UserRole.STUDENT
-        }
-      })
-
-      if (studentAuthors.length !== studentAuthorIds.length) {
-        return NextResponse.json(
-          { error: "One or more student authors are invalid" },
-          { status: 400 }
-        )
+    // Validate student authors exist
+    const studentAuthors = await prisma.user.findMany({
+      where: {
+        id: { in: data.studentAuthorIds },
+        role: UserRole.STUDENT
       }
+    })
+
+    if (studentAuthors.length !== data.studentAuthorIds.length) {
+      return NextResponse.json(
+        { error: "One or more student authors are invalid" },
+        { status: 400 }
+      )
     }
 
-    /* -------------------- Create Journal -------------------- */
-
+    // Create Journal inside database
     const journal = await prisma.journal.create({
       data: {
-        serialNo,
-        title,
-        journalName,
-        imageUrl,
-        documentUrl,
-        abstract,
-        scope,
-        reviewType,
-        accessType,
-        indexing,
-        quartile: quartile ?? JournalQuartile.NOT_APPLICABLE,
-        publicationMode,
-        impactFactor: impactFactor !== undefined ? Number(impactFactor) : null,
-        impactFactorDate: impactFactorDate ? new Date(impactFactorDate) : null,
-        publisher,
-        publicationDate: publicationDate ? new Date(publicationDate) : null,
-        doi,
-        paperLink,
-        keywords: keywords ?? [],
-        registrationFees: registrationFees !== undefined ? Number(registrationFees) : null,
-        reimbursement: reimbursement !== undefined ? Number(reimbursement) : null,
-        journalStatus: journalStatus ?? JournalStatus.SUBMITTED,
-        teacherStatus: teacherStatus ?? TeacherStatus.UPLOADED,
-        isPublic: Boolean(isPublic),
+        serialNo: data.serialNo,
+        title: data.title,
+        journalName: data.journalName,
+        abstract: data.abstract,
+        scope: data.scope,
+        reviewType: data.reviewType,
+        accessType: data.accessType,
+        indexing: data.indexing,
+        quartile: data.quartile,
+        publicationMode: data.publicationMode,
+        impactFactor: data.impactFactor,
+        impactFactorDate: data.impactFactorDate ? new Date(data.impactFactorDate) : null,
+        publisher: data.publisher,
+        publicationDate: data.publicationDate ? new Date(data.publicationDate) : null,
+        doi: data.doi,
+        paperLink: data.paperLink,
+        keywords: data.keywords,
+        registrationFees: data.registrationFees,
+        reimbursement: data.reimbursement,
+        journalStatus: data.journalStatus,
+        teacherStatus: data.teacherStatus,
+        isPublic: data.isPublic,
+        imageUrl: data.imageUrl,
+        documentUrl: data.documentUrl,
 
         studentAuthors: {
-          create: studentAuthorIds.map((userId: string) => ({
+          create: data.studentAuthorIds.map((userId: string) => ({
             userId
           }))
         },
 
         facultyAuthors: {
-          create: facultyAuthorIds.map((userId: string) => ({
+          create: data.facultyAuthorIds.map((userId: string) => ({
             userId
           }))
         }
       },
-
       include: {
         studentAuthors: {
           include: { user: true }
@@ -470,6 +374,24 @@ export async function POST(request: Request) {
         }
       }
     })
+
+    // Notify faculty authors (co-authors / reviewers)
+    const facultyUserIds = journal.facultyAuthors.map((fa) => fa.userId)
+    for (const fId of facultyUserIds) {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: fId,
+            title: "Co-authored Publication Submitted",
+            message: `A new co-authored publication '${journal.title}' has been submitted for review.`,
+            type: "JOURNAL_SUBMITTED",
+            link: `/dashboard/journal`,
+          },
+        })
+      } catch (err) {
+        console.error("Failed to create notification for faculty author", fId, err)
+      }
+    }
 
     return NextResponse.json(
       { journal },
@@ -485,15 +407,15 @@ export async function POST(request: Request) {
   }
 }
 
-// DELETE - Bulk delete journals
+// DELETE - Bulk delete journals with permissions
 export async function DELETE(request: Request) {
   try {
     const session = await auth()
 
-    if (!session?.user || session.user.role === UserRole.STUDENT) {
+    if (!session?.user) {
       return NextResponse.json(
-        { error: 'Unauthorized - Admin or Faculty access required' },
-        { status: 403 }
+        { error: "Unauthorized" },
+        { status: 401 }
       )
     }
 
@@ -501,12 +423,42 @@ export async function DELETE(request: Request) {
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return NextResponse.json(
-        { error: 'IDs array is required' },
+        { error: "IDs array is required" },
         { status: 400 }
       )
     }
 
-    // Delete journals (cascade will handle authors)
+    const userRole = session.user.role
+    const userId = session.user.id
+
+    // Student role is completely forbidden from deleting
+    if (userRole === UserRole.STUDENT) {
+      return NextResponse.json(
+        { error: "Unauthorized - Students cannot delete journals" },
+        { status: 403 }
+      )
+    }
+
+    // Faculty role can only delete journals they are reviewing/assigned to
+    if (userRole === UserRole.FACULTY) {
+      const journals = await prisma.journal.findMany({
+        where: { id: { in: ids } },
+        include: { facultyAuthors: true }
+      })
+
+      const isAuthorized = journals.every((j) =>
+        j.facultyAuthors.some((fa) => fa.userId === userId)
+      )
+
+      if (!isAuthorized) {
+        return NextResponse.json(
+          { error: "Unauthorized - You can only delete journals you are assigned to review" },
+          { status: 403 }
+        )
+      }
+    }
+
+    // Delete journals (cascade will delete authors)
     const result = await prisma.journal.deleteMany({
       where: {
         id: {
@@ -520,9 +472,9 @@ export async function DELETE(request: Request) {
       count: result.count
     })
   } catch (error) {
-    console.error('Error deleting journals:', error)
+    console.error("Error bulk deleting journals:", error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: "Internal server error" },
       { status: 500 }
     )
   }

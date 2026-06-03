@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { IconDashboard, IconInnerShadowTop } from "@tabler/icons-react"
-import { BookOpen, CircleDollarSign } from "lucide-react"
+import { BookOpen, CircleDollarSign, UserCog } from "lucide-react"
 import { useSession } from "next-auth/react"
 
 import { NavUser } from "@/components/nav-user"
@@ -15,7 +15,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import {  SidebarNavItem } from "@/types/sidebar"
+import { SidebarNavItem } from "@/types/sidebar"
 import { NavMain } from "./nav-main"
 
 interface GrantSidebarItem {
@@ -30,7 +30,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
   const { data: session } = useSession()
   const userRole = session?.user?.role
-  console.log("User Role:", userRole) // Debugging line to check the user role
+
   const researchItems = [
     { title: "Book Chapters", url: "/dashboard/book-chapters" },
     { title: "Copyright", url: "/dashboard/copyright" },
@@ -38,7 +38,6 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
     { title: "Conferences", url: "/dashboard/conferences" },
     { title: "Patent", url: "/dashboard/patent" },
     { title: "Certificate", url: "/dashboard/certificate" },
-    // FDP is only visible to FACULTY and ADMIN
     ...(userRole === "FACULTY" || userRole === "ADMIN"
       ? [{ title: "FDP", url: "/dashboard/fdp" }]
       : []),
@@ -46,7 +45,6 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
 
   const grantSubItems = [
     { title: "Grant In", url: "/dashboard/grant" },
-    // Dynamic grant links from the user's grants
     ...grants.map((g) => ({
       title: g.projectCode ?? g.id.slice(0, 8),
       url: `/dashboard/grant/${g.id}`,
@@ -71,6 +69,25 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
       icon: CircleDollarSign,
       items: grantSubItems,
     },
+    // ── Admin-only: Admin Panel ────────────────────────────────
+    ...(userRole === "ADMIN"
+      ? [
+          {
+            title: "Admin",
+            url: "#",
+            icon: UserCog,
+            items: [
+              { title: "All Users", url: "/dashboard/admin/users" },
+              {
+                title: "Access Management",
+                url: "/dashboard/admin/special-user",
+              },
+              { title: "Journal Management", url: "/dashboard/admin/journals" },
+            ],
+          },
+        ]
+      : []),
+      
   ]
 
   const user = session?.user
@@ -79,11 +96,11 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
         email: session.user.email ?? "",
         avatar: session.user.image ?? "/avatars/shadcn.jpg",
       }
-   :{
-      name: "Guest",
-      email: "",
-      avatar: "/avatars/shadcn.jpg",
-   }
+    : {
+        name: "Guest",
+        email: "",
+        avatar: "/avatars/shadcn.jpg",
+      }
 
   return (
     <Sidebar collapsible="icon" {...props}>

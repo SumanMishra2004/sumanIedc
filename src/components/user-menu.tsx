@@ -81,9 +81,9 @@ export default function UserMenu() {
         <DropdownMenuItem asChild>
           <Link href="/dashboard/profile">Profile</Link>
         </DropdownMenuItem>
-        {session.user.role === 'FACULTY' && (
+        {session.user.role === 'ADMIN' && (
           <DropdownMenuItem asChild>
-            <Link href="/admin">Admin Panel</Link>
+            <Link href="/dashboard/admin/special-user">Admin Panel</Link>
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />

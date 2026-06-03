@@ -35,6 +35,7 @@ export interface UpdateJournalInput {
   keywords?: string[]
   studentAuthorIds?: string[]
   facultyAuthorIds?: string[]
+  updateComment?: string | null
 }
 
 export interface JournalStatsResponse {
@@ -332,9 +333,10 @@ export const toggleJournalVisibility = async (
  */
 export const updateJournalTeacherStatus = async (
   id: string,
-  teacherStatus: string
+  teacherStatus: string,
+  updateComment?: string
 ): Promise<ApiResponse<{ journal: Journal }>> => {
-  return updateJournal(id, { teacherStatus: teacherStatus as any })
+  return updateJournal(id, { teacherStatus: teacherStatus as any, updateComment })
 }
 
 const BASE_URL = "/api/public/journal"

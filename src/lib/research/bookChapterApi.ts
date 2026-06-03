@@ -257,3 +257,15 @@ export const updateBookChapterStatus = async (
 ): Promise<ApiResponse<{ bookChapter: BookChapter }>> => {
   return updateBookChapter(id, { bookChapterStatus: status as any })
 }
+
+/**
+ * Update book chapter review status (faculty/admin status change actions)
+ */
+export const updateBookChapterReviewStatus = async (
+  id: string,
+  teacherStatus: string,
+  updateComment?: string | null
+): Promise<ApiResponse<{ bookChapter: BookChapter }>> => {
+  return updateBookChapter(id, { teacherStatus: teacherStatus as any, updateComment })
+}
+

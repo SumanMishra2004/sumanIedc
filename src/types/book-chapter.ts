@@ -30,6 +30,7 @@ export interface BookChapter {
   doi: string | null
   publicationDate: Date | string | null
   publisher: string | null
+  updateComment: string | null
   createdAt: Date | string
   updatedAt: Date | string
   studentAuthors: BookChapterAuthor[]
@@ -86,6 +87,7 @@ export interface CreateBookChapterInput {
   publisher?: string
   studentAuthorIds?: string[]
   facultyAuthorIds?: string[]
+  updateComment?: string | null
 }
 
 export type UpdateBookChapterInput = Partial<CreateBookChapterInput>

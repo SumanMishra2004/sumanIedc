@@ -6,7 +6,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 
 import { Label } from "@/components/ui/label";
-import { User, LogOut, Settings, UserCircle, BellRing } from "lucide-react";
+import { User, LogOut, Settings, UserCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +18,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { signOut } from "next-auth/react";
 import UserMenu from "./user-menu";
+import { NotificationBell } from "@/components/journal/NotificationBell";
 
 export function SiteHeader() {
   return (
@@ -40,7 +41,7 @@ export function SiteHeader() {
         
           {/* Notification Bell */}
     
-          <BellRing className="h-6 w-6 text-accent fill" />
+          <NotificationBell />
 
           {/* Avatar Dropdown */}
           <UserMenu/>

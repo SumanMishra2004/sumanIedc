@@ -14,6 +14,7 @@ export interface User {
   name: string | null
   email: string | null
   image?: string | null
+  department?: string | null
 }
 
 export interface JournalAuthor {
@@ -49,6 +50,7 @@ export interface Journal {
   journalStatus: JournalStatus
   teacherStatus: TeacherStatus
   isPublic: boolean
+  updateComment?: string | null
   createdAt: Date | string
   updatedAt: Date | string
   studentAuthors: JournalAuthor[]

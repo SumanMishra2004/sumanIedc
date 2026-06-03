@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { journalSchema } from "@/lib/validations/journal";
 import axios from "axios";
 import { Loader2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
@@ -52,34 +53,7 @@ import {
   JournalPublicationMode
 } from "@prisma/client";
 
-const journalSchema = z.object({
-  serialNo: z.string(),
-  journalName: z.string().min(1, "Journal name is required").max(500),
-  title: z.string().min(1, "Paper title is required").max(500),
-  scope: z.nativeEnum(JournalScope),
-  reviewType: z.nativeEnum(JournalReviewType),
-  accessType: z.nativeEnum(JournalAccessType),
-  indexing: z.nativeEnum(JournalIndexing),
-  quartile: z.nativeEnum(JournalQuartile),
-  publicationMode: z.nativeEnum(JournalPublicationMode),
-  impactFactor: z.number().nullable().optional(),
-  impactFactorDate: z.string().nullable().optional(),
-  publisher: z.string().nullable().optional(),
-  journalStatus: z.nativeEnum(JournalStatus),
- 
-  paperLink: z.string().nullable().optional(),
-  doi: z.string().nullable().optional(),
-  registrationFees: z.number().nullable().optional(),
-  reimbursement: z.number().nullable().optional(),
-  isPublic: z.boolean(),
-  abstract: z.string().nullable().optional(),
-  imageUrl: z.string().nullable().optional(),
-  documentUrl: z.string().nullable().optional(),
-  publicationDate: z.string().nullable().optional(),
-  keywords: z.array(z.string()),
-  studentAuthorIds: z.array(z.string()),
-  facultyAuthorIds: z.array(z.string()),
-});
+// Use imported journalSchema from @/lib/validations/journal
 
 type JournalFormValues = z.infer<typeof journalSchema>;
 
@@ -89,6 +63,14 @@ interface SelectedUser {
   email: string;
   image?: string;
 }
+
+const formatDateForInput = (val: string | Date | null | undefined): string => {
+  if (!val) return "";
+  if (val instanceof Date) {
+    return val.toISOString().split("T")[0];
+  }
+  return typeof val === "string" ? val.split("T")[0] : "";
+};
 
 export default function JournalDialog({
   onSuccess,
@@ -144,13 +126,22 @@ export default function JournalDialog({
       facultyAuthorIds: [],
     },
   });
+  const indexing = form.watch("indexing");
+
+  useEffect(() => {
+    if (indexing === "NONE") {
+      form.setValue("quartile", "NOT_APPLICABLE");
+    }
+  }, [indexing, form]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    const input = e.currentTarget;
     if (!file) return;
 
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
+    const allowedImageTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!allowedImageTypes.includes(file.type)) {
+      toast.error("Allowed image formats: jpg, jpeg, png, webp");
       return;
     }
 
@@ -171,6 +162,7 @@ export default function JournalDialog({
       setImageFile(null);
     } finally {
       setUploadingImage(false);
+      input.value = "";
     }
   };
 
@@ -178,10 +170,17 @@ export default function JournalDialog({
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
+    const input = e.currentTarget;
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Document size should be less than 10MB");
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      toast.error("Only PDF files are allowed for documents");
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error("Document size should be less than 25MB");
       return;
     }
 
@@ -197,6 +196,7 @@ export default function JournalDialog({
       setDocumentFile(null);
     } finally {
       setUploadingDocument(false);
+      input.value = "";
     }
   };
 
@@ -401,15 +401,23 @@ export default function JournalDialog({
                       render={({ field }) => (
                         <FormItem className="lg:col-span-2">
                           <FormLabel className="text-base font-semibold mb-1">
-                            Abstract
+                            Abstract <span className="text-destructive">*</span>
                           </FormLabel>
                           <FormControl>
-                            <Textarea
-                              placeholder="Write abstract (optional)"
-                              className="min-h-[100px] text-base border focus-visible:ring-1 resize-vertical"
-                              {...field}
-                              value={field.value ?? ""}
-                            />
+                            <div className="space-y-1">
+                              <Textarea
+                                placeholder="Write abstract (at least 100 characters)"
+                                className="min-h-[100px] text-base border focus-visible:ring-1 resize-vertical"
+                                {...field}
+                                value={field.value ?? ""}
+                              />
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>Minimum 100, Maximum 5000 characters</span>
+                                <span className={((field.value ?? "").length < 100 || (field.value ?? "").length > 5000) ? "text-destructive font-semibold" : "text-emerald-500"}>
+                                  {(field.value ?? "").length} / 5000
+                                </span>
+                              </div>
+                            </div>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -558,7 +566,8 @@ export default function JournalDialog({
                         </FormLabel>
                         <Select
                           onValueChange={field.onChange}
-                          defaultValue={field.value}
+                          value={field.value || "NOT_APPLICABLE"}
+                          disabled={indexing === "NONE"}
                         >
                           <FormControl>
                             <SelectTrigger className="h-10">
@@ -644,7 +653,7 @@ export default function JournalDialog({
                             type="date"
                             className="h-10"
                             {...field}
-                            value={field.value ?? ""}
+                            value={formatDateForInput(field.value)}
                           />
                         </FormControl>
                         <FormMessage />
@@ -750,7 +759,7 @@ export default function JournalDialog({
                             type="date"
                             className="h-10"
                             {...field}
-                            value={field.value ?? ""}
+                            value={formatDateForInput(field.value)}
                           />
                         </FormControl>
                         <FormMessage />
@@ -1057,36 +1066,30 @@ export default function JournalDialog({
                           Document
                         </FormLabel>
                         <FormControl>
-                          <Card className="border-2 border-dashed border-muted hover:border-primary/50 transition-colors cursor-pointer p-6 text-center h-full">
-                            <div
-                              className="space-y-2 h-full flex flex-col justify-center"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                document
-                                  .getElementById("document-upload")
-                                  ?.click();
-                              }}
-                            >
-                              <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
-                              <div>
-                                <p className="font-medium">Document</p>
-                                <p className="text-xs text-muted-foreground">
-                                  Max 10MB
-                                </p>
+                          <label htmlFor="document-upload" className="cursor-pointer block h-full">
+                            <Card className="border-2 border-dashed border-muted hover:border-primary/50 transition-colors p-6 text-center h-full">
+                              <div className="space-y-2 h-full flex flex-col justify-center">
+                                <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+                                <div>
+                                  <p className="font-medium">Document</p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Max 10MB
+                                  </p>
+                                </div>
+                                <Input
+                                  id="document-upload"
+                                  type="file"
+                                  accept=".pdf,.doc,.docx"
+                                  onChange={handleDocumentUpload}
+                                  disabled={uploadingDocument}
+                                  className="sr-only"
+                                />
+                                {uploadingDocument && (
+                                  <Loader2 className="h-5 w-5 animate-spin mx-auto" />
+                                )}
                               </div>
-                              <Input
-                                id="document-upload"
-                                type="file"
-                                accept=".pdf,.doc,.docx"
-                                onChange={handleDocumentUpload}
-                                disabled={uploadingDocument}
-                                className="hidden"
-                              />
-                              {uploadingDocument && (
-                                <Loader2 className="h-5 w-5 animate-spin mx-auto" />
-                              )}
-                            </div>
-                          </Card>
+                            </Card>
+                          </label>
                         </FormControl>
                         <FormDescription className="text-xs text-center pt-2 block">
                           {documentFile && (

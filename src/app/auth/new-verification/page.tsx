@@ -1,17 +1,20 @@
 'use client'
 
-import { useCallback, useEffect, useState, useRef, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { verifyEmailAction } from '@/lib/actions/auth'
 import gsap from 'gsap'
 
 function NewVerificationContent() {
-  const [error, setError] = useState<string | undefined>()
-  const [success, setSuccess] = useState<string | undefined>()
   const searchParams = useSearchParams()
-  const token = searchParams.get('token')
+const token = searchParams.get('token')
+
+const [error, setError] = useState<string | undefined>()
+  const [success, setSuccess] = useState<string | undefined>()
+  
   const wrapRef = useRef<HTMLDivElement>(null)
+  const verifiedRef = useRef(false)
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -22,9 +25,11 @@ function NewVerificationContent() {
 
   useEffect(() => {
     if (!token) {
-      setError('Missing verification token!')
       return
     }
+
+    if (verifiedRef.current) return
+    verifiedRef.current = true
 
     verifyEmailAction(token)
       .then((data) => {

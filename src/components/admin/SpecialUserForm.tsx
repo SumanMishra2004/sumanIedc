@@ -79,7 +79,7 @@ export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
           Add Special User
         </CardTitle>
         <CardDescription>
-          Assign special roles to users by their email address
+          Grant Faculty or Admin privileges by email address. Students have these privileges removed automatically.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -104,9 +104,8 @@ export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="STUDENT">Student</SelectItem>
-                <SelectItem value="ADMIN">Admin</SelectItem>
                 <SelectItem value="FACULTY">Faculty</SelectItem>
+                <SelectItem value="ADMIN">Admin</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -119,9 +118,8 @@ export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
         <div className="mt-6 space-y-2">
           <h3 className="text-sm font-semibold">Role Descriptions:</h3>
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p><span className="font-medium">Student:</span> Basic access to dashboard</p>
-            <p><span className="font-medium">Faculty:</span> Access to admin panels and advanced features</p>
-            <p><span className="font-medium">Admin:</span> Full system access and management</p>
+            <p><span className="font-medium">Faculty:</span> Can manage publications, view admin panels and advanced features</p>
+            <p><span className="font-medium">Admin:</span> Full system access — user management, access control, statistics</p>
           </div>
         </div>
       </CardContent>
