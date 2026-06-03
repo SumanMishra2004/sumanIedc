@@ -464,7 +464,7 @@ export async function PATCH(
             title,
             message,
             type,
-            link: `/dashboard/journal`,
+            link: `/dashboard/journal?id=${id}`,
           },
         })
       } catch (err) {

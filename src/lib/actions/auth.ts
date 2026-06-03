@@ -147,6 +147,23 @@ export async function setupProfileAction(
       department: (formData.get('department') as string) || undefined,
       phone: (formData.get('phone') as string) || undefined,
       image: (formData.get('image') as string) || undefined,
+      coverImage: (formData.get('coverImage') as string) || undefined,
+      institution: (formData.get('institution') as string) || undefined,
+      linkedinLink: (formData.get('linkedinLink') as string) || undefined,
+      skills: (formData.get('skills') as string) || undefined,
+      enrollmentNo: (formData.get('enrollmentNo') as string) || undefined,
+      degree: (formData.get('degree') as string) || undefined,
+      currentYear: (formData.get('currentYear') as string) || undefined,
+      currentSemester: (formData.get('currentSemester') as string) || undefined,
+      graduationYear: (formData.get('graduationYear') as string) || undefined,
+      resumeLink: (formData.get('resumeLink') as string) || undefined,
+      portfolioLink: (formData.get('portfolioLink') as string) || undefined,
+      githubLink: (formData.get('githubLink') as string) || undefined,
+      researchInterests: (formData.get('researchInterests') as string) || undefined,
+      designation: (formData.get('designation') as string) || undefined,
+      yearsOfExperience: (formData.get('yearsOfExperience') as string) || undefined,
+      areasOfExpertise: (formData.get('areasOfExpertise') as string) || undefined,
+      orcidId: (formData.get('orcidId') as string) || undefined,
     }
 
     const parsed = SetupProfileSchema.safeParse(raw)
@@ -154,12 +171,19 @@ export async function setupProfileAction(
       return { error: parsed.error.issues[0]?.message ?? 'Invalid input' }
     }
 
-    const { name, bio, department, phone, image } = parsed.data
+    const { 
+      name, bio, department, phone, image, coverImage, institution, linkedinLink, 
+      skills, enrollmentNo, degree, currentYear, currentSemester, graduationYear, 
+      resumeLink, portfolioLink, githubLink, researchInterests, 
+      designation, yearsOfExperience, areasOfExpertise, orcidId 
+    } = parsed.data
+
     const displayName = name || DEFAULT_NAME
     const fallbackImage = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}`
 
-    // Transaction to ensure Appwrite/DB sync doesn't leave partial state if we had complex relation updates.
-    // If Prisma fails here (even if Appwrite succeeded client-side), we catch it and inform the user.
+    // Helper to split comma-separated strings to arrays
+    const toArray = (str?: string) => str ? str.split(',').map(s => s.trim()).filter(Boolean) : []
+
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
@@ -169,6 +193,23 @@ export async function setupProfileAction(
         phone: phone || null,
         image: image || fallbackImage,
         profileCompleted: true,
+        coverImage,
+        institution,
+        linkedinLink,
+        skills: toArray(skills),
+        enrollmentNo,
+        degree,
+        currentYear,
+        currentSemester,
+        graduationYear,
+        resumeLink,
+        portfolioLink,
+        githubLink,
+        researchInterests: toArray(researchInterests),
+        designation,
+        yearsOfExperience,
+        areasOfExpertise: toArray(areasOfExpertise),
+        orcidId,
       },
     })
 
@@ -176,8 +217,6 @@ export async function setupProfileAction(
     return { success: true }
   } catch (err) {
     console.error('[setupProfileAction]', err)
-    // If DB update fails after Appwrite upload, the user can just submit again
-    // since the Appwrite URL is already in the form state.
     return { error: 'Failed to save profile. Please try again.' }
   }
 }

@@ -418,7 +418,7 @@ export async function PATCH(
             title,
             message,
             type,
-            link: `/dashboard/book-chapters`,
+            link: `/dashboard/book-chapters?id=${id}`,
           }
         })
       } catch (err) {

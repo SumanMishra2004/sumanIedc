@@ -1,24 +1,11 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
-
-import { Label } from "@/components/ui/label";
-import { User, LogOut, Settings, UserCircle } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { signOut } from "next-auth/react";
 import UserMenu from "./user-menu";
 import { NotificationBell } from "@/components/journal/NotificationBell";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function SiteHeader() {
   return (
@@ -38,6 +25,7 @@ export function SiteHeader() {
         {/* Right section - aligned items */}
         <div className="flex items-center gap-3 ml-auto">
           {/* Theme Toggle */}
+          <ThemeToggle />
         
           {/* Notification Bell */}
     

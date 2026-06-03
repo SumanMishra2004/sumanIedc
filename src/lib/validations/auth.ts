@@ -62,6 +62,27 @@ export const SetupProfileSchema = z.object({
     .optional()
     .or(z.literal('')),
   image: z.string().url('Invalid image URL').optional().or(z.literal('')),
+  coverImage: z.string().url('Invalid image URL').optional().or(z.literal('')),
+  institution: z.string().max(100, 'Institution name too long').optional(),
+  linkedinLink: z.string().url('Invalid LinkedIn URL').optional().or(z.literal('')),
+  skills: z.string().optional(),
+
+  // Student specific
+  enrollmentNo: z.string().max(50, 'Enrollment number too long').optional(),
+  degree: z.string().max(100, 'Degree too long').optional(),
+  currentYear: z.string().max(20, 'Year too long').optional(),
+  currentSemester: z.string().max(20, 'Semester too long').optional(),
+  graduationYear: z.string().max(4, 'Invalid year').optional(),
+  resumeLink: z.string().url('Invalid URL').optional().or(z.literal('')),
+  portfolioLink: z.string().url('Invalid URL').optional().or(z.literal('')),
+  githubLink: z.string().url('Invalid GitHub URL').optional().or(z.literal('')),
+  researchInterests: z.string().optional(),
+
+  // Faculty specific
+  designation: z.string().max(100, 'Designation too long').optional(),
+  yearsOfExperience: z.string().max(50, 'Years too long').optional(),
+  areasOfExpertise: z.string().optional(),
+  orcidId: z.string().max(50, 'ORCID too long').optional(),
 })
 
 export type SetupProfileInput = z.infer<typeof SetupProfileSchema>

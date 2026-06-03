@@ -148,3 +148,21 @@ export const exportCertificatesToCSV = async (filters?: CertificateFilters) => {
         return handleApiError(error);
     }
 }
+
+/**
+ * Bulk delete certificates
+ */
+export const bulkDeleteCertificates = async (
+  ids: string[]
+): Promise<ApiResponse<{ count: number }>> => {
+  try {
+    const response = await axios.delete<{ count: number }>(
+      API_BASE_URL,
+      { data: { ids } }
+    )
+    return { data: response.data }
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+

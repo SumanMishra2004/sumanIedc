@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { CopyrightStatus, TeacherStatus, UserRole } from '@prisma/client'
+import { copyrightSchema } from '@/lib/validations/copyright'
 
 // GET - List all copyrights with filtering, pagination, and search
 export async function GET(req: NextRequest) {
@@ -209,78 +210,40 @@ export async function POST(request: Request) {
 
     const body = await request.json()
 
-    const {
-      regNo,
-      title,
-      abstract,
-      imageUrl,
-      documentUrl,
-      dateOfFiling,
-      dateOfSubmission,
-      dateOfPublished,
-      dateOfGrant,
-      registrationFees,
-      reimbursement,
-      copyrightStatus,
-      teacherStatus,
-      isPublic,
-      studentAuthorIds = [],
-      facultyAuthorIds = []
-    } = body
+    // Students have forced default parameters:
+    if (session.user.role === UserRole.STUDENT) {
+      body.teacherStatus = TeacherStatus.UPLOADED
+      body.copyrightStatus = CopyrightStatus.SUBMITTED
+      body.isPublic = false
 
-    /* -------------------- Basic validation -------------------- */
+      // Auto-assign creating student if not present in the payload
+      if (!body.studentAuthorIds || body.studentAuthorIds.length === 0) {
+        body.studentAuthorIds = [session.user.id]
+      } else if (!body.studentAuthorIds.includes(session.user.id)) {
+        body.studentAuthorIds.push(session.user.id)
+      }
+    }
 
-    if (!regNo || typeof regNo !== "string") {
+    // Validate request body with Zod
+    const validation = copyrightSchema.safeParse(body)
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Registration number is required" },
+        { error: validation.error.issues[0].message, details: validation.error.issues },
         { status: 400 }
       )
     }
 
-    if (!title || typeof title !== "string") {
-      return NextResponse.json(
-        { error: "Title is required" },
-        { status: 400 }
-      )
-    }
-
-    if (!Array.isArray(facultyAuthorIds) || facultyAuthorIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one faculty author is required" },
-        { status: 400 }
-      )
-    }
-    if (!Array.isArray(studentAuthorIds) || studentAuthorIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one student author is required" },
-        { status: 400 }
-      )
-    }
-
-    if (copyrightStatus && !Object.values(CopyrightStatus).includes(copyrightStatus)) {
-      return NextResponse.json(
-        { error: "Invalid copyright status" },
-        { status: 400 }
-      )
-    }
-
-    if (teacherStatus && !Object.values(TeacherStatus).includes(teacherStatus)) {
-      return NextResponse.json(
-        { error: "Invalid teacher status" },
-        { status: 400 }
-      )
-    }
+    const data = validation.data
 
     /* -------------------- Validate faculty authors -------------------- */
-
     const facultyAuthors = await prisma.user.findMany({
       where: {
-        id: { in: facultyAuthorIds },
+        id: { in: data.facultyAuthorIds },
         role: UserRole.FACULTY
       }
     })
 
-    if (facultyAuthors.length !== facultyAuthorIds.length) {
+    if (facultyAuthors.length !== data.facultyAuthorIds.length) {
       return NextResponse.json(
         { error: "One or more faculty authors are invalid" },
         { status: 400 }
@@ -288,52 +251,46 @@ export async function POST(request: Request) {
     }
 
     /* -------------------- Validate student authors -------------------- */
-
-    if (studentAuthorIds.length > 0) {
-      const studentAuthors = await prisma.user.findMany({
-        where: {
-          id: { in: studentAuthorIds },
-          role: UserRole.STUDENT
-        }
-      })
-
-      if (studentAuthors.length !== studentAuthorIds.length) {
-        return NextResponse.json(
-          { error: "One or more student authors are invalid" },
-          { status: 400 }
-        )
+    const studentAuthors = await prisma.user.findMany({
+      where: {
+        id: { in: data.studentAuthorIds },
+        role: UserRole.STUDENT
       }
+    })
+
+    if (studentAuthors.length !== data.studentAuthorIds.length) {
+      return NextResponse.json(
+        { error: "One or more student authors are invalid" },
+        { status: 400 }
+      )
     }
 
     /* -------------------- Create Copyright -------------------- */
-
     const copyright = await prisma.copyright.create({
       data: {
-        regNo,
-        title,
-        abstract,
-        imageUrl,
-        documentUrl,
-        dateOfFiling: dateOfFiling ? new Date(dateOfFiling) : null,
-        dateOfSubmission: dateOfSubmission ? new Date(dateOfSubmission) : null,
-        dateOfPublished: dateOfPublished ? new Date(dateOfPublished) : null,
-        dateOfGrant: dateOfGrant ? new Date(dateOfGrant) : null,
-        registrationFees:
-          registrationFees !== undefined ? Number(registrationFees) : null,
-        reimbursement:
-          reimbursement !== undefined ? Number(reimbursement) : null,
-        copyrightStatus: copyrightStatus ?? CopyrightStatus.SUBMITTED,
-        teacherStatus: teacherStatus ?? TeacherStatus.UPLOADED,
-        isPublic: Boolean(isPublic),
+        regNo: data.regNo || "",
+        title: data.title,
+        abstract: data.abstract,
+        imageUrl: data.imageUrl,
+        documentUrl: data.documentUrl,
+        dateOfFiling: data.dateOfFiling ? new Date(data.dateOfFiling) : null,
+        dateOfSubmission: data.dateOfSubmission ? new Date(data.dateOfSubmission) : null,
+        dateOfPublished: data.dateOfPublished ? new Date(data.dateOfPublished) : null,
+        dateOfGrant: data.dateOfGrant ? new Date(data.dateOfGrant) : null,
+        registrationFees: data.registrationFees !== undefined ? Number(data.registrationFees) : null,
+        reimbursement: data.reimbursement !== undefined ? Number(data.reimbursement) : null,
+        copyrightStatus: data.copyrightStatus ?? CopyrightStatus.SUBMITTED,
+        teacherStatus: data.teacherStatus ?? TeacherStatus.UPLOADED,
+        isPublic: Boolean(data.isPublic),
 
         studentAuthors: {
-          create: studentAuthorIds.map((userId: string) => ({
+          create: data.studentAuthorIds.map((userId: string) => ({
             userId
           }))
         },
 
         facultyAuthors: {
-          create: facultyAuthorIds.map((userId: string) => ({
+          create: data.facultyAuthorIds.map((userId: string) => ({
             userId
           }))
         }
@@ -348,6 +305,24 @@ export async function POST(request: Request) {
         }
       }
     })
+
+    // Notify faculty authors (co-authors / reviewers)
+    const facultyUserIds = copyright.facultyAuthors.map((fa) => fa.userId)
+    for (const fId of facultyUserIds) {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: fId,
+            title: "Co-authored Copyright Submitted",
+            message: `A new co-authored copyright '${copyright.title}' has been submitted for review.`,
+            type: "COPYRIGHT_SUBMITTED",
+            link: `/dashboard/copyright?id=${copyright.id}`,
+          },
+        })
+      } catch (err) {
+        console.error("Failed to create notification for faculty author", fId, err)
+      }
+    }
 
     return NextResponse.json(
       { copyright },

@@ -1,8 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { IconDashboard, IconInnerShadowTop } from "@tabler/icons-react"
-import { BookOpen, CircleDollarSign, UserCog } from "lucide-react"
+import { IconInnerShadowTop } from "@tabler/icons-react"
+import { BookOpen, CircleDollarSign, User2, UserCog } from "lucide-react"
 import { useSession } from "next-auth/react"
 
 import { NavUser } from "@/components/nav-user"
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/sidebar"
 import { SidebarNavItem } from "@/types/sidebar"
 import { NavMain } from "./nav-main"
+import { ProfileSearch } from "./profile-search"
 
 interface GrantSidebarItem {
   id: string
@@ -53,9 +54,9 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
 
   const navMain: SidebarNavItem[] = [
     {
-      title: "Dashboard",
+      title: "My Profile",
       url: "/dashboard",
-      icon: IconDashboard,
+      icon: User2,
     },
     {
       title: "Research",
@@ -82,7 +83,11 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
                 title: "Access Management",
                 url: "/dashboard/admin/special-user",
               },
+              { title: "Book Chapter Management", url: "/dashboard/admin/book-chapters" },
               { title: "Journal Management", url: "/dashboard/admin/journals" },
+              { title: "Conference Management", url: "/dashboard/admin/conferences" },
+              { title: "Patent Management", url: "/dashboard/admin/patents" },
+              { title: "Certificate Management", url: "/dashboard/admin/certificates" },
             ],
           },
         ]
@@ -103,21 +108,26 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
       }
 
   return (
-    <Sidebar collapsible="icon" {...props}>
+    <Sidebar variant="inset" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:p-1.5!"
-            >
-              <a href="/dashboard">
-                <IconInnerShadowTop className="size-5!" />
-                <span className="text-base font-semibold">IEDC Research Lab</span>
+            <SidebarMenuButton size="lg" asChild>
+              <a href="/">
+                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                  <IconInnerShadowTop className="size-4" />
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-semibold">IEDC</span>
+                  <span className="truncate text-xs">Research Portal</span>
+                </div>
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <div className="px-2 pb-2">
+          <ProfileSearch />
+        </div>
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />

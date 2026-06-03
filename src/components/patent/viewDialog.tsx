@@ -25,15 +25,13 @@ import { Patent } from "@/types/patent"
 interface PatentViewDialogProps {
   patentId: string | null
   open: boolean
-  setOpen: (open: boolean) => void
-  setViewingPatentId: (id: string | null) => void
+  onOpenChange: (open: boolean) => void
 }
 
 export function PatentViewDialog({
   patentId,
   open,
-  setOpen,
-  setViewingPatentId,
+  onOpenChange,
 }: PatentViewDialogProps) {
   const [patent, setPatent] = React.useState<Patent | null>(null)
   const [loading, setLoading] = React.useState(false)
@@ -67,8 +65,7 @@ export function PatentViewDialog({
   }, [open, patentId])
 
   const handleClose = () => {
-    setOpen(false)
-    setViewingPatentId(null)
+    onOpenChange(false)
     setPatent(null)
     setError(null)
   }

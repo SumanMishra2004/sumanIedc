@@ -30,6 +30,7 @@ export interface Copyright {
   copyrightStatus: CopyrightStatus
   teacherStatus: TeacherStatus
   isPublic: boolean
+  updateComment: string | null
   createdAt: Date | string
   updatedAt: Date | string
   studentAuthors: CopyrightAuthor[]
@@ -91,6 +92,7 @@ export interface CreateCopyrightInput {
   isPublic?: boolean
   studentAuthorIds?: string[]
   facultyAuthorIds?: string[]
+  updateComment?: string | null
 }
 
 export type UpdateCopyrightInput = Partial<CreateCopyrightInput>

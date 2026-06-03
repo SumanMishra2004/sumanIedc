@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSession } from "next-auth/react";
 import {
   flexRender,
   getCoreRowModel,
@@ -68,16 +69,29 @@ import {
   CardHeader,
 } from "../ui/card";
 import { AnimatedAvatarGroupTooltip } from "../ui/animated-tooltip";
-import { CopyrightStatus } from "@prisma/client";
+import { CopyrightStatus, TeacherStatus } from "@prisma/client";
 import { toast } from "sonner";
 import {
   getCopyrights,
   deleteCopyright,
   bulkDeleteCopyrights,
+  updateCopyrightTeacherStatus,
 } from "@/lib/research/copyrightApi";
 import CopyrightAddForm from "./copyrightAddForm";
 import { useState } from "react";
 import EditCopyrightDialog from "./copyrightEditForm";
+import { CopyrightViewDialog } from "./viewDialog";
+import type { Session } from "next-auth";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 
 // --- Types & Data ---
@@ -116,12 +130,53 @@ const getStatusConfig = (status: CopyrightStatus) => {
   return configs[status];
 };
 
+const getTeacherStatusConfig = (status: TeacherStatus) => {
+  const configs: Record<
+    TeacherStatus,
+    { bg: string; text: string; border: string; dot: string }
+  > = {
+    UPLOADED: {
+      bg: "bg-slate-50 dark:bg-slate-950/30",
+      text: "text-slate-700 dark:text-slate-400",
+      border: "border-slate-200 dark:border-slate-800",
+      dot: "bg-slate-500",
+    },
+    ACCEPTED: {
+      bg: "bg-green-50 dark:bg-green-950/30",
+      text: "text-green-700 dark:text-green-400",
+      border: "border-green-200 dark:border-green-800",
+      dot: "bg-green-500",
+    },
+    PUBLISHED: {
+      bg: "bg-blue-50 dark:bg-blue-950/30",
+      text: "text-blue-700 dark:text-blue-400",
+      border: "border-blue-200 dark:border-blue-800",
+      dot: "bg-blue-500",
+    },
+    UPDATE: {
+      bg: "bg-amber-50 dark:bg-amber-950/30",
+      text: "text-amber-700 dark:text-amber-400",
+      border: "border-amber-200 dark:border-amber-800",
+      dot: "bg-amber-500",
+    },
+    REJECTED: {
+      bg: "bg-red-50 dark:bg-red-950/30",
+      text: "text-red-700 dark:text-red-400",
+      border: "border-red-200 dark:border-red-800",
+      dot: "bg-red-500",
+    },
+  };
+  return configs[status];
+};
+
 // --- Actions Component ---
 interface CopyrightActionsProps {
   copyright: Copyright;
   onDelete: (id: string) => void;
   onEdit?: (id: string) => void;
   onView?: (id: string) => void;
+  onTeacherStatusChange?: (id: string, status: TeacherStatus) => void;
+  session?: Session | null;
 }
 
 const CopyrightActions = ({
@@ -129,6 +184,8 @@ const CopyrightActions = ({
   onDelete,
   onEdit,
   onView,
+  onTeacherStatusChange,
+  session,
 }: CopyrightActionsProps) => (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
@@ -137,7 +194,7 @@ const CopyrightActions = ({
         <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
       </Button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="end" className="w-[160px]">
+    <DropdownMenuContent align="end" className="w-50">
       <DropdownMenuLabel>Actions</DropdownMenuLabel>
       <DropdownMenuItem
         onClick={() => navigator.clipboard.writeText(copyright.id)}
@@ -149,18 +206,81 @@ const CopyrightActions = ({
         <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
         View details
       </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => onEdit?.(copyright.id)}>
-        <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
-        Edit copyright
-      </DropdownMenuItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem
-        className="text-red-600 focus:text-red-600 focus:bg-red-50"
-        onClick={() => onDelete(copyright.id)}
-      >
-        <Trash className="mr-2 h-4 w-4" />
-        Delete
-      </DropdownMenuItem>
+      {copyright.teacherStatus !== "PUBLISHED" && session?.user.role !== "TEACHER" && (
+        <>
+          <DropdownMenuItem onClick={() => onEdit?.(copyright.id)}>
+            <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+            Edit copyright
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+        </>
+      )}
+      {copyright.teacherStatus === "PUBLISHED" &&
+        session?.user.role === "ADMIN" && (
+          <>
+            <DropdownMenuItem onClick={() => onEdit?.(copyright.id)}>
+              <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
+              Edit copyright
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+
+      {session?.user.role != "STUDENT" && (
+        <>
+          <p className="text-xs text-muted-foreground mb-1">Teacher Status</p>
+
+          <Select
+            defaultValue={copyright.teacherStatus}
+            disabled={copyright.teacherStatus === "PUBLISHED"}
+            onValueChange={(value) =>
+              onTeacherStatusChange?.(copyright.id, value as TeacherStatus)
+            }
+          >
+            <SelectTrigger className="w-45">
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+
+            <SelectContent>
+              {["ACCEPTED", "PUBLISHED", "UPDATE", "REJECTED"].map((status) => {
+                const config = getTeacherStatusConfig(status as TeacherStatus);
+                const isDisabled = 
+                  copyright.teacherStatus === "REJECTED" && 
+                  (status === "PUBLISHED" || status === "UPDATE");
+
+                return (
+                  <SelectItem key={status} value={status} disabled={isDisabled}>
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${config.dot}`} />
+                      <span className="text-sm capitalize">
+                        {status.toLowerCase()}
+                      </span>
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </>
+      )}
+
+      {(
+        copyright.teacherStatus === "UPLOADED"
+          ? session?.user.role !== "STUDENT"
+          : copyright.teacherStatus === "ACCEPTED"
+          ? session?.user.role === "TEACHER" || session?.user.role === "ADMIN"
+          : copyright.teacherStatus === "PUBLISHED"
+          ? session?.user.role === "ADMIN"
+          : session?.user.role === "TEACHER" || session?.user.role === "ADMIN"
+      ) && (
+        <DropdownMenuItem
+          className="text-red-600 focus:text-red-600 focus:bg-red-50"
+          onClick={() => onDelete(copyright.id)}
+        >
+          <Trash className="mr-2 h-4 w-4" />
+          Delete
+        </DropdownMenuItem>
+      )}
     </DropdownMenuContent>
   </DropdownMenu>
 );
@@ -171,12 +291,16 @@ interface ColumnProps {
   onDelete: (id: string) => void;
   onEdit?: (id: string) => void;
   onView?: (id: string) => void;
+  onTeacherStatusChange?: (id: string, status: TeacherStatus) => void;
+  session?: Session | null;
 }
 
 export const createColumns = ({
   onDelete,
   onEdit,
   onView,
+  onTeacherStatusChange,
+  session,
 }: ColumnProps): ColumnDef<Copyright>[] => [
   {
     id: "select",
@@ -363,6 +487,26 @@ export const createColumns = ({
     },
   },
   {
+    accessorKey: "teacherStatus",
+    header: "Teacher Status",
+    cell: ({ row }) => {
+      const status = row.getValue("teacherStatus") as TeacherStatus;
+      const config = getTeacherStatusConfig(status);
+      return (
+        <Badge
+          variant="outline"
+          className={`${config.bg} ${config.text} ${config.border} font-medium px-2.5 py-1`}
+        >
+          <span className={`mr-1.5 h-1.5 w-1.5 rounded-full ${config.dot}`} />
+          {status.replace(/_/g, " ")}
+        </Badge>
+      );
+    },
+    filterFn: (row, id, value) => {
+      return value.includes(row.getValue(id));
+    },
+  },
+  {
     id: "actions",
     cell: ({ row }) => (
       <CopyrightActions
@@ -370,6 +514,8 @@ export const createColumns = ({
         onDelete={onDelete}
         onEdit={onEdit}
         onView={onView}
+        onTeacherStatusChange={onTeacherStatusChange}
+        session={session}
       />
     ),
   },
@@ -381,13 +527,17 @@ interface CopyrightTableProps {
   initialData?: Copyright[];
   initialTotal?: number;
   onRefresh?: () => void;
+  session?: Session | null;
 }
 
 export default function CopyrightTable({
   initialData = [],
   initialTotal = 0,
   onRefresh,
+  session: propSession,
 }: CopyrightTableProps) {
+  const { data: sessionData } = useSession();
+  const session = propSession || sessionData;
   const [data, setData] = React.useState<Copyright[]>(initialData);
   const [totalRecords, setTotalRecords] = React.useState(initialTotal);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -402,6 +552,11 @@ export default function CopyrightTable({
   const [searchTerm, setSearchTerm] = React.useState("");
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingCopyrightId, setEditingCopyrightId] = useState<string | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewingCopyrightId, setViewingCopyrightId] = useState<string | null>(null);
+  const [updateCommentDialogOpen, setUpdateCommentDialogOpen] = useState(false);
+  const [targetCopyrightId, setTargetCopyrightId] = useState<string | null>(null);
+  const [updateComment, setUpdateComment] = useState("");
 
   const [filters, setFilters] = React.useState<CopyrightFilters>({
     page: 1,
@@ -536,6 +691,70 @@ export default function CopyrightTable({
     }
   };
 
+  // Handle teacher status change
+  const handleTeacherStatusChange = async (
+    id: string,
+    status: TeacherStatus,
+  ) => {
+    if (status === "UPDATE") {
+      setTargetCopyrightId(id);
+      setUpdateComment("");
+      setUpdateCommentDialogOpen(true);
+      return;
+    }
+
+    const toastId = toast.loading("Updating teacher status...");
+    try {
+      const response = await updateCopyrightTeacherStatus(id, status);
+      if (response.data) {
+        toast.success(
+          `Teacher status updated to ${status.replace(/_/g, " ").toLowerCase()}`,
+          { id: toastId }
+        );
+        fetchData();
+        onRefresh?.();
+      } else if (response.error) {
+        toast.error("Failed to update teacher status", {
+          id: toastId,
+          description: response.error,
+        });
+      }
+    } catch (error) {
+      console.error("Error updating teacher status:", error);
+      toast.error("Failed to update teacher status", { id: toastId });
+    }
+  };
+
+  // Confirm update request with comment
+  const handleConfirmUpdateComment = async () => {
+    if (!updateComment.trim()) {
+      toast.error("Please enter a comment explaining the requested corrections");
+      return;
+    }
+    setUpdateCommentDialogOpen(false);
+    const toastId = toast.loading("Updating status and sending notification...");
+    try {
+      if (targetCopyrightId) {
+        const response = await updateCopyrightTeacherStatus(targetCopyrightId, "UPDATE", updateComment);
+        if (response.data) {
+          toast.success("Teacher status updated to update requested", { id: toastId });
+          setTargetCopyrightId(null);
+          setUpdateComment("");
+          fetchData();
+          onRefresh?.();
+        } else if (response.error) {
+          toast.error("Failed to update teacher status", {
+            id: toastId,
+            description: response.error,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error requesting update:", error);
+      toast.error("Failed to request update", { id: toastId });
+    }
+  };
+
   // Create columns with handlers
   const columns = React.useMemo(
     () =>
@@ -545,12 +764,15 @@ export default function CopyrightTable({
           setEditingCopyrightId(id);
           setEditDialogOpen(true);
         },
-        onView: () => {
-          toast.info("View functionality coming soon");
+        onView: (id) => {
+          setViewingCopyrightId(id);
+          setViewDialogOpen(true);
         },
+        onTeacherStatusChange: handleTeacherStatusChange,
+        session,
       }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [session, data],
   );
 
   const table = useReactTable({
@@ -1019,6 +1241,36 @@ export default function CopyrightTable({
         }}
       />
     )}
+    <CopyrightViewDialog
+      copyrightId={viewingCopyrightId}
+      open={viewDialogOpen}
+      setOpen={setViewDialogOpen}
+      setViewingCopyrightId={setViewingCopyrightId}
+    />
+    <Dialog open={updateCommentDialogOpen} onOpenChange={setUpdateCommentDialogOpen}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Request Corrections</DialogTitle>
+          <DialogDescription>
+            Provide feedback explaining what changes are required for verification.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <Textarea
+            placeholder="Explain what corrections need to be made..."
+            value={updateComment}
+            onChange={(e) => setUpdateComment(e.target.value)}
+            className="min-h-[100px]"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setUpdateCommentDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirmUpdateComment}>Submit Request</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </>
   );
 }

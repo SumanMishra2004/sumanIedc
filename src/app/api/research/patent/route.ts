@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { PatentStatus, TeacherStatus, UserRole } from '@prisma/client'
+import { patentSchema } from '@/lib/validations/patent'
 
 // GET - List all patents with filtering, pagination, and search
 export async function GET(req: NextRequest) {
@@ -157,7 +158,15 @@ export async function POST(request: Request) {
       )
     }
 
+    // Validate using Zod schema
     const body = await request.json()
+    const validation = patentSchema.safeParse(body)
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message, details: validation.error.issues },
+        { status: 400 }
+      )
+    }
 
     const {
       title,
@@ -175,46 +184,9 @@ export async function POST(request: Request) {
       patentLink,
       isPublic,
       keywords,
-      studentAuthorIds = [],
-      facultyAuthorIds = []
-    } = body
-
-    /* -------------------- Basic validation -------------------- */
-    if (!title || typeof title !== "string") {
-      return NextResponse.json(
-        { error: "Title is required" },
-        { status: 400 }
-      )
-    }
-
-    if (!Array.isArray(facultyAuthorIds) || facultyAuthorIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one faculty author is required" },
-        { status: 400 }
-      )
-    }
-    // Assuming student authors are not mandatory as per generic logic found in book-chapter but we handle it similarly
-
-    if (keywords && !Array.isArray(keywords)) {
-      return NextResponse.json(
-        { error: "Keywords must be an array of strings" },
-        { status: 400 }
-      )
-    }
-
-    if (patentStatus && !Object.values(PatentStatus).includes(patentStatus)) {
-      return NextResponse.json(
-        { error: "Invalid patent status" },
-        { status: 400 }
-      )
-    }
-
-    if (teacherStatus && !Object.values(TeacherStatus).includes(teacherStatus)) {
-      return NextResponse.json(
-        { error: "Invalid teacher status" },
-        { status: 400 }
-      )
-    }
+      studentAuthorIds,
+      facultyAuthorIds,
+    } = validation.data
 
     /* -------------------- Validate faculty authors -------------------- */
     const facultyAuthors = await prisma.user.findMany({
@@ -290,6 +262,23 @@ export async function POST(request: Request) {
         }
       }
     })
+
+    // Trigger Notifications for faculty co-authors
+    for (const faculty of facultyAuthors) {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: faculty.id,
+            title: "New Patent Co-Authored",
+            message: `A new patent submission '${patent.title}' has been uploaded and lists you as co-author.`,
+            type: "PATENT_SUBMITTED",
+            link: `/dashboard/patent?id=${patent.id}`,
+          }
+        })
+      } catch (err) {
+        console.error("Failed to notify faculty co-author:", err)
+      }
+    }
 
     return NextResponse.json(
       { patent },

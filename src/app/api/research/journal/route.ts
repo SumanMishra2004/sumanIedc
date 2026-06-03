@@ -385,7 +385,7 @@ export async function POST(request: Request) {
             title: "Co-authored Publication Submitted",
             message: `A new co-authored publication '${journal.title}' has been submitted for review.`,
             type: "JOURNAL_SUBMITTED",
-            link: `/dashboard/journal`,
+            link: `/dashboard/journal?id=${journal.id}`,
           },
         })
       } catch (err) {

@@ -73,6 +73,30 @@ model User {
   bio                 String?
   department          String?
   phone               String?
+
+  // --- NEW FIELDS ---
+  // Common
+  coverImage        String?
+  institution       String?
+  linkedinLink      String?
+  skills            String[] 
+
+  // Student-specific
+  enrollmentNo      String?
+  degree            String?
+  currentYear       String?
+  currentSemester   String?
+  graduationYear    String?
+  resumeLink        String?
+  portfolioLink     String?
+  githubLink        String?
+  researchInterests String[]
+
+  // Faculty-specific
+  designation       String?
+  yearsOfExperience String?
+  areasOfExpertise  String[]
+  orcidId           String?
   studentBookChapters BookChapterStudentAuthor[] @relation("studentAuthors")
   facultyBookChapters BookChapterTeacherAuthor[] @relation("facultyAuthors")
   certification       Certificate[]              @relation("userCertificates")
@@ -151,6 +175,7 @@ model Copyright {
   copyrightStatus  CopyrightStatus          @default(SUBMITTED)
   teacherStatus    TeacherStatus            @default(UPLOADED)
   isPublic         Boolean                  @default(false)
+  updateComment    String?
   createdAt        DateTime                 @default(now()) @map("created_at")
   updatedAt        DateTime                 @updatedAt @map("updated_at")
   studentAuthors   CopyrightStudentAuthor[] @relation("studentCopyrightAuthors")
@@ -249,6 +274,7 @@ model Patent {
   patentStatus    PatentStatus          @default(SUBMITTED)
   createdAt       DateTime              @default(now()) @map("created_at")
   updatedAt       DateTime              @updatedAt @map("updated_at")
+  updateComment   String?
   studentAuthors  PatentStudentAuthor[] @relation("studentPatentAuthors")
   facultyAuthors  PatentTeacherAuthor[] @relation("facultyPatentAuthors")
   grantMappings   GrantInMapping[]
@@ -404,6 +430,8 @@ model Certificate {
   userId           String   @map("user_id")
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
+  certificateStatus CertificateStatus @default(SUBMITTED)
+  updateComment     String?
   user             User     @relation("userCertificates", fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -584,3 +612,10 @@ model Notification {
 
   @@map("notifications")
 }
+
+enum CertificateStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+}
+

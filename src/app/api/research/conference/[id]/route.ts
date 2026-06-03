@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { ConferenceStatus, TeacherStatus, UserRole, ConferenceMode } from '@prisma/client'
+import { UserRole, TeacherStatus, ConferenceStatus, ConferenceMode } from '@prisma/client'
+import { conferenceSchema } from '@/lib/validations/conference'
 
 // GET - Get single conference by ID
 export async function GET(
@@ -22,7 +23,8 @@ export async function GET(
                 id: true,
                 name: true,
                 email: true,
-                image: true
+                image: true,
+                department: true,
               }
             }
           }
@@ -34,7 +36,8 @@ export async function GET(
                 id: true,
                 name: true,
                 email: true,
-                image: true
+                image: true,
+                department: true,
               }
             }
           }
@@ -88,7 +91,7 @@ export async function GET(
   }
 }
 
-// PATCH - Update conference
+// PATCH - Update conference with validation, transitions and notifications
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -105,30 +108,14 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-    const {
-      conferenceName,
-      paperName,
-      abstract,
-      imageUrl,
-      documentUrl,
-      conferenceStatus,
-      teacherStatus,
-      mode,
-      registrationFees,
-      reimbursement,
-      isPublic,
-      keywords,
-      paperDoi,
-      paperLink,
-      conferenceDate,
-      conferencePublisher,
-      studentAuthorIds,
-      facultyAuthorIds
-    } = body
 
-    // Check if conference exists
+    // 1. Fetch existing record
     const existingConference = await prisma.conference.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        studentAuthors: true,
+        facultyAuthors: true,
+      }
     })
 
     if (!existingConference) {
@@ -138,49 +125,221 @@ export async function PATCH(
       )
     }
 
-    // Update conference
-    const updateData: any = {}
-    if (conferenceName !== undefined) updateData.conferenceName = conferenceName
-    if (paperName !== undefined) updateData.paperName = paperName
-    if (abstract !== undefined) updateData.abstract = abstract
-    if (imageUrl !== undefined) updateData.imageUrl = imageUrl
-    if (documentUrl !== undefined) updateData.documentUrl = documentUrl
-    if (conferenceStatus !== undefined) updateData.conferenceStatus = conferenceStatus
-    if (teacherStatus !== undefined) updateData.teacherStatus = teacherStatus
-    if (mode !== undefined) updateData.mode = mode
-    if (registrationFees !== undefined) updateData.registrationFees = parseFloat(registrationFees)
-    if (reimbursement !== undefined) updateData.reimbursement = parseFloat(reimbursement)
-    if (isPublic !== undefined) updateData.isPublic = isPublic
-    if (keywords !== undefined) updateData.keywords = keywords
-    if (paperDoi !== undefined) updateData.paperDoi = paperDoi
-    if (paperLink !== undefined) updateData.paperLink = paperLink
-    if (conferenceDate !== undefined) updateData.conferenceDate = conferenceDate ? new Date(conferenceDate) : null
-    if (conferencePublisher !== undefined) updateData.conferencePublisher = conferencePublisher
+    const userRole = session.user.role
+    const userId = session.user.id
 
-    // Update authors if provided
-    if (studentAuthorIds !== undefined) {
-      // Delete existing student authors
-      await prisma.conferenceStudentAuthor.deleteMany({
-        where: { conferenceId: id }
-      })
-      // Create new student authors
-      updateData.studentAuthors = {
-        create: (studentAuthorIds || []).map((userId: string) => ({
-          userId
-        }))
+    // 2. Validate role-based permissions
+    if (userRole === UserRole.STUDENT) {
+      const isAuthor = existingConference.studentAuthors.some(
+        (sa) => sa.userId === userId
+      )
+      if (!isAuthor) {
+        return NextResponse.json(
+          { error: "Unauthorized - You can only edit your own conferences" },
+          { status: 403 }
+        )
+      }
+
+      // Lock checking
+      const isLocked =
+        existingConference.conferenceStatus === ConferenceStatus.PUBLISHED ||
+        existingConference.teacherStatus === TeacherStatus.ACCEPTED ||
+        existingConference.teacherStatus === TeacherStatus.REJECTED ||
+        existingConference.teacherStatus === TeacherStatus.PUBLISHED
+
+      if (isLocked) {
+        return NextResponse.json(
+          { error: "This conference is locked and cannot be edited by students" },
+          { status: 403 }
+        )
+      }
+
+      // Prevent student modifying status or visibility directly
+      delete body.conferenceStatus
+      delete body.teacherStatus
+      delete body.isPublic
+    } else if (userRole === UserRole.FACULTY) {
+      const isAssigned = existingConference.facultyAuthors.some(
+        (fa) => fa.userId === userId
+      )
+      if (!isAssigned) {
+        return NextResponse.json(
+          { error: "Unauthorized - You are not assigned to review this conference" },
+          { status: 403 }
+        )
+      }
+
+      if (body.isPublic === true) {
+        return NextResponse.json(
+          { error: "Unauthorized - Faculty cannot make conferences public" },
+          { status: 403 }
+        )
+      }
+    } else if (userRole !== UserRole.ADMIN) {
+      return NextResponse.json(
+        { error: "Unauthorized - Invalid user role" },
+        { status: 403 }
+      )
+    }
+
+    // 3. Enforce status transition validation
+    const currentConfStatus = existingConference.conferenceStatus
+    const currentTeacherStatus = existingConference.teacherStatus
+
+    const newConfStatus = body.conferenceStatus as ConferenceStatus | undefined
+    const newTeacherStatus = body.teacherStatus as TeacherStatus | undefined
+
+    if (newConfStatus && newConfStatus !== currentConfStatus) {
+      if (newConfStatus === ConferenceStatus.PUBLISHED && userRole !== UserRole.ADMIN) {
+        return NextResponse.json(
+          { error: "Only administrators can publish conferences" },
+          { status: 403 }
+        )
+      }
+      if (currentConfStatus === ConferenceStatus.PUBLISHED) {
+        return NextResponse.json(
+          { error: "Cannot modify status of a published conference" },
+          { status: 400 }
+        )
       }
     }
 
-    if (facultyAuthorIds !== undefined) {
-      // Delete existing faculty authors
-      await prisma.conferenceTeacherAuthor.deleteMany({
-        where: { conferenceId: id }
+    if (newTeacherStatus && newTeacherStatus !== currentTeacherStatus) {
+      if (currentTeacherStatus === TeacherStatus.REJECTED && newTeacherStatus === TeacherStatus.ACCEPTED) {
+        return NextResponse.json(
+          { error: "Cannot transition status from REJECTED to ACCEPTED" },
+          { status: 400 }
+        )
+      }
+      if (currentTeacherStatus === TeacherStatus.PUBLISHED) {
+        if (newTeacherStatus === TeacherStatus.UPDATE || newTeacherStatus === TeacherStatus.ACCEPTED) {
+          return NextResponse.json(
+            { error: `Cannot transition from PUBLISHED to ${newTeacherStatus}` },
+            { status: 400 }
+          )
+        }
+      }
+      if (currentTeacherStatus === TeacherStatus.REJECTED) {
+        return NextResponse.json(
+          { error: "This conference is rejected and locked" },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Automated transitions
+    if (userRole === UserRole.STUDENT && currentTeacherStatus === TeacherStatus.UPDATE) {
+      body.teacherStatus = TeacherStatus.UPLOADED
+      body.updateComment = null
+    }
+
+    if (newTeacherStatus === TeacherStatus.ACCEPTED) {
+      body.conferenceStatus = ConferenceStatus.UNDER_REVIEW
+    }
+
+    if (newConfStatus === ConferenceStatus.PUBLISHED) {
+      body.isPublic = true
+      body.teacherStatus = TeacherStatus.PUBLISHED
+    }
+
+    // 4. Validate merged data using schema
+    const mergedData = {
+      conferenceName: body.conferenceName !== undefined ? body.conferenceName : existingConference.conferenceName,
+      paperName: body.paperName !== undefined ? body.paperName : existingConference.paperName,
+      abstract: body.abstract !== undefined ? body.abstract : existingConference.abstract,
+      imageUrl: body.imageUrl !== undefined ? body.imageUrl : existingConference.imageUrl,
+      documentUrl: body.documentUrl !== undefined ? body.documentUrl : existingConference.documentUrl,
+      conferenceStatus: body.conferenceStatus !== undefined ? body.conferenceStatus : existingConference.conferenceStatus,
+      teacherStatus: body.teacherStatus !== undefined ? body.teacherStatus : existingConference.teacherStatus,
+      mode: body.mode !== undefined ? body.mode : existingConference.mode,
+      registrationFees: body.registrationFees !== undefined ? (body.registrationFees ? parseFloat(body.registrationFees) : null) : existingConference.registrationFees,
+      reimbursement: body.reimbursement !== undefined ? (body.reimbursement ? parseFloat(body.reimbursement) : null) : existingConference.reimbursement,
+      isPublic: body.isPublic !== undefined ? body.isPublic : existingConference.isPublic,
+      keywords: body.keywords !== undefined ? body.keywords : existingConference.keywords,
+      paperDoi: body.paperDoi !== undefined ? body.paperDoi : existingConference.paperDoi,
+      paperLink: body.paperLink !== undefined ? body.paperLink : existingConference.paperLink,
+      conferenceDate: body.conferenceDate !== undefined ? body.conferenceDate : existingConference.conferenceDate,
+      conferencePublisher: body.conferencePublisher !== undefined ? body.conferencePublisher : existingConference.conferencePublisher,
+      studentAuthorIds: body.studentAuthorIds !== undefined ? body.studentAuthorIds : existingConference.studentAuthors.map((sa) => sa.userId),
+      facultyAuthorIds: body.facultyAuthorIds !== undefined ? body.facultyAuthorIds : existingConference.facultyAuthors.map((fa) => fa.userId),
+      updateComment: body.updateComment !== undefined ? body.updateComment : null,
+    }
+
+    const validationResult = conferenceSchema.safeParse(mergedData)
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: validationResult.error.issues[0].message, details: validationResult.error.issues },
+        { status: 400 }
+      )
+    }
+
+    // Validate Author ID constraints
+    if (body.studentAuthorIds) {
+      const validStudents = await prisma.user.findMany({
+        where: { id: { in: body.studentAuthorIds }, role: UserRole.STUDENT }
       })
-      // Create new faculty authors
+      if (validStudents.length !== body.studentAuthorIds.length) {
+        return NextResponse.json({ error: "One or more student authors are invalid" }, { status: 400 })
+      }
+      if (userRole === UserRole.STUDENT && !body.studentAuthorIds.includes(userId)) {
+        return NextResponse.json({ error: "You must remain listed as an author on your own publication" }, { status: 400 })
+      }
+    }
+
+    if (body.facultyAuthorIds) {
+      const validFaculty = await prisma.user.findMany({
+        where: { id: { in: body.facultyAuthorIds }, role: UserRole.FACULTY }
+      })
+      if (validFaculty.length !== body.facultyAuthorIds.length) {
+        return NextResponse.json({ error: "One or more faculty authors are invalid" }, { status: 400 })
+      }
+    }
+
+    // 5. Update Database Record
+    const updateData: any = {}
+    const directFields = [
+      "conferenceName",
+      "paperName",
+      "abstract",
+      "imageUrl",
+      "documentUrl",
+      "conferenceStatus",
+      "teacherStatus",
+      "mode",
+      "isPublic",
+      "keywords",
+      "paperDoi",
+      "paperLink",
+      "conferencePublisher",
+    ]
+
+    for (const field of directFields) {
+      if (body[field] !== undefined) {
+        updateData[field] = body[field]
+      }
+    }
+
+    if (body.conferenceDate !== undefined) {
+      updateData.conferenceDate = body.conferenceDate ? new Date(body.conferenceDate) : null
+    }
+    if (body.registrationFees !== undefined) {
+      updateData.registrationFees = body.registrationFees ? parseFloat(body.registrationFees) : null
+    }
+    if (body.reimbursement !== undefined) {
+      updateData.reimbursement = body.reimbursement ? parseFloat(body.reimbursement) : null
+    }
+
+    if (body.studentAuthorIds !== undefined) {
+      await prisma.conferenceStudentAuthor.deleteMany({ where: { conferenceId: id } })
+      updateData.studentAuthors = {
+        create: body.studentAuthorIds.map((uId: string) => ({ userId: uId }))
+      }
+    }
+
+    if (body.facultyAuthorIds !== undefined) {
+      await prisma.conferenceTeacherAuthor.deleteMany({ where: { conferenceId: id } })
       updateData.facultyAuthors = {
-        create: (facultyAuthorIds || []).map((userId: string) => ({
-          userId
-        }))
+        create: body.facultyAuthorIds.map((uId: string) => ({ userId: uId }))
       }
     }
 
@@ -190,28 +349,110 @@ export async function PATCH(
       include: {
         studentAuthors: {
           include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
+            user: { select: { id: true, name: true, email: true } }
           }
         },
         facultyAuthors: {
           include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
+            user: { select: { id: true, name: true, email: true } }
           }
         }
       }
     })
+
+    // 6. Notifications System Dispatch
+    const studentUserIds = conference.studentAuthors.map((sa) => sa.userId)
+    const facultyUserIds = conference.facultyAuthors.map((fa) => fa.userId)
+
+    const notifyUser = async (uId: string, title: string, message: string, type: string) => {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: uId,
+            title,
+            message,
+            type,
+            link: `/dashboard/conferences?id=${id}`,
+          }
+        })
+      } catch (err) {
+        console.error("Failed to create notification for user", uId, err)
+      }
+    }
+
+    if (newTeacherStatus && newTeacherStatus !== currentTeacherStatus) {
+      if (newTeacherStatus === TeacherStatus.ACCEPTED) {
+        for (const sId of studentUserIds) {
+          await notifyUser(
+            sId,
+            "Conference Approved by Faculty",
+            `Your conference '${conference.conferenceName}' has been accepted by the faculty reviewer.`,
+            "CONFERENCE_APPROVED"
+          )
+        }
+        // Notify Admins
+        const admins = await prisma.user.findMany({
+          where: { role: UserRole.ADMIN },
+          select: { id: true }
+        })
+        for (const admin of admins) {
+          await notifyUser(
+            admin.id,
+            "Conference Ready for Publication",
+            `The conference '${conference.conferenceName}' has been approved by the reviewer and is ready for final publication.`,
+            "CONFERENCE_APPROVED"
+          )
+        }
+      } else if (newTeacherStatus === TeacherStatus.UPDATE) {
+        for (const sId of studentUserIds) {
+          await notifyUser(
+            sId,
+            "Revision Requested for Conference",
+            `The reviewer requested corrections for '${conference.conferenceName}'. Reason: ${body.updateComment || "Please view details."}`,
+            "CONFERENCE_UPDATE_REQUESTED"
+          )
+        }
+      } else if (newTeacherStatus === TeacherStatus.REJECTED) {
+        for (const sId of studentUserIds) {
+          await notifyUser(
+            sId,
+            "Conference Rejected",
+            `Your conference '${conference.conferenceName}' was rejected by the reviewer.`,
+            "CONFERENCE_REJECTED"
+          )
+        }
+      } else if (newTeacherStatus === TeacherStatus.UPLOADED) {
+        for (const fId of facultyUserIds) {
+          await notifyUser(
+            fId,
+            "Conference Resubmitted for Review",
+            `A co-authored conference '${conference.conferenceName}' has been resubmitted for review.`,
+            "CONFERENCE_SUBMITTED"
+          )
+        }
+      }
+    }
+
+    if (newConfStatus && newConfStatus !== currentConfStatus) {
+      if (newConfStatus === ConferenceStatus.PUBLISHED) {
+        for (const sId of studentUserIds) {
+          await notifyUser(
+            sId,
+            "Conference Published!",
+            `Your conference '${conference.conferenceName}' has been successfully verified and published by the administrator.`,
+            "CONFERENCE_PUBLISHED"
+          )
+        }
+        for (const fId of facultyUserIds) {
+          await notifyUser(
+            fId,
+            "Conference Published!",
+            `The co-authored conference '${conference.conferenceName}' has been successfully published.`,
+            "CONFERENCE_PUBLISHED"
+          )
+        }
+      }
+    }
 
     return NextResponse.json({ conference })
   } catch (error) {
@@ -237,6 +478,29 @@ export async function DELETE(
         { error: 'Unauthorized' },
         { status: 403 }
       )
+    }
+
+    const conference = await prisma.conference.findUnique({
+      where: { id },
+      include: { facultyAuthors: true }
+    })
+
+    if (!conference) {
+      return NextResponse.json(
+        { error: 'Conference not found' },
+        { status: 404 }
+      )
+    }
+
+    // Faculty author deletion checks
+    if (session.user.role === UserRole.FACULTY) {
+      const isAssigned = conference.facultyAuthors.some((fa) => fa.userId === session.user.id)
+      if (!isAssigned) {
+        return NextResponse.json(
+          { error: 'Unauthorized - You can only delete conferences you are assigned to' },
+          { status: 403 }
+        )
+      }
     }
 
     await prisma.conference.delete({

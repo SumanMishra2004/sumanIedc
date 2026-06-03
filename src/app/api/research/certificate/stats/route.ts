@@ -1,7 +1,6 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { UserRole } from "@prisma/client";
+import { UserRole, CertificateStatus } from "@prisma/client";
 import { auth } from "@/lib/auth";
 
 // GET - Get statistics for certificates
@@ -25,7 +24,6 @@ export async function GET(req: NextRequest) {
     }
 
     // Build filter based on user role
-    // Consistent with BookChapter: Users see what they have access to.
     const roleFilter: any =
       user.role === UserRole.ADMIN
         ? {} // Admin sees all
@@ -36,75 +34,79 @@ export async function GET(req: NextRequest) {
             ],
           };
 
-    // Get counts by public/private status
-    const publicStatusCounts = await prisma.certificate.groupBy({
-      by: ["isPublic"],
-      where: roleFilter,
-      _count: {
-        id: true,
-      },
-    });
-
     // Calculate totals
     const total = await prisma.certificate.count({ where: roleFilter });
     
-    // Calculate specific counts based on the user's perspective
-    // For Admin: All Public, All Private
-    // For User: All Public + My Private
-    
     const publicCount = await prisma.certificate.count({
-        where: {
-            AND: [roleFilter, { isPublic: true }]
-        }
+      where: {
+        AND: [roleFilter, { isPublic: true }]
+      }
     });
 
     const privateCount = await prisma.certificate.count({
-        where: {
-            AND: [roleFilter, { isPublic: false }]
-        }
+      where: {
+        AND: [roleFilter, { isPublic: false }]
+      }
     });
     
-    // My Certificates (regardless of public status) - Useful for dashboard
-    const myCertificatesCount = await prisma.certificate.count({
-        where: { userId: user.id }
+    // Get counts by certificateStatus
+    const certificateStatusCounts = await prisma.certificate.groupBy({
+      by: ['certificateStatus'],
+      where: roleFilter,
+      _count: {
+        id: true
+      }
     });
 
-    // Calcluate trending data (Last 12 months)
+    const formattedStatusCounts = certificateStatusCounts.reduce((acc, curr) => {
+      acc[curr.certificateStatus] = curr._count.id;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // My Certificates (regardless of public status) - Useful for dashboard
+    const myCertificatesCount = await prisma.certificate.count({
+      where: { userId: user.id }
+    });
+
+    // Calculate trending data (Last 12 months)
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
     const certificateForTrend = await prisma.certificate.findMany({
-        where: {
-            ...roleFilter,
-            createdAt: {
-                gte: oneYearAgo
-            }
-        },
-        select: {
-            createdAt: true
+      where: {
+        ...roleFilter,
+        createdAt: {
+          gte: oneYearAgo
         }
+      },
+      select: {
+        createdAt: true
+      }
     });
 
     const monthWiseCounts = certificateForTrend.reduce((acc: { month: string, count: number }[], cert) => {
-        const monthYear = `${cert.createdAt.getFullYear()}-${String(cert.createdAt.getMonth() + 1).padStart(2, '0')}`;
-        const existing = acc.find(item => item.month === monthYear);
-        if (existing) {
-            existing.count++;
-        } else {
-            acc.push({ month: monthYear, count: 1 });
-        }
-        return acc;
+      const monthYear = `${cert.createdAt.getFullYear()}-${String(cert.createdAt.getMonth() + 1).padStart(2, '0')}`;
+      const existing = acc.find(item => item.month === monthYear);
+      if (existing) {
+        existing.count++;
+      } else {
+        acc.push({ month: monthYear, count: 1 });
+      }
+      return acc;
     }, []);
 
     // Sort by month
     monthWiseCounts.sort((a, b) => a.month.localeCompare(b.month));
 
     return NextResponse.json({
-        total,
-        publicCount,
-        privateCount,
-        monthWiseCounts,
-        myCertificates: myCertificatesCount
+      total,
+      publicCount,
+      privateCount,
+      submitted: formattedStatusCounts[CertificateStatus.SUBMITTED] || 0,
+      underReview: formattedStatusCounts[CertificateStatus.UNDER_REVIEW] || 0,
+      approved: formattedStatusCounts[CertificateStatus.APPROVED] || 0,
+      monthWiseCounts,
+      myCertificates: myCertificatesCount
     });
 
   } catch (error) {

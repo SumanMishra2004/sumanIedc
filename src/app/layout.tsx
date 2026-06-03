@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/providers/auth-provider";
 import LenisProvider from "@/providers/lenis-provider";
+import { ThemeProvider } from "@/providers/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import ConditionalNavbar from "@/components/home/ConditionalNavbar";
 
@@ -31,12 +32,20 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>
-          <LenisProvider>
-            <ConditionalNavbar>{children}</ConditionalNavbar>
-          </LenisProvider>
-        </AuthProvider>
-        <Toaster />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          disableTransitionOnChange={false}
+          storageKey="iedc-theme"
+        >
+          <AuthProvider>
+            <LenisProvider>
+              <ConditionalNavbar>{children}</ConditionalNavbar>
+            </LenisProvider>
+          </AuthProvider>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

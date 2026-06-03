@@ -301,7 +301,7 @@ export async function POST(request: Request) {
             title: "New Book Chapter Co-Authored",
             message: `A new book chapter submission '${bookChapter.title}' has been uploaded and lists you as co-author.`,
             type: "BOOK_CHAPTER_SUBMITTED",
-            link: `/dashboard/book-chapters`,
+            link: `/dashboard/book-chapters?id=${bookChapter.id}`,
           }
         })
       } catch (err) {

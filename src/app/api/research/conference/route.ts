@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { ConferenceStatus, TeacherStatus, UserRole, ConferenceMode } from '@prisma/client'
+import { conferenceSchema } from '@/lib/validations/conference'
 
 // GET - List all conferences with filtering, pagination, and search
 export async function GET(req: NextRequest) {
@@ -190,6 +191,15 @@ export async function POST(request: Request) {
 
     const body = await request.json()
 
+    // Validate using Zod schema
+    const validation = conferenceSchema.safeParse(body)
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message, details: validation.error.issues },
+        { status: 400 }
+      )
+    }
+
     const {
       conferenceName,
       paperName,
@@ -207,62 +217,11 @@ export async function POST(request: Request) {
       paperLink,
       conferenceDate,
       conferencePublisher,
-      studentAuthorIds = [],
-      facultyAuthorIds = []
-    } = body
-
-    /* -------------------- Basic validation -------------------- */
-    // According to model, conferenceName is required.
-    if (!conferenceName || typeof conferenceName !== "string") {
-      return NextResponse.json(
-        { error: "Conference Name is required" },
-        { status: 400 }
-      )
-    }
-
-    if (!Array.isArray(facultyAuthorIds) || facultyAuthorIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one faculty author is required" },
-        { status: 400 }
-      )
-    }
-    if (!Array.isArray(studentAuthorIds) || studentAuthorIds.length === 0) {
-      return NextResponse.json(
-        { error: "At least one student author is required" },
-        { status: 400 }
-      )
-    }
-
-    if (keywords && !Array.isArray(keywords)) {
-      return NextResponse.json(
-        { error: "Keywords must be an array of strings" },
-        { status: 400 }
-      )
-    }
-
-    if (conferenceStatus && !Object.values(ConferenceStatus).includes(conferenceStatus)) {
-      return NextResponse.json(
-        { error: "Invalid conference status" },
-        { status: 400 }
-      )
-    }
-
-    if (teacherStatus && !Object.values(TeacherStatus).includes(teacherStatus)) {
-      return NextResponse.json(
-        { error: "Invalid teacher status" },
-        { status: 400 }
-      )
-    }
-
-    if (mode && !Object.values(ConferenceMode).includes(mode)) {
-      return NextResponse.json(
-        { error: "Invalid conference mode" },
-        { status: 400 }
-      )
-    }
+      studentAuthorIds,
+      facultyAuthorIds
+    } = validation.data
 
     /* -------------------- Validate faculty authors -------------------- */
-
     const facultyAuthors = await prisma.user.findMany({
       where: {
         id: { in: facultyAuthorIds },
@@ -277,26 +236,22 @@ export async function POST(request: Request) {
       )
     }
 
-    /* -------------------- Validate student authors (optional) -------------------- */
-
-    if (studentAuthorIds.length > 0) {
-      const studentAuthors = await prisma.user.findMany({
-        where: {
-          id: { in: studentAuthorIds },
-          role: UserRole.STUDENT
-        }
-      })
-
-      if (studentAuthors.length !== studentAuthorIds.length) {
-        return NextResponse.json(
-          { error: "One or more student authors are invalid" },
-          { status: 400 }
-        )
+    /* -------------------- Validate student authors -------------------- */
+    const studentAuthors = await prisma.user.findMany({
+      where: {
+        id: { in: studentAuthorIds },
+        role: UserRole.STUDENT
       }
+    })
+
+    if (studentAuthors.length !== studentAuthorIds.length) {
+      return NextResponse.json(
+        { error: "One or more student authors are invalid" },
+        { status: 400 }
+      )
     }
 
     /* -------------------- Create Conference -------------------- */
-
     const conference = await prisma.conference.create({
       data: {
         conferenceName,
@@ -306,33 +261,26 @@ export async function POST(request: Request) {
         documentUrl,
         conferenceStatus: conferenceStatus ?? ConferenceStatus.SUBMITTED,
         teacherStatus: teacherStatus ?? TeacherStatus.UPLOADED,
-        mode: mode ?? ConferenceMode.OFFLINE, // Default per schema? Schema says OFFLINE default
-        registrationFees:
-          registrationFees !== undefined ? Number(registrationFees) : null,
-        reimbursement:
-          reimbursement !== undefined ? Number(reimbursement) : null,
-        isPublic: Boolean(isPublic),
+        mode: mode ?? ConferenceMode.OFFLINE,
+        registrationFees,
+        reimbursement,
+        isPublic,
         keywords: keywords ?? [],
         paperDoi,
         paperLink,
-        conferenceDate: conferenceDate
-          ? new Date(conferenceDate)
-          : null,
+        conferenceDate: conferenceDate ? new Date(conferenceDate) : null,
         conferencePublisher,
-
         studentAuthors: {
           create: studentAuthorIds.map((userId: string) => ({
             userId
           }))
         },
-
         facultyAuthors: {
           create: facultyAuthorIds.map((userId: string) => ({
             userId
           }))
         }
       },
-
       include: {
         studentAuthors: {
           include: { user: true }
@@ -342,6 +290,23 @@ export async function POST(request: Request) {
         }
       }
     })
+
+    // Trigger Notifications for faculty co-authors
+    for (const faculty of facultyAuthors) {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: faculty.id,
+            title: "New Conference Co-Authored",
+            message: `A new conference submission '${conference.conferenceName}' has been uploaded and lists you as co-author.`,
+            type: "CONFERENCE_SUBMITTED",
+            link: `/dashboard/conferences?id=${conference.id}`,
+          }
+        })
+      } catch (err) {
+        console.error("Failed to notify faculty co-author:", err)
+      }
+    }
 
     return NextResponse.json(
       { conference },

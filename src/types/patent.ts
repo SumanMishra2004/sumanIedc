@@ -35,6 +35,7 @@ export interface Patent {
   updatedAt: Date | string
   studentAuthors: PatentAuthor[]
   facultyAuthors: PatentAuthor[]
+  updateComment: string | null
 }
 
 export interface PatentListResponse {
@@ -76,20 +77,24 @@ export interface PatentFilters {
 export interface CreatePatentInput {
   title: string
   keywords: string[]
-  grantedPatentNo?: string
-  abstract?: string
-  imageUrl?: string
-  documentUrl?: string
-  filingDate?: string
-  submissionDate?: string
-  publicationDate?: string
-  grantDate?: string
-  applicationNo?: string
+  grantedPatentNo?: string | null
+  abstract?: string | null
+  imageUrl?: string | null
+  documentUrl?: string | null
+  filingDate?: string | null
+  submissionDate?: string | null
+  publicationDate?: string | null
+  grantDate?: string | null
+  applicationNo?: string | null
   isPublic?: boolean
-  patentLink?: string
+  patentLink?: string | null
   patentStatus?: PatentStatus
+  teacherStatus?: TeacherStatus
   studentAuthors?: string[] // Application User IDs
   facultyAuthors?: string[] // Application User IDs
+  studentAuthorIds?: string[]
+  facultyAuthorIds?: string[]
+  updateComment?: string | null
 }
 
 export type UpdatePatentInput = Partial<CreatePatentInput>

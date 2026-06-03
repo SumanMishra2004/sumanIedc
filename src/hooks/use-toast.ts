@@ -4,7 +4,7 @@ export const useToast = () => {
   return {
     toast: ({ title, description, variant }: { 
       title: string
-      description: string
+      description?: string
       variant?: "default" | "destructive"
     }) => {
       if (variant === "destructive") {

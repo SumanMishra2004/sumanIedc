@@ -285,7 +285,8 @@ export const updateCopyrightStatus = async (
  */
 export const updateCopyrightTeacherStatus = async (
   id: string,
-  teacherStatus: string
+  teacherStatus: string,
+  updateComment?: string
 ): Promise<ApiResponse<{ copyright: Copyright }>> => {
-  return updateCopyright(id, { teacherStatus: teacherStatus as any })
+  return updateCopyright(id, { teacherStatus: teacherStatus as any, updateComment })
 }

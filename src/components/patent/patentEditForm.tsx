@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Loader2, Upload, X } from "lucide-react";
+import {
+  Loader2, Upload, X, Lightbulb, FileText,
+  Users, Tag, Calendar, ChevronRight, CheckCircle2,
+  Clock, Globe, Link as LinkIcon, MessageSquare
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -26,45 +29,14 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { MultiSelectUsers } from "@/components/ui/multi-select";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import { uploadFile } from "@/lib/appwrite";
+import { patentSchema } from "@/lib/validations/patent";
 import { getPatentById, updatePatent } from "@/lib/research/patentApi";
-import Image from "next/image";
-
-
-const patentSchema = z.object({
-  title: z.string().min(1, "Title is required").max(200, "Title is too long"),
-  abstract: z.string().optional(),
-  imageUrl: z.string().optional(),
-  documentUrl: z.string().nullable().optional(),
-  patentStatus: z.enum([
-    "SUBMITTED",
-    "UNDER_REVIEW",
-    "APPROVED",
-    "GRANTED",
-  ]),
-  applicationNo: z.string().nullable().optional(),
-  grantedPatentNo: z.string().nullable().optional(),
-  patentLink: z.string().url("Invalid URL").optional().or(z.literal("")),
-  isPublic: z.boolean(),
-  keywords: z.array(z.string()).min(1, "At least 1 keyword is required").max(10, "No more than 10 keywords are allowed"),
-  filingDate: z.string().nullable().optional(),
-  submissionDate: z.string().nullable().optional(),
-  publicationDate: z.string().nullable().optional(),
-  grantDate: z.string().nullable().optional(),
-  studentAuthorIds: z.array(z.string()),
-  facultyAuthorIds: z.array(z.string()),
-});
+import { MultiSelectUsers } from "@/components/ui/multi-select";
 
 type PatentFormValues = z.infer<typeof patentSchema>;
 
@@ -73,6 +45,180 @@ interface SelectedUser {
   name: string;
   email: string;
   image?: string;
+}
+
+interface Patent {
+  id: string;
+  title: string;
+  abstract?: string | null;
+  imageUrl?: string | null;
+  documentUrl?: string | null;
+  patentStatus: "SUBMITTED" | "UNDER_REVIEW" | "APPROVED" | "GRANTED";
+  teacherStatus: "UPLOADED" | "ACCEPTED" | "UPDATE" | "REJECTED" | "PUBLISHED";
+  applicationNo?: string | null;
+  grantedPatentNo?: string | null;
+  patentLink?: string | null;
+  isPublic: boolean;
+  keywords: string[];
+  filingDate?: string | Date | null;
+  submissionDate?: string | Date | null;
+  publicationDate?: string | Date | null;
+  grantDate?: string | Date | null;
+  updateComment?: string | null;
+  facultyAuthors?: Array<{
+    id: string;
+    user: { id: string; name: string | null; email: string | null; image?: string | null };
+  }>;
+  studentAuthors?: Array<{
+    id: string;
+    user: { id: string; name: string | null; email: string | null; image?: string | null };
+  }>;
+}
+
+const STATUS_OPTIONS = [
+  {
+    value: "SUBMITTED",
+    label: "Submitted",
+    icon: Upload,
+    color: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800",
+    activeRing: "ring-blue-400",
+  },
+  {
+    value: "UNDER_REVIEW",
+    label: "Under Review",
+    icon: Clock,
+    color: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800",
+    activeRing: "ring-amber-400",
+  },
+  {
+    value: "APPROVED",
+    label: "Approved",
+    icon: CheckCircle2,
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800",
+    activeRing: "ring-emerald-400",
+  },
+  {
+    value: "GRANTED",
+    label: "Granted",
+    icon: Lightbulb,
+    color: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-400 dark:border-purple-800",
+    activeRing: "ring-purple-400",
+  },
+] as const;
+
+function SectionHeader({
+  icon: Icon,
+  title,
+  accent,
+}: {
+  icon: React.ElementType;
+  title: string;
+  accent: string;
+}) {
+  return (
+    <div className="flex items-center gap-3 mb-5">
+      <div className={cn("flex items-center justify-center w-8 h-8 rounded-lg shrink-0", accent)}>
+        <Icon className="w-4 h-4" />
+      </div>
+      <h3 className="text-xs font-semibold text-muted-foreground tracking-widest uppercase">
+        {title}
+      </h3>
+    </div>
+  );
+}
+
+function RequiredDot() {
+  return <span className="text-rose-500 ml-0.5 text-xs leading-none">*</span>;
+}
+
+interface UploadZoneProps {
+  label: string;
+  hint: string;
+  uploading: boolean;
+  fileName?: string;
+  hasValue: boolean;
+  existingLabel?: string;
+  onTrigger: () => void;
+  onRemove: () => void;
+  error?: string;
+}
+
+function UploadZone({
+  label, hint, uploading, fileName, hasValue, existingLabel, onTrigger, onRemove, error,
+}: UploadZoneProps) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={!uploading ? onTrigger : undefined}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          if (!uploading) onTrigger();
+        }
+      }}
+      className={cn(
+        "relative border-2 border-dashed rounded-xl p-5 transition-all duration-200 cursor-pointer outline-none",
+        "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        fileName
+          ? "border-primary/40 bg-primary/5"
+          : hasValue
+          ? "border-emerald-400/50 bg-emerald-50/50 dark:bg-emerald-950/20"
+          : "border-border hover:border-primary/50 hover:bg-muted/30",
+        error && "border-destructive/50 bg-destructive/5",
+        uploading && "cursor-not-allowed opacity-70",
+      )}
+    >
+      {uploading ? (
+        <div className="flex flex-col items-center gap-2 py-1">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <p className="text-xs text-muted-foreground font-medium">Uploading…</p>
+        </div>
+      ) : fileName ? (
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <FileText className="w-4 h-4 text-primary" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{fileName}</p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">Ready to upload ✓</p>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
+            className="w-7 h-7 rounded-full bg-muted hover:bg-destructive/10 hover:text-destructive flex items-center justify-center transition-colors shrink-0"
+            aria-label="Remove file"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : hasValue ? (
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">
+              {existingLabel ?? "File on record"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Click to replace
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-2.5 py-1">
+          <div className="w-10 h-10 rounded-xl bg-muted/80 flex items-center justify-center">
+            <Upload className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-medium text-foreground">{label}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function EditPatentDialog({
@@ -87,27 +233,34 @@ export default function EditPatentDialog({
   onSuccess?: () => void;
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [patent, setPatent] = useState<Patent | null>(null);
   const [keywordInput, setKeywordInput] = useState("");
 
+  // Files
   const [imageFile, setImageFile] = useState<File | null>(null);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
 
-
+  // Authors
   const [selectedFaculty, setSelectedFaculty] = useState<SelectedUser[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<SelectedUser[]>([]);
 
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const documentInputRef = useRef<HTMLInputElement>(null);
+
   const form = useForm<PatentFormValues>({
-    resolver: zodResolver(patentSchema),
+    resolver: zodResolver(patentSchema) as any,
     defaultValues: {
       title: "",
       abstract: "",
       imageUrl: "",
-      documentUrl: null,
+      documentUrl: "",
       patentStatus: "SUBMITTED",
-      applicationNo: "",
+      teacherStatus: "UPLOADED",
       grantedPatentNo: "",
+      applicationNo: "",
       patentLink: "",
       isPublic: false,
       keywords: [],
@@ -120,150 +273,155 @@ export default function EditPatentDialog({
     },
   });
 
+  const loadPatentData = useCallback(async () => {
+    if (!patentId) return;
+    setIsLoading(true);
+    try {
+      const result = await getPatentById(patentId);
+      if (result.error || !result.data) {
+        toast.error(result.error || "Failed to fetch patent details");
+        onOpenChange(false);
+        return;
+      }
+
+      const pat: Patent = result.data.patent;
+      setPatent(pat);
+
+      const formatDate = (date: any) => {
+        if (!date) return "";
+        return new Date(date).toISOString().split('T')[0];
+      };
+
+      form.reset({
+        title: pat.title,
+        abstract: pat.abstract || "",
+        imageUrl: pat.imageUrl || "",
+        documentUrl: pat.documentUrl || "",
+        patentStatus: pat.patentStatus,
+        teacherStatus: pat.teacherStatus,
+        grantedPatentNo: pat.grantedPatentNo || "",
+        applicationNo: pat.applicationNo || "",
+        patentLink: pat.patentLink || "",
+        isPublic: pat.isPublic,
+        keywords: pat.keywords || [],
+        filingDate: pat.filingDate ? formatDate(pat.filingDate) : null,
+        submissionDate: pat.submissionDate ? formatDate(pat.submissionDate) : null,
+        publicationDate: pat.publicationDate ? formatDate(pat.publicationDate) : null,
+        grantDate: pat.grantDate ? formatDate(pat.grantDate) : null,
+        facultyAuthorIds: pat.facultyAuthors?.map((a) => a.user.id) || [],
+        studentAuthorIds: pat.studentAuthors?.map((a) => a.user.id) || [],
+      });
+
+      if (pat.facultyAuthors) {
+        setSelectedFaculty(
+          pat.facultyAuthors.map((a) => ({
+            id: a.user.id,
+            name: a.user.name || "",
+            email: a.user.email || "",
+            image: a.user.image || undefined,
+          }))
+        );
+      }
+
+      if (pat.studentAuthors) {
+        setSelectedStudents(
+          pat.studentAuthors.map((a) => ({
+            id: a.user.id,
+            name: a.user.name || "",
+            email: a.user.email || "",
+            image: a.user.image || undefined,
+          }))
+        );
+      }
+    } catch {
+      toast.error("Failed to load patent");
+      onOpenChange(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [patentId, form, onOpenChange]);
+
   useEffect(() => {
     if (open && patentId) {
-      const fetchData = async () => {
-        setLoading(true);
-        try {
-          const result = await getPatentById(patentId);
-          if (result.error || !result.data) {
-            toast.error(result.error || "Failed to fetch patent details");
-            onOpenChange(false);
-            return;
-          }
-
-          const patent = result.data.patent;
-
-          // Helper to format date for input type="date"
-          const formatDate = (date: any) => {
-            if (!date) return "";
-            return new Date(date).toISOString().split('T')[0];
-          };
-
-          form.reset({
-            title: patent.title,
-            abstract: patent.abstract || "",
-            imageUrl: patent.imageUrl || "",
-            documentUrl: patent.documentUrl,
-            patentStatus: patent.patentStatus as any,
-            applicationNo: patent.applicationNo || "",
-            grantedPatentNo: patent.grantedPatentNo || "",
-            patentLink: patent.patentLink || "",
-            isPublic: patent.isPublic,
-            keywords: patent.keywords,
-            filingDate: formatDate(patent.filingDate),
-            submissionDate: formatDate(patent.submissionDate),
-            publicationDate: formatDate(patent.publicationDate),
-            grantDate: formatDate(patent.grantDate),
-            studentAuthorIds: patent.studentAuthors.map(a => a.user.id),
-            facultyAuthorIds: patent.facultyAuthors.map(a => a.user.id),
-          });
-
-          setSelectedFaculty(patent.facultyAuthors.map(a => ({
-             id: a.user.id,
-             name: a.user.name || "",
-             email: a.user.email || "",
-             image: a.user.image || undefined
-          })));
-          
-          setSelectedStudents(patent.studentAuthors.map(a => ({
-             id: a.user.id,
-             name: a.user.name || "",
-             email: a.user.email || "",
-             image: a.user.image || undefined
-          })));
-
-        } catch {
-          toast.error("Failed to load patent");
-
-          onOpenChange(false);
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchData();
+      const id = window.setTimeout(() => void loadPatentData(), 0);
+      return () => window.clearTimeout(id);
     }
-  }, [open, patentId, form, onOpenChange]);
+  }, [open, patentId, loadPatentData]);
 
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
+      toast.error("Please upload a valid image file (JPG, PNG, WebP)");
+      e.target.value = "";
       return;
     }
-
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB");
+      toast.error("Image must be smaller than 5 MB");
+      e.target.value = "";
       return;
     }
-
     setImageFile(file);
     setUploadingImage(true);
-
     try {
-      const imageUrl = await uploadFile(file);
-      form.setValue("imageUrl", imageUrl);
-      toast.success("Image uploaded successfully");
+      const url = await uploadFile(file);
+      form.setValue("imageUrl", url, { shouldValidate: true });
+      toast.success("Cover image updated");
     } catch {
-      toast.error("Failed to upload image");
+      toast.error("Image upload failed — please try again");
       setImageFile(null);
     } finally {
       setUploadingImage(false);
+      e.target.value = "";
     }
-  };
+  }, [form]);
 
-  const handleDocumentUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleDocumentChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Document size should be less than 10MB");
+      toast.error("Document must be smaller than 10 MB");
+      e.target.value = "";
       return;
     }
-
+    setDocumentFile(file);
     setUploadingDocument(true);
-
     try {
-      const documentUrl = await uploadFile(file);
-      form.setValue("documentUrl", documentUrl);
-      toast.success("Document uploaded successfully");
+      const url = await uploadFile(file);
+      form.setValue("documentUrl", url, { shouldValidate: true });
+      toast.success("Document updated");
     } catch {
-      toast.error("Failed to upload document");
+      toast.error("Document upload failed — please try again");
+      setDocumentFile(null);
     } finally {
       setUploadingDocument(false);
+      e.target.value = "";
     }
-  };
+  }, [form]);
 
-  const handleKeywordAdd = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const keyword = keywordInput.trim();
-      if (keyword && !form.getValues("keywords").includes(keyword)) {
-        const currentKeywords = form.getValues("keywords");
-        if (currentKeywords.length >= 10) {
-          toast.error("Maximum 10 keywords allowed");
-          return;
-        }
-        form.setValue("keywords", [...currentKeywords, keyword]);
-        setKeywordInput("");
+  const addKeyword = useCallback(() => {
+    const kw = keywordInput.trim();
+    if (!kw) return;
+    const current = form.getValues("keywords") || [];
+    if (!current.includes(kw)) {
+      if (current.length >= 10) {
+        toast.error("At most 10 keywords are allowed");
+        return;
       }
+      form.setValue("keywords", [...current, kw], { shouldValidate: true });
     }
-  };
+    setKeywordInput("");
+  }, [keywordInput, form]);
 
-  const removeKeyword = (keywordToRemove: string) => {
-    const currentKeywords = form.getValues("keywords");
+  const removeKeyword = useCallback((kw: string) => {
     form.setValue(
       "keywords",
-      currentKeywords.filter((k) => k !== keywordToRemove),
+      (form.getValues("keywords") || []).filter((k) => k !== kw),
+      { shouldValidate: true }
     );
-  };
+  }, [form]);
 
-  async function onSubmit(data: PatentFormValues) {
+  const onSubmit = async (data: PatentFormValues) => {
     if (!patentId) return;
     setIsSubmitting(true);
     try {
@@ -272,13 +430,13 @@ export default function EditPatentDialog({
         abstract: data.abstract || undefined,
         imageUrl: data.imageUrl || undefined,
         documentUrl: data.documentUrl || undefined,
-        applicationNo: data.applicationNo || undefined,
         grantedPatentNo: data.grantedPatentNo || undefined,
+        applicationNo: data.applicationNo || undefined,
         patentLink: data.patentLink || undefined,
-        filingDate: data.filingDate || undefined,
-        submissionDate: data.submissionDate || undefined,
-        publicationDate: data.publicationDate || undefined,
-        grantDate: data.grantDate || undefined,
+        filingDate: data.filingDate ? new Date(data.filingDate).toISOString() : undefined,
+        submissionDate: data.submissionDate ? new Date(data.submissionDate).toISOString() : undefined,
+        publicationDate: data.publicationDate ? new Date(data.publicationDate).toISOString() : undefined,
+        grantDate: data.grantDate ? new Date(data.grantDate).toISOString() : undefined,
       });
 
       if (response.error) {
@@ -286,118 +444,133 @@ export default function EditPatentDialog({
         return;
       }
 
-      toast.success("Patent updated successfully");
-      onSuccess?.();
+      toast.success("Patent updated successfully!");
       onOpenChange(false);
-    } catch {
-      toast.error("Something went wrong");
+      onSuccess?.();
+    } catch (error: any) {
+      toast.error("Failed to update patent");
     } finally {
       setIsSubmitting(false);
     }
-  }
+  };
+
+  const currentStatusValue = useWatch({ control: form.control, name: "patentStatus" });
+  const keywords = useWatch({ control: form.control, name: "keywords" }) ?? [];
+  const currentStatus = STATUS_OPTIONS.find((s) => s.value === currentStatusValue);
+  const StatusIcon = currentStatus?.icon ?? Lightbulb;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[90vh] p-0 overflow-hidden flex flex-col">
+    <>
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        aria-hidden
+        tabIndex={-1}
+        onChange={handleImageChange}
+      />
+      <input
+        ref={documentInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx"
+        className="sr-only"
+        aria-hidden
+        tabIndex={-1}
+        onChange={handleDocumentChange}
+      />
 
-        <DialogHeader className="px-6 py-4 border-b shrink-0 bg-background z-10">
-          <DialogTitle>Edit Patent</DialogTitle>
-          <DialogDescription>
-             Update the details of your patent.
-          </DialogDescription>
-        </DialogHeader>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className="max-w-4xl max-h-[92dvh] p-0 gap-0 overflow-hidden rounded-2xl border border-border/60 shadow-2xl"
+          onInteractOutside={(e) => {
+            if (isSubmitting) e.preventDefault();
+          }}
+        >
+          {/* Header */}
+          <div className="px-6 sm:px-8 pt-6 pb-5 border-b bg-gradient-to-br from-background via-background to-muted/30 shrink-0">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                  <Lightbulb className="w-4 h-4 text-primary-foreground" />
+                </div>
+                <div className="min-w-0">
+                  <DialogTitle className="text-lg font-semibold tracking-tight leading-tight">
+                    Edit Patent details
+                  </DialogTitle>
+                  <DialogDescription className="text-sm text-muted-foreground mt-0.5">
+                    Update the registered information of your patent entry
+                  </DialogDescription>
+                </div>
+              </div>
 
-        {loading ? (
-            <div className="flex items-center justify-center flex-1">
-                <Loader2 className="h-8 w-8 animate-spin" />
+              {!isLoading && currentStatus && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-xs font-medium px-2.5 py-1 gap-1.5 shrink-0 hidden sm:flex items-center",
+                    currentStatus.color
+                  )}
+                >
+                  <StatusIcon className="w-3 h-3" />
+                  {currentStatus.label}
+                </Badge>
+              )}
             </div>
-        ) : (
-        <ScrollArea className="flex-1 w-full min-h-0">
-          <div className="px-6 py-6">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <div className="flex flex-col gap-6">
-                  {/* Basic Information */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Basic Information</h3>
-                    <Separator />
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          </div>
+
+          {/* Body */}
+          {isLoading ? (
+            <div className="flex items-center justify-center h-96">
+              <div className="text-center space-y-3">
+                <Loader2 className="w-10 h-10 animate-spin mx-auto text-primary" />
+                <p className="text-sm text-muted-foreground">Loading patent details…</p>
+              </div>
+            </div>
+          ) : (
+            <ScrollArea className="flex-1 h-[calc(92dvh-160px)]">
+              <Form {...form}>
+                <form
+                  onSubmit={form.handleSubmit(onSubmit)}
+                  className="px-6 sm:px-8 py-7 space-y-8"
+                  noValidate
+                >
+                  {/* Revision comment banner */}
+                  {patent?.updateComment && (
+                    <div className="flex items-start gap-3 p-4 rounded-xl border border-amber-200 bg-amber-50/80 dark:bg-amber-950/30 dark:border-amber-800">
+                      <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide mb-1">
+                          Revision requested by reviewer
+                        </p>
+                        <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed whitespace-pre-wrap">
+                          {patent.updateComment}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ① Basic Information */}
+                  <section>
+                    <SectionHeader
+                      icon={FileText}
+                      title="Basic Information"
+                      accent="bg-primary/10 text-primary"
+                    />
+                    <div className="space-y-5">
                       <FormField
                         control={form.control}
                         name="title"
                         render={({ field }) => (
-                          <FormItem className="col-span-1 md:col-span-2">
-                            <FormLabel>Title *</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Patent Title" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="patentStatus"
-                        render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Status *</FormLabel>
-                            <Select
-                              onValueChange={field.onChange}
-                              defaultValue={field.value}
-                            >
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select status" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="SUBMITTED">Submitted</SelectItem>
-                                <SelectItem value="UNDER_REVIEW">Under Review</SelectItem>
-                                <SelectItem value="APPROVED">Approved</SelectItem>
-                                <SelectItem value="GRANTED">Granted</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                          control={form.control}
-                          name="isPublic"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
-                              <div className="space-y-0.5">
-                                <FormLabel>Public Visibility</FormLabel>
-                                <FormDescription>
-                                  Make this patent visible to everyone
-                                </FormDescription>
-                              </div>
-                              <FormControl>
-                                <Switch
-                                  checked={field.value}
-                                  onCheckedChange={field.onChange}
-                                />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                    </div>
-
-                    <div className="gap-4">
-                      <FormField
-                        control={form.control}
-                        name="abstract"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Abstract</FormLabel>
+                            <FormLabel className="text-sm font-medium">
+                              Patent Title <RequiredDot />
+                            </FormLabel>
                             <FormControl>
-                              <Textarea
-                                placeholder="Patent Abstract"
-                                className="min-h-25"
-
+                              <Input
+                                placeholder="e.g. Adaptive edge-cloud dynamic virtualization"
+                                className="h-10 text-sm rounded-lg"
+                                autoComplete="off"
                                 {...field}
                               />
                             </FormControl>
@@ -405,26 +578,114 @@ export default function EditPatentDialog({
                           </FormItem>
                         )}
                       />
+
+                      <FormField
+                        control={form.control}
+                        name="abstract"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">
+                              Abstract
+                            </FormLabel>
+                            <FormControl>
+                              <Textarea
+                                placeholder="Provide a concise summary of the patent abstract…"
+                                className="min-h-28 text-sm rounded-lg resize-none"
+                                {...field}
+                                value={field.value ?? ""}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="keywords"
+                        render={() => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">
+                              Keywords <RequiredDot />
+                            </FormLabel>
+                            <FormControl>
+                              <div className="space-y-2.5">
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="Type a keyword and press Enter"
+                                    value={keywordInput}
+                                    onChange={(e) => setKeywordInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        addKeyword();
+                                      }
+                                    }}
+                                    className="h-10 text-sm rounded-lg flex-1"
+                                  />
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={addKeyword}
+                                    className="h-10 px-4 rounded-lg font-medium shrink-0"
+                                  >
+                                    Add
+                                  </Button>
+                                </div>
+                                {keywords.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {keywords.map((kw) => (
+                                      <Badge
+                                        key={kw}
+                                        variant="secondary"
+                                        className="gap-1.5 pl-2.5 pr-1.5 py-1 text-xs font-medium rounded-full"
+                                      >
+                                        <Tag className="w-2.5 h-2.5 opacity-50 shrink-0" />
+                                        <span>{kw}</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => removeKeyword(kw)}
+                                          className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-foreground/15 transition-colors ml-0.5"
+                                          aria-label={`Remove keyword ${kw}`}
+                                        >
+                                          <X className="w-2.5 h-2.5" />
+                                        </button>
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-                  </div>
+                  </section>
 
-                  {/* Patent Details */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Patent Details</h3>
-                    <Separator />
+                  <Separator />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* ② Patent Details */}
+                  <section>
+                    <SectionHeader
+                      icon={Globe}
+                      title="Patent Details"
+                      accent="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <FormField
                         control={form.control}
                         name="applicationNo"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Application No.</FormLabel>
+                            <FormLabel className="text-sm font-medium">Application No.</FormLabel>
                             <FormControl>
-                              <Input 
-                                placeholder="Application Number" 
-                                {...field} 
-                                value={field.value || ""} 
+                              <Input
+                                placeholder="Application number"
+                                className="h-10 rounded-lg text-sm"
+                                {...field}
+                                value={field.value ?? ""}
                               />
                             </FormControl>
                             <FormMessage />
@@ -437,176 +698,175 @@ export default function EditPatentDialog({
                         name="grantedPatentNo"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Granted Patent No.</FormLabel>
+                            <FormLabel className="text-sm font-medium">
+                              Granted Patent No. {currentStatusValue === "GRANTED" && <RequiredDot />}
+                            </FormLabel>
                             <FormControl>
-                              <Input 
-                                placeholder="Granted Patent Number" 
-                                {...field} 
-                                value={field.value || ""} 
+                              <Input
+                                placeholder="Patent grant number"
+                                className="h-10 rounded-lg text-sm"
+                                {...field}
+                                value={field.value ?? ""}
                               />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                      
+
                       <FormField
                         control={form.control}
                         name="patentLink"
                         render={({ field }) => (
-                          <FormItem className="col-span-1 md:col-span-2">
-                            <FormLabel>Patent Link (URL)</FormLabel>
+                          <FormItem className="sm:col-span-2">
+                            <FormLabel className="text-sm font-medium">Patent Link (URL)</FormLabel>
                             <FormControl>
-                              <Input 
-                                placeholder="https://..." 
-                                {...field} 
-                                value={field.value || ""} 
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                            control={form.control}
-                            name="filingDate"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Filing Date</FormLabel>
-                                <FormControl>
-                                <Input type="date" {...field} value={field.value || ""} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                         <FormField
-                            control={form.control}
-                            name="submissionDate"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Submission Date</FormLabel>
-                                <FormControl>
-                                <Input type="date" {...field} value={field.value || ""} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="publicationDate"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Publication Date</FormLabel>
-                                <FormControl>
-                                <Input type="date" {...field} value={field.value || ""} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                         <FormField
-                            control={form.control}
-                            name="grantDate"
-                            render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Grant Date</FormLabel>
-                                <FormControl>
-                                <Input type="date" {...field} value={field.value || ""} />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                            )}
-                        />
-                    </div>
-                  
-
-                  {/* Taxonomy */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Taxonomy</h3>
-                    <Separator />
-
-                    <div className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="keywords"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Keywords *</FormLabel>
-                            <FormControl>
-                              <div className="flex flex-col gap-2">
-                                <div className="flex gap-2">
-                                  <Input
-                                    placeholder="Type keyword and press Enter"
-                                    value={keywordInput}
-                                    onChange={(e) => setKeywordInput(e.target.value)}
-                                    onKeyDown={handleKeywordAdd}
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => {
-                                      if (keywordInput.trim()) {
-                                        const event = {
-                                          key: "Enter",
-                                          preventDefault: () => {},
-                                        } as any;
-                                        handleKeywordAdd(event);
-                                      }
-                                    }}
-                                  >
-                                    Add
-                                  </Button>
-                                </div>
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                  {field.value.map((keyword, index) => (
-                                    <Badge key={index} variant="secondary">
-                                      {keyword}
-                                      <button
-                                        type="button"
-                                        className="ml-1 hover:text-destructive"
-                                        onClick={() => removeKeyword(keyword)}
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </Badge>
-                                  ))}
-                                </div>
+                              <div className="relative">
+                                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
+                                <Input
+                                  placeholder="Patent url"
+                                  className="h-10 rounded-lg text-sm pl-8"
+                                  {...field}
+                                  value={field.value ?? ""}
+                                />
                               </div>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
+
+                      <FormField
+                        control={form.control}
+                        name="filingDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">Filing Date</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                className="h-10 rounded-lg text-sm"
+                                {...field}
+                                value={
+                                  field.value instanceof Date
+                                    ? field.value.toISOString().split("T")[0]
+                                    : (field.value ?? "")
+                                }
+                                onChange={(e) => field.onChange(e.target.value || null)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="submissionDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">Submission Date</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                className="h-10 rounded-lg text-sm"
+                                {...field}
+                                value={
+                                  field.value instanceof Date
+                                    ? field.value.toISOString().split("T")[0]
+                                    : (field.value ?? "")
+                                }
+                                onChange={(e) => field.onChange(e.target.value || null)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="publicationDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">Publication Date</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                className="h-10 rounded-lg text-sm"
+                                {...field}
+                                value={
+                                  field.value instanceof Date
+                                    ? field.value.toISOString().split("T")[0]
+                                    : (field.value ?? "")
+                                }
+                                onChange={(e) => field.onChange(e.target.value || null)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="grantDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">
+                              Grant Date {currentStatusValue === "GRANTED" && <RequiredDot />}
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                className="h-10 rounded-lg text-sm"
+                                {...field}
+                                value={
+                                  field.value instanceof Date
+                                    ? field.value.toISOString().split("T")[0]
+                                    : (field.value ?? "")
+                                }
+                                onChange={(e) => field.onChange(e.target.value || null)}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
                     </div>
-                  </div>
+                  </section>
 
-                  {/* Authors */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Authors</h3>
-                    <Separator />
+                  <Separator />
 
-                    <div className="grid grid-cols-1 gap-4">
+                  {/* ③ Authors & Status */}
+                  <section className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:gap-8">
+                    {/* Authors */}
+                    <div className="lg:col-span-3 space-y-5">
+                      <SectionHeader
+                        icon={Users}
+                        title="Authors"
+                        accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                      />
                       <FormField
                         control={form.control}
                         name="facultyAuthorIds"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Faculty Authors</FormLabel>
+                            <FormLabel className="text-sm font-medium">
+                              Faculty Authors <RequiredDot />
+                            </FormLabel>
+                            <FormDescription className="text-xs text-muted-foreground">
+                              Faculty inventors listed on registration
+                            </FormDescription>
                             <FormControl>
                               <MultiSelectUsers
-                            
                                 isStudent={false}
                                 value={selectedFaculty}
                                 onChange={(users) => {
                                   setSelectedFaculty(users);
                                   field.onChange(users.map((u) => u.id));
                                 }}
-                                />
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -618,150 +878,206 @@ export default function EditPatentDialog({
                         name="studentAuthorIds"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Student Authors</FormLabel>
+                            <FormLabel className="text-sm font-medium">
+                              Student Authors
+                            </FormLabel>
+                            <FormDescription className="text-xs text-muted-foreground">
+                              Student inventors listed on registration
+                            </FormDescription>
                             <FormControl>
                               <MultiSelectUsers
-                              
                                 isStudent={true}
                                 value={selectedStudents}
                                 onChange={(users) => {
                                   setSelectedStudents(users);
                                   field.onChange(users.map((u) => u.id));
                                 }}
-                                />
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </div>
-                  </div>
 
-                  {/* Files */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Files & Media</h3>
-                    <Separator />
+                    {/* Status & Visibility */}
+                    <div className="lg:col-span-2 space-y-5">
+                      <SectionHeader
+                        icon={ChevronRight}
+                        title="Status & Visibility"
+                        accent="bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                      />
 
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-  <div className="relative w-full h-64 rounded-md overflow-hidden border">
+                      <FormField
+                        control={form.control}
+                        name="patentStatus"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">
+                              Status <RequiredDot />
+                            </FormLabel>
+                            <div className="grid grid-cols-2 gap-2 mt-1.5">
+                              {STATUS_OPTIONS.map((s) => {
+                                const Icon = s.icon;
+                                const isActive = field.value === s.value;
+                                return (
+                                  <button
+                                    key={s.value}
+                                    type="button"
+                                    onClick={() => field.onChange(s.value)}
+                                    className={cn(
+                                      "flex items-center gap-2 text-xs font-medium px-3 py-2.5 rounded-lg border transition-all text-left",
+                                      isActive
+                                        ? cn(s.color, "ring-1 ring-inset", s.activeRing)
+                                        : "border-border hover:bg-muted/60 text-muted-foreground bg-transparent"
+                                    )}
+                                  >
+                                    <Icon className="w-3.5 h-3.5 shrink-0" />
+                                    {s.label}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
-    {/* ✅ If file is uploaded */}
-    {imageFile ? (
-      imageFile.type.startsWith("image/") ? (
-        // ✅ Image Preview
-        <Image
-          src={URL.createObjectURL(imageFile)}
-          alt="Preview"
-          fill
-          className="object-cover"
-        />
-      ) : imageFile.type === "application/pdf" ? (
-        // ✅ PDF Preview
-        <iframe
-          src={URL.createObjectURL(imageFile)}
-          title="PDF Preview"
-          className="w-full h-full"
-        />
-      ) : (
-        <p className="text-sm text-center p-4">
-          Unsupported file type
-        </p>
-      )
-
-    ) : form.getValues("imageUrl") ? (
-      // ✅ If no file, show existing URL image
-      <Image
-        src={form.getValues("imageUrl")!}
-        alt="Patent Image"
-        fill
-        className="object-cover"
-      />
-    ) : (
-      // ✅ No file, no URL
-      <p className="text-sm text-gray-500 text-center p-4">
-        No preview available
-      </p>
-    )}
-  </div>
-</div>
-
-
-                     
-                        <div className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-muted/50 transition-colors">
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            id="image-upload"
-                            onChange={handleImageUpload}
-                            disabled={uploadingImage}
-                          />
-                          <label
-                            htmlFor="image-upload"
-                            className="cursor-pointer flex flex-col items-center gap-2"
-                          >
-                            {uploadingImage ? (
-                              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                            ) : (
-                                <>
-                                 <Upload className="h-8 w-8 text-muted-foreground" />
-                                 <span className="text-sm text-muted-foreground">Change Image</span>
-                                </>
-                            )}
-                          </label>
-                        </div>
-                    
-
-                      <div className="space-y-2">
-                         <FormLabel>Document (PDF)</FormLabel>
-                         {form.getValues('documentUrl') && (
-                             <div className="mb-2 text-sm text-blue-600">
-                                 <a href={form.getValues('documentUrl')!} target="_blank" rel="noopener noreferrer">View Current Document</a>
-                             </div>
-                         )}
-                        <div className="border-2 border-dashed rounded-lg p-4 text-center hover:bg-muted/50 transition-colors">
-                          <Input
-                            type="file"
-                            accept=".pdf,.doc,.docx"
-                            className="hidden"
-                            id="document-upload"
-                            onChange={handleDocumentUpload}
-                            disabled={uploadingDocument}
-                          />
-                          <label
-                            htmlFor="document-upload"
-                            className="cursor-pointer flex flex-col items-center gap-2"
-                          >
-                            {uploadingDocument ? (
-                              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                            ) : (
-                                <>
-                                 <Upload className="h-8 w-8 text-muted-foreground" />
-                                 <span className="text-sm text-muted-foreground">Change Document</span>
-                                </>
-                            )}
-                          </label>
-                        </div>
-                      </div>
+                      <FormField
+                        control={form.control}
+                        name="isPublic"
+                        render={({ field }) => (
+                          <FormItem>
+                            <div className="flex items-center justify-between p-3.5 rounded-xl bg-muted/40 border border-border/50 hover:bg-muted/60 transition-colors">
+                              <div>
+                                <p className="text-sm font-medium leading-tight">Make Public</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  Visible to everyone in directory
+                                </p>
+                              </div>
+                              <FormControl>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                  aria-label="Make patent public"
+                                />
+                              </FormControl>
+                            </div>
+                          </FormItem>
+                        )}
+                      />
                     </div>
+                  </section>
+
+                  <Separator />
+
+                  {/* ④ Attachments */}
+                  <section>
+                    <SectionHeader
+                      icon={Upload}
+                      title="Attachments"
+                      accent="bg-purple-500/10 text-purple-600 dark:text-purple-400"
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Cover image */}
+                      <FormField
+                        control={form.control}
+                        name="imageUrl"
+                        render={({ field, fieldState }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">
+                              Patent Cover Image / Artwork
+                            </FormLabel>
+                            <FormControl>
+                              <UploadZone
+                                label="Upload cover image"
+                                hint="JPG or PNG · max 5 MB"
+                                uploading={uploadingImage}
+                                fileName={imageFile?.name}
+                                hasValue={!!field.value}
+                                existingLabel="Cover image on file"
+                                onTrigger={() => imageInputRef.current?.click()}
+                                onRemove={() => {
+                                  setImageFile(null);
+                                  form.setValue("imageUrl", "", { shouldValidate: true });
+                                }}
+                                error={fieldState.error?.message}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Document */}
+                      <FormField
+                        control={form.control}
+                        name="documentUrl"
+                        render={({ field, fieldState }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm font-medium">
+                              Patent Manuscript / Proof File
+                            </FormLabel>
+                            <FormControl>
+                              <UploadZone
+                                label="Upload manuscript"
+                                hint="PDF, DOC, DOCX · max 10 MB"
+                                uploading={uploadingDocument}
+                                fileName={documentFile?.name}
+                                hasValue={!!field.value}
+                                existingLabel="Patent document on file"
+                                onTrigger={() => documentInputRef.current?.click()}
+                                onRemove={() => {
+                                  setDocumentFile(null);
+                                  form.setValue("documentUrl", "", { shouldValidate: true });
+                                }}
+                                error={fieldState.error?.message}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </section>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-end gap-2.5 pt-3 border-t">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-10 px-5 rounded-lg text-sm"
+                      onClick={() => onOpenChange(false)}
+                      disabled={isSubmitting}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      className="h-10 px-6 rounded-lg text-sm font-semibold gap-2 min-w-36"
+                      disabled={isSubmitting || uploadingImage || uploadingDocument}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Saving…
+                        </>
+                      ) : (
+                        <>
+                          <Lightbulb className="w-3.5 h-3.5" />
+                          Update Patent
+                        </>
+                      )}
+                    </Button>
                   </div>
-               
-              </form>
-            </Form>
-          </div>
-        </ScrollArea>
-        )}
-        
-        <div className="p-6 border-t bg-background mt-auto flex justify-end gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={form.handleSubmit(onSubmit)} disabled={isSubmitting || loading}>
-             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-             Update Patent
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+                </form>
+              </Form>
+            </ScrollArea>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

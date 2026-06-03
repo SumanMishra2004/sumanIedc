@@ -1,4 +1,4 @@
-import { UserRole } from "@prisma/client"
+import { UserRole, CertificateStatus, TeacherStatus } from "@prisma/client"
 
 export interface User {
   id: string
@@ -21,6 +21,8 @@ export interface Certificate {
   user: User
   createdAt: Date | string
   updatedAt: Date | string
+  certificateStatus: CertificateStatus
+  updateComment: string | null
 }
 
 export interface CertificateListResponse {
@@ -41,34 +43,46 @@ export interface CertificateFilters {
   isPublic?: boolean
   page?: number
   limit?: number
+  certificateStatus?: CertificateStatus
+  sortBy?: string
+  sortOrder?: "asc" | "desc"
+  dateOfCompletionFrom?: string
+  dateOfCompletionTo?: string
 }
 
 export interface CreateCertificateInput {
   title: string
-  description?: string
+  description?: string | null
   keywords?: string[]
-  documentUrl?: string
-  offeredBy?: string
+  documentUrl?: string | null
+  offeredBy?: string | null
   dateOfCompletion: string | Date
-  remark?: string
+  remark?: string | null
   isPublic?: boolean
+  certificateStatus?: CertificateStatus
+  updateComment?: string | null
 }
 
 export interface UpdateCertificateInput {
   title?: string
-  description?: string
+  description?: string | null
   keywords?: string[]
-  documentUrl?: string
-  offeredBy?: string
+  documentUrl?: string | null
+  offeredBy?: string | null
   dateOfCompletion?: string | Date
-  remark?: string
+  remark?: string | null
   isPublic?: boolean
+  certificateStatus?: CertificateStatus
+  updateComment?: string | null
 }
 
 export interface CertificateStats {
   total: number
   publicCount: number
   privateCount: number
+  submitted: number
+  underReview: number
+  approved: number
   monthWiseCounts: { month: string; count: number }[]
   certificateTypeCounts?: { type: string; count: number }[]
 }

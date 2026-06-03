@@ -1,24 +1,16 @@
-import { AppSidebar } from "@/components/app-sidebar"
+import { ProfileViewer } from "@/components/profile/ProfileViewer"
 
-import { SectionCards } from "@/components/section-cards"
-import { SiteHeader } from "@/components/site-header"
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar"
+interface PageProps {
+  searchParams: Promise<{ userId?: string }>
+}
 
-export default function Page() {
+export default async function Page({ searchParams }: PageProps) {
+  const params = await searchParams
+  const userId = params.userId
+
   return (
-  
-     
-        <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-              <SectionCards />
-             
-            </div>
-          </div>
-        </div>
-     
+    <div className="px-4 md:px-6 py-6 ">
+      <ProfileViewer userId={userId} />
+    </div>
   )
 }
