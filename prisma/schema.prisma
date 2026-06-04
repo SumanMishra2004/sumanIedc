@@ -115,6 +115,7 @@ model User {
   facultyJournals     JournalTeacherAuthor[]     @relation("facultyJournalAuthors")
   sessions            Session[]
   notifications       Notification[]
+  achievements        Achievement[]              @relation("userAchievements")
 
   @@map("users")
 }
@@ -350,6 +351,7 @@ model GrantIn {
   amountGranted       Float?
   usedAmount          Float?
   isPublic            Boolean                @default(false)
+  hideFromAdmin       Boolean                @default(false)
   createdAt           DateTime               @default(now()) @map("created_at")
   updatedAt           DateTime               @updatedAt @map("updated_at")
   studentAuthors      GrantInStudentAuthor[] @relation("studentGrantInAuthors")
@@ -365,6 +367,7 @@ model GrantInBill {
   fileId      String     @unique
   fileUrl     String?
   billType    BillType   @default(OTHER)
+  customBillType String?
   isMasterPdf Boolean    @default(false)
   billStatus  BillStatus @default(PENDING)
   billDate    DateTime   @default(now())
@@ -436,20 +439,23 @@ model Certificate {
 }
 
 model FDP {
-  id          String    @id @default(cuid())
-  title       String
-  description String?
-  keywords    String[]
-  organizedBy String?
-  startDate   DateTime?
-  endDate     DateTime?
-  topic       String?
-  duration    String?
-  remark      String?
-  userId      String    @map("user_id")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  user        User      @relation("userFDPs", fields: [userId], references: [id], onDelete: Cascade)
+  id            String    @id @default(cuid())
+  title         String
+  description   String?
+  keywords      String[]
+  organizedBy   String?
+  startDate     DateTime?
+  endDate       DateTime?
+  topic         String?
+  duration      String?
+  remark        String?
+  userId        String    @map("user_id")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  isPublic      Boolean   @default(false)
+  fdpStatus     FDPStatus @default(SUBMITTED)
+  updateComment String?
+  user          User      @relation("userFDPs", fields: [userId], references: [id], onDelete: Cascade)
 }
 
 enum crdb_internal_region {
@@ -617,5 +623,53 @@ enum CertificateStatus {
   SUBMITTED
   UNDER_REVIEW
   APPROVED
+}
+
+enum FDPStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+}
+
+enum AchievementStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model Achievement {
+  id                String            @id @default(cuid())
+  title             String
+  description       String
+  category          String?           // e.g. Biotech, AI, Space Tech
+  year              String            // Year of achievement
+  imageUrl          String?           // Image upload from Appwrite
+  documentUrl       String?           // Optional proof file
+  achievementStatus AchievementStatus @default(SUBMITTED)
+  isPublic          Boolean           @default(false)
+  updateComment     String?           // Admin feedback
+  userId            String            @map("user_id")
+  user              User              @relation("userAchievements", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  @@map("achievements")
+}
+
+model Event {
+  id               String   @id @default(cuid())
+  name             String
+  posterUrl        String?  // Event poster image URL
+  registrationCost Float?   // Optional registration fees
+  description      String
+  registrationLink String
+  contactName      String
+  contactPhone     String
+  eventDate        DateTime // Date and time of event
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("events")
 }
 

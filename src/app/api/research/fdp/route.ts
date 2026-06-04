@@ -1,8 +1,8 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { UserRole } from "@prisma/client";
+import { UserRole, FDPStatus } from "@prisma/client";
+import { fdpSchema } from "@/lib/validations/fdp";
 
 // GET - List all FDPs
 export async function GET(req: NextRequest) {
@@ -23,6 +23,8 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit;
 
     const search = searchParams.get("search");
+    const fdpStatus = searchParams.get("fdpStatus") as FDPStatus | null;
+    const isPublic = searchParams.get("isPublic");
 
     const where: any = {};
     const userId = session.user.id;
@@ -47,6 +49,14 @@ export async function GET(req: NextRequest) {
         { remark: { contains: search, mode: "insensitive" } },
         { keywords: { has: search } }
       ];
+    }
+
+    if (fdpStatus) {
+      where.fdpStatus = fdpStatus;
+    }
+
+    if (isPublic !== null && isPublic !== undefined) {
+      where.isPublic = isPublic === "true";
     }
 
     const [fdps, total] = await Promise.all([
@@ -102,6 +112,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    const validation = fdpSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0].message, details: validation.error.issues },
+        { status: 400 }
+      );
+    }
+
     const {
       title,
       description,
@@ -112,14 +130,9 @@ export async function POST(req: NextRequest) {
       topic,
       duration,
       remark,
-    } = body;
-
-    if (!title || !startDate || !endDate) {
-        return NextResponse.json(
-            { error: "Title, Start Date and End Date are required" },
-            { status: 400 }
-        );
-    }
+      isPublic,
+      fdpStatus,
+    } = validation.data;
 
     const fdp = await prisma.fDP.create({
       data: {
@@ -127,11 +140,13 @@ export async function POST(req: NextRequest) {
         description,
         keywords: keywords || [],
         organizedBy,
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
         topic,
         duration,
         remark,
+        isPublic: isPublic ?? false,
+        fdpStatus: fdpStatus ?? FDPStatus.SUBMITTED,
         userId: session.user.id,
       },
     });
@@ -139,6 +154,48 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(fdp, { status: 201 });
   } catch (error) {
     console.error("Error creating FDP:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE - Bulk delete FDPs
+export async function DELETE(request: Request) {
+  try {
+    const session = await auth();
+
+    if (!session?.user || (session.user.role !== "FACULTY" && session.user.role !== "ADMIN")) {
+      return NextResponse.json(
+        { error: "Unauthorized - Faculty or Admin access required" },
+        { status: 403 }
+      );
+    }
+
+    const { ids } = await request.json();
+
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return NextResponse.json(
+        { error: "IDs array is required" },
+        { status: 400 }
+      );
+    }
+
+    const result = await prisma.fDP.deleteMany({
+      where: {
+        id: {
+          in: ids,
+        },
+      },
+    });
+
+    return NextResponse.json({
+      message: `Successfully deleted ${result.count} FDP(s)`,
+      count: result.count,
+    });
+  } catch (error) {
+    console.error("Error deleting FDPs:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

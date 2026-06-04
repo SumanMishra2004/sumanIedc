@@ -1,10 +1,10 @@
 "use client"
 
 import * as React from "react"
-import { Search, Loader2 } from "lucide-react"
+import { Search, Loader2, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 
 interface SearchUser {
   id: string
@@ -16,20 +16,27 @@ interface SearchUser {
   degree: string | null
 }
 
+const roleMeta: Record<string, { label: string; color: string }> = {
+  FACULTY: { label: "Faculty", color: "bg-violet-500/10 text-violet-400" },
+  ADMIN: { label: "Admin", color: "bg-amber-500/10 text-amber-400" },
+  STUDENT: { label: "Student", color: "bg-sky-500/10 text-sky-400" },
+}
+
 export function ProfileSearch() {
   const router = useRouter()
   const [query, setQuery] = React.useState("")
   const [results, setResults] = React.useState<SearchUser[]>([])
   const [isLoading, setIsLoading] = React.useState(false)
   const [isOpen, setIsOpen] = React.useState(false)
-  
+  const [focused, setFocused] = React.useState(false)
   const containerRef = React.useRef<HTMLDivElement>(null)
+  const inputRef = React.useRef<HTMLInputElement>(null)
 
-  // Fallback if useClickOutside hook isn't available, we use basic event listener
   React.useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false)
+        setFocused(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -38,13 +45,10 @@ export function ProfileSearch() {
 
   React.useEffect(() => {
     if (!query || query.length < 2) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults([])
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsOpen(false)
       return
     }
-
     const timer = setTimeout(async () => {
       setIsLoading(true)
       try {
@@ -59,8 +63,7 @@ export function ProfileSearch() {
       } finally {
         setIsLoading(false)
       }
-    }, 400) // 400ms debounce
-
+    }, 400)
     return () => clearTimeout(timer)
   }, [query])
 
@@ -70,61 +73,101 @@ export function ProfileSearch() {
     router.push(`/dashboard?userId=${user.id}`)
   }
 
+  const handleClear = () => {
+    setQuery("")
+    setResults([])
+    setIsOpen(false)
+    inputRef.current?.focus()
+  }
+
   return (
     <div className="relative w-full" ref={containerRef}>
-      <div className="relative">
-        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
+      <div
+        className={cn(
+          "relative flex items-center rounded-lg border transition-all duration-200",
+          focused
+            ? "border-[#c9f53b]/40 bg-sidebar-accent/40 shadow-[0_0_0_3px_rgba(201,245,59,0.08)]"
+            : "border-sidebar-border/30 bg-sidebar-accent/20 hover:border-sidebar-border/50"
+        )}
+      >
+        <Search
+          className={cn(
+            "absolute left-3 size-3.5 shrink-0 transition-colors",
+            focused ? "text-[#c9f53b]/70" : "text-sidebar-foreground/35"
+          )}
+        />
+        <input
+          ref={inputRef}
           type="text"
-          placeholder="Search profiles..."
-          className="w-full pl-9 bg-background/50 border-border/40 focus-visible:ring-1 focus-visible:ring-[#c9f53b]"
+          placeholder="Search people..."
+          className="h-8 w-full bg-transparent pl-8 pr-8 text-[13px] text-sidebar-foreground placeholder:text-sidebar-foreground/35 focus:outline-none"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => {
+            setFocused(true)
             if (results.length > 0) setIsOpen(true)
           }}
         />
-        {isLoading && (
-          <Loader2 className="absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-        )}
+        <div className="absolute right-2.5 flex items-center">
+          {isLoading && (
+            <Loader2 className="size-3.5 animate-spin text-sidebar-foreground/35" />
+          )}
+          {!isLoading && query && (
+            <button
+              onClick={handleClear}
+              className="flex size-4 items-center justify-center rounded-full bg-sidebar-foreground/20 text-sidebar-foreground/60 hover:bg-sidebar-foreground/30 transition-colors"
+            >
+              <X className="size-2.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-80 overflow-y-auto rounded-md border border-border/40 bg-card/95 backdrop-blur-md p-1 shadow-md">
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border border-sidebar-border/30 bg-sidebar shadow-xl shadow-black/20">
           {results.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              No profiles found.
+            <div className="flex items-center justify-center gap-2 p-6 text-[13px] text-sidebar-foreground/40">
+              <Search className="size-4" />
+              No results for &ldquo;{query}&rdquo;
             </div>
           ) : (
-            results.map((user) => {
-              const initials = user.name ? user.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase() : "U"
-              const primaryTag = user.role === "FACULTY" ? user.designation : user.degree
-              
-              return (
-                <button
-                  key={user.id}
-                  className="flex w-full items-center gap-3 rounded-sm px-2 py-2 text-left hover:bg-muted/50 transition-colors"
-                  onClick={() => handleSelect(user)}
-                >
-                  <Avatar className="h-8 w-8 border border-border/40">
-                    <AvatarImage src={user.image ?? ""} alt={user.name ?? "User"} />
-                    <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col flex-1 overflow-hidden">
-                    <span className="text-sm font-medium leading-none truncate">{user.name}</span>
-                    <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground truncate">
-                      <span className="capitalize">{user.role.toLowerCase()}</span>
-                      {user.department && (
-                        <>
-                          <span>•</span>
-                          <span className="truncate">{user.department}</span>
-                        </>
-                      )}
+            <div className="p-1.5">
+              <p className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-widest text-sidebar-foreground/35">
+                {results.length} result{results.length !== 1 ? "s" : ""}
+              </p>
+              {results.map((user) => {
+                const initials = user.name
+                  ? user.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
+                  : "U"
+                const meta = roleMeta[user.role] ?? { label: user.role, color: "bg-sidebar-foreground/10 text-sidebar-foreground/60" }
+
+                return (
+                  <button
+                    key={user.id}
+                    className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-sidebar-accent"
+                    onClick={() => handleSelect(user)}
+                  >
+                    <Avatar className="size-8 rounded-lg border border-sidebar-border/30">
+                      <AvatarImage src={user.image ?? ""} alt={user.name ?? "User"} />
+                      <AvatarFallback className="rounded-lg bg-sidebar-accent text-[11px] font-semibold text-sidebar-foreground/70">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-1 flex-col overflow-hidden">
+                      <span className="truncate text-[13px] font-medium text-sidebar-foreground">
+                        {user.name}
+                      </span>
+                      <span className="truncate text-[11px] text-sidebar-foreground/45">
+                        {user.department ?? "—"}
+                      </span>
                     </div>
-                  </div>
-                </button>
-              )
-            })
+                    <span className={cn("shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold", meta.color)}>
+                      {meta.label}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
           )}
         </div>
       )}

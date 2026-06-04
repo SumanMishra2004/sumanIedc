@@ -1,4 +1,4 @@
-import { UserRole } from "@prisma/client"
+import { FDPStatus } from "@prisma/client"
 
 export interface User {
   id: string
@@ -13,8 +13,8 @@ export interface FDP {
   description: string | null
   keywords: string[]
   organizedBy: string | null
-  startDate: Date | string
-  endDate: Date | string
+  startDate: Date | string | null
+  endDate: Date | string | null
   topic: string | null
   duration: string | null
   remark: string | null
@@ -22,6 +22,9 @@ export interface FDP {
   user: User
   createdAt: Date | string
   updatedAt: Date | string
+  isPublic: boolean
+  fdpStatus: FDPStatus
+  updateComment: string | null
 }
 
 export interface FDPListResponse {
@@ -42,34 +45,51 @@ export interface FDPFilters {
   topic?: string
   page?: number
   limit?: number
+  isPublic?: boolean
+  fdpStatus?: FDPStatus
+  sortBy?: string
+  sortOrder?: "asc" | "desc"
+  startDateFrom?: string
+  startDateTo?: string
+  endDateFrom?: string
+  endDateTo?: string
 }
 
 export interface CreateFDPInput {
   title: string
-  description?: string
+  description?: string | null
   keywords?: string[]
-  organizedBy?: string
-  startDate: string | Date
-  endDate: string | Date
-  topic?: string
-  duration?: string
-  remark?: string
+  organizedBy?: string | null
+  startDate: string | Date | null
+  endDate: string | Date | null
+  topic?: string | null
+  duration?: string | null
+  remark?: string | null
+  isPublic?: boolean
+  fdpStatus?: FDPStatus
+  updateComment?: string | null
 }
 
 export interface UpdateFDPInput {
   title?: string
-  description?: string
+  description?: string | null
   keywords?: string[]
-  organizedBy?: string
-  startDate?: string | Date
-  endDate?: string | Date
-  topic?: string
-  duration?: string
-  remark?: string
+  organizedBy?: string | null
+  startDate?: string | Date | null
+  endDate?: string | Date | null
+  topic?: string | null
+  duration?: string | null
+  remark?: string | null
+  isPublic?: boolean
+  fdpStatus?: FDPStatus
+  updateComment?: string | null
 }
 
 export interface FDPStats {
   total: number
+  submitted: number
+  underReview: number
+  approved: number
   monthWiseCounts: { month: string; count: number }[]
 }
 

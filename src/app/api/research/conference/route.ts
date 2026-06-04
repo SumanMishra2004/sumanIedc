@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { ConferenceStatus, TeacherStatus, UserRole, ConferenceMode } from '@prisma/client'
 import { conferenceSchema } from '@/lib/validations/conference'
-
+import { sendNotificationEmail } from '@/lib/mail'
 // GET - List all conferences with filtering, pagination, and search
 export async function GET(req: NextRequest) {
   try {
@@ -303,6 +303,18 @@ export async function POST(request: Request) {
             link: `/dashboard/conferences?id=${conference.id}`,
           }
         })
+
+        if (faculty.email) {
+          await sendNotificationEmail({
+            to: faculty.email,
+            recipientName: faculty.name || "Faculty",
+            type: "SUBMITTED",
+            resourceType: "conference",
+            resourceTitle: conference.conferenceName,
+            dashboardLink: `/dashboard/conferences?id=${conference.id}`,
+            submittedBy: session.user.name || "A team member",
+          }).catch(err => console.error("[Email] Failed to send SUBMITTED email to faculty author:", err))
+        }
       } catch (err) {
         console.error("Failed to notify faculty co-author:", err)
       }

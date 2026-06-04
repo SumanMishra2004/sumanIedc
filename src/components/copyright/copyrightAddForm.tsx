@@ -40,6 +40,8 @@ import { MultiSelectUsers } from "@/components/ui/multi-select";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { uploadFile } from "@/lib/appwrite";
+import { ImageCropModal } from "@/components/ui/ImageCropModal";
+import { useImageCrop } from "@/hooks/useImageCrop";
 
 const copyrightSchema = z.object({
   title: z.string().min(1, "Title is required").min(10, "Title is too short").max(100, "Title is too long"),
@@ -85,6 +87,7 @@ export default function CopyrightDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { cropState, openCrop, closeCrop } = useImageCrop();
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -116,33 +119,25 @@ export default function CopyrightDialog({
     },
   });
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload an image file");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB");
-      return;
-    }
-
-    setImageFile(file);
-    setUploadingImage(true);
-
-    try {
-      const imageUrl = await uploadFile(file);
-      form.setValue("imageUrl", imageUrl);
-      toast.success("Image uploaded successfully");
-    } catch {
-      toast.error("Failed to upload image");
-      setImageFile(null);
-    } finally {
-      setUploadingImage(false);
-    }
+    e.target.value = "";
+    openCrop(file, "poster", async (croppedFile) => {
+      closeCrop();
+      setImageFile(croppedFile);
+      setUploadingImage(true);
+      try {
+        const imageUrl = await uploadFile(croppedFile);
+        form.setValue("imageUrl", imageUrl);
+        toast.success("Image uploaded successfully");
+      } catch {
+        toast.error("Failed to upload image");
+        setImageFile(null);
+      } finally {
+        setUploadingImage(false);
+      }
+    });
   };
 
   const handleDocumentUpload = async (
@@ -196,6 +191,8 @@ export default function CopyrightDialog({
   };
 
   return (
+    <>
+      {cropState.open && <ImageCropModal src={cropState.src} ratio={cropState.ratio} fileName={cropState.fileName} onCrop={cropState.onCrop} onCancel={closeCrop} />}
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
@@ -767,5 +764,6 @@ export default function CopyrightDialog({
         </ScrollArea>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

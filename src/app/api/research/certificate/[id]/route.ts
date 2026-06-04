@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { UserRole, CertificateStatus } from "@prisma/client";
 import { certificateSchema } from "@/lib/validations/certificate";
-
+import { sendNotificationEmail } from "@/lib/mail";
 // GET - Get single certificate by ID
 export async function GET(
   req: NextRequest,
@@ -197,6 +197,16 @@ export async function PATCH(
           `Your certificate '${updatedCertificate.title}' has been verified and approved by the administrator.`,
           "CERTIFICATE_APPROVED"
         );
+        if (updatedCertificate.user?.email) {
+          await sendNotificationEmail({
+            to: updatedCertificate.user.email,
+            recipientName: updatedCertificate.user.name || "User",
+            type: "APPROVED",
+            resourceType: "certificate",
+            resourceTitle: updatedCertificate.title,
+            dashboardLink: `/dashboard/certificate?id=${id}`,
+          }).catch(err => console.error("[Email] Failed to send email", err))
+        }
       }
     }
 
@@ -212,6 +222,17 @@ export async function PATCH(
             link: `/dashboard/certificate?id=${id}`,
           }
         });
+        if (updatedCertificate.user?.email) {
+          await sendNotificationEmail({
+            to: updatedCertificate.user.email,
+            recipientName: updatedCertificate.user.name || "User",
+            type: "REVISION",
+            resourceType: "certificate",
+            resourceTitle: updatedCertificate.title,
+            dashboardLink: `/dashboard/certificate?id=${id}`,
+            message: body.updateComment,
+          }).catch(err => console.error("[Email] Failed to send email", err))
+        }
       } catch (err) {
         console.error("Failed to notify user of certificate comment update:", err);
       }

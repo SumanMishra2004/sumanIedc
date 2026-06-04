@@ -5,6 +5,8 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import { setupProfileAction } from "@/lib/actions/auth"
 import { uploadFile } from "@/lib/appwrite"
+import { ImageCropModal } from "@/components/ui/ImageCropModal"
+import { useImageCrop } from "@/hooks/useImageCrop"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -191,34 +193,48 @@ export function ProfileForm({ user }: ProfileFormProps) {
   const coverInputRef = useRef<HTMLInputElement>(null)
   const resumeInputRef = useRef<HTMLInputElement>(null)
 
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ── Crop modal state ────────────────────────────────────────────────────────
+  const { cropState, openCrop, closeCrop } = useImageCrop()
+
+  // ── Profile photo: file selected → open 1:1 crop modal ─────────────────────
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setIsUploadingImage(true)
-    try {
-      const url = await uploadFile(file)
-      setImage(url)
-      toast({ title: "Photo updated" })
-    } catch {
-      toast({ title: "Upload failed", variant: "destructive" })
-    } finally {
-      setIsUploadingImage(false)
-    }
+    // Reset input so the same file can be re-selected after cancel
+    e.target.value = ""
+    openCrop(file, "avatar", async (croppedFile) => {
+      closeCrop()
+      setIsUploadingImage(true)
+      try {
+        const url = await uploadFile(croppedFile)
+        setImage(url)
+        toast({ title: "Photo updated" })
+      } catch {
+        toast({ title: "Upload failed", variant: "destructive" })
+      } finally {
+        setIsUploadingImage(false)
+      }
+    })
   }
 
-  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ── Cover photo: file selected → open 4:1 crop modal ───────────────────────
+  const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setIsUploadingCover(true)
-    try {
-      const url = await uploadFile(file)
-      setCoverImage(url)
-      toast({ title: "Cover updated" })
-    } catch {
-      toast({ title: "Upload failed", variant: "destructive" })
-    } finally {
-      setIsUploadingCover(false)
-    }
+    e.target.value = ""
+    openCrop(file, "cover", async (croppedFile) => {
+      closeCrop()
+      setIsUploadingCover(true)
+      try {
+        const url = await uploadFile(croppedFile)
+        setCoverImage(url)
+        toast({ title: "Cover updated" })
+      } catch {
+        toast({ title: "Upload failed", variant: "destructive" })
+      } finally {
+        setIsUploadingCover(false)
+      }
+    })
   }
 
   const handleResumeChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -286,10 +302,21 @@ export function ProfileForm({ user }: ProfileFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
 
+      {/* ── Crop modal (portal-rendered above everything) ──────────────── */}
+      {cropState.open && (
+        <ImageCropModal
+          src={cropState.src}
+          ratio={cropState.ratio}
+          fileName={cropState.fileName}
+          onCrop={cropState.onCrop}
+          onCancel={closeCrop}
+        />
+      )}
+
       {/* ── COVER + AVATAR HERO ─────────────────────────────────────────── */}
       <Card className="border-white/[0.06] bg-[#0d0d0d] overflow-hidden p-0">
-        {/* Cover photo */}
-        <div className="relative h-44 md:h-56 group">
+        {/* Cover photo — LinkedIn ratio 4:1 (e.g. 1584×396) */}
+        <div className="relative h-[120px] md:h-[140px] group" style={{ aspectRatio: "4/1", height: "auto", minHeight: "100px", maxHeight: "180px" }}>
           {coverImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={coverImage} alt="Cover" className="w-full h-full object-cover" />

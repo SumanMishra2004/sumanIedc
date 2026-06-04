@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { PatentStatus, TeacherStatus, UserRole } from '@prisma/client'
 import { patentSchema } from '@/lib/validations/patent'
-
+import { sendNotificationEmail } from '@/lib/mail'
 // GET - List all patents with filtering, pagination, and search
 export async function GET(req: NextRequest) {
   try {
@@ -275,6 +275,18 @@ export async function POST(request: Request) {
             link: `/dashboard/patent?id=${patent.id}`,
           }
         })
+
+        if (faculty.email) {
+          await sendNotificationEmail({
+            to: faculty.email,
+            recipientName: faculty.name || "Faculty",
+            type: "SUBMITTED",
+            resourceType: "patent",
+            resourceTitle: patent.title,
+            dashboardLink: `/dashboard/patent?id=${patent.id}`,
+            submittedBy: session.user.name || "A team member",
+          }).catch(err => console.error("[Email] Failed to send SUBMITTED email to faculty author:", err))
+        }
       } catch (err) {
         console.error("Failed to notify faculty co-author:", err)
       }

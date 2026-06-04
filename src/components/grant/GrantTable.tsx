@@ -1,6 +1,7 @@
-﻿"use client"
+"use client"
 
 import * as React from "react"
+import { useRouter } from "next/navigation"
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -104,6 +105,7 @@ export function GrantTable({
   onClearFilters,
   loading = false,
 }: GrantTableProps) {
+  const router = useRouter()
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
@@ -394,7 +396,7 @@ export function GrantTable({
       enableHiding: false,
       cell: ({ row }) => {
         const grant = row.original
-        const canEdit = userRole === "ADMIN" || isCurrentUserPiOrCoPi(grant)
+        const canEdit = (userRole === "ADMIN" && grant.isPublic) || (userRole !== "ADMIN" && isCurrentUserPiOrCoPi(grant))
         const canDel = userRole === "ADMIN" || isCurrentUserPiOrCoPi(grant)
         return (
           <DropdownMenu>
@@ -411,7 +413,7 @@ export function GrantTable({
               <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground">Actions</DropdownMenuLabel>
               <DropdownMenuItem
                 className="text-sm cursor-pointer"
-                onClick={() => setViewingGrantId(grant.id)}
+                onClick={() => router.push(`/dashboard/grant/${grant.id}`)}
               >
                 <Eye className="mr-2 h-3.5 w-3.5" /> View Details
               </DropdownMenuItem>
@@ -531,7 +533,7 @@ export function GrantTable({
                   key={row.id}
                   className="group/row cursor-pointer hover:bg-muted/30 transition-colors border-border/40"
                   data-state={row.getIsSelected() && "selected"}
-                  onClick={() => setViewingGrantId(row.original.id)}
+                  onClick={() => router.push(`/dashboard/grant/${row.original.id}`)}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell

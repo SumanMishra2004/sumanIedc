@@ -370,7 +370,7 @@ export default function Navbar() {
           className="w-full py-3 overflow-hidden"
           style={{ willChange: "height, opacity" }}
         >
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 flex items-center justify-between gap-3">
+          <div className=" mx-auto px-4 sm:px-6 lg:px-10 flex items-center justify-between gap-3">
 
             {/* LEFT LOGO – hidden on xs, shown sm+ */}
             <div className="hidden sm:flex shrink-0 items-center gap-2 lg:gap-3">
@@ -441,7 +441,7 @@ export default function Navbar() {
 
         {/* ── ROW 2 · Navigation bar ── */}
         <div className="w-full" style={{ background: "rgba(10,10,10,0.96)" }}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 flex items-center h-11 gap-3">
+          <div className=" mx-auto px-4 sm:px-6 lg:px-10 flex items-center h-11 gap-3">
             {/* Desktop row: links left, search right */}
             <div className="hidden md:flex flex-1 items-center min-w-0 gap-3">
               <nav className="flex items-center min-w-0 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">

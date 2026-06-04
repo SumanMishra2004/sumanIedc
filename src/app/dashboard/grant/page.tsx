@@ -11,7 +11,7 @@ import {
   TrendingUp,
   Globe,
   Lock,
-  Clock,
+  CircleDollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -53,7 +53,6 @@ export default function GrantPage() {
       try {
         setLoading(true);
         const response = await fetchGrantIns(activeFilters);
-        console.log("Fetched grants:", response);
         if (response.data?.grants) setGrants(response.data.grants);
         else if (response.error) toast.error(response.error);
       } catch {
@@ -101,7 +100,7 @@ export default function GrantPage() {
       const result = await deleteGrantIn(grant.id);
       if (result.error) toast.error(result.error);
       else {
-        toast.success("Grant deleted");
+        toast.success("Grant deleted successfully");
         loadGrants(filters);
         loadStats();
       }
@@ -115,7 +114,7 @@ export default function GrantPage() {
       const result = await bulkDeleteGrantIns(ids);
       if (result.error) toast.error(result.error);
       else {
-        toast.success(`${ids.length} grant${ids.length !== 1 ? "s" : ""} deleted`);
+        toast.success(`${ids.length} grants deleted successfully`);
         loadGrants(filters);
         loadStats();
       }
@@ -127,7 +126,7 @@ export default function GrantPage() {
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-4rem)]">
-        <Loader2 className="w-8 h-8 animate-spin" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -169,35 +168,43 @@ export default function GrantPage() {
       : 0;
 
   return (
-    <div className="container mx-auto py-6 px-4 md:px-6 flex flex-col gap-6">
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Research Grants</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            {userRole === "ADMIN"
-              ? "Overview of all research grants across the institution."
-              : userRole === "FACULTY"
-                ? "Grants you are a member of as PI, Co-PI, or faculty."
-                : "Grants you are enrolled in as a student researcher."}
-          </p>
+    <div className="container mx-auto py-6 px-4 md:px-6 flex flex-col gap-6 max-w-[1600px] animate-in fade-in duration-500">
+      {/* ── Header Banner ── */}
+      <div className="relative overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-purple-500/5 to-transparent p-6 md:p-8 backdrop-blur-md shadow-sm">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full filter blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-purple-500/5 rounded-full filter blur-2xl pointer-events-none" />
+        
+        <div className="relative flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-foreground via-foreground to-primary bg-clip-text flex items-center gap-2">
+              <CircleDollarSign className="h-8 w-8 text-primary/80" />
+              Research Grants
+            </h1>
+            <p className="text-muted-foreground text-sm max-w-2xl leading-relaxed">
+              {userRole === "ADMIN"
+                ? "Overview of all research grants across the institution."
+                : userRole === "FACULTY"
+                  ? "Grants you are a member of as PI, Co-PI, or faculty."
+                  : "Grants you are enrolled in as a student researcher."}
+            </p>
+          </div>
+          {canCreate && <GrantAddDialog userRole={userRole} />}
         </div>
-        {canCreate && <GrantAddDialog userRole={userRole} />}
       </div>
 
       {/* ── Context bar ── */}
       {userRole !== "ADMIN" && (
-        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <Badge variant="outline" className="capitalize">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground bg-muted/30 py-2 px-4 rounded-xl border border-border/40 w-fit">
+          <Badge variant="secondary" className="capitalize text-[10px] font-semibold py-0">
             {userRole.toLowerCase()}
           </Badge>
-          <Separator orientation="vertical" className="h-4" />
+          <Separator orientation="vertical" className="h-3" />
           <span>
             {myGrants.length} grant{myGrants.length !== 1 ? "s" : ""} as member
           </span>
           {userRole === "FACULTY" && (
             <>
-              <Separator orientation="vertical" className="h-4" />
+              <Separator orientation="vertical" className="h-3" />
               <span>{myPiGrants.length} as PI / Co-PI</span>
             </>
           )}
@@ -208,7 +215,7 @@ export default function GrantPage() {
       {statsLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-24" />
+            <Skeleton key={i} className="h-24 rounded-xl" />
           ))}
         </div>
       ) : stats ? (
@@ -218,60 +225,59 @@ export default function GrantPage() {
               label: "Total Applied",
               value: stats.total,
               sub: "applications",
-              icon: <FileText className="h-3.5 w-3.5" />,
-              color: "",
+              icon: <FileText className="h-4 w-4" />,
+              gradient: "from-slate-400 to-slate-200",
             },
             {
               label: "Granted",
               value: grantedCount,
               sub: "approved",
-              icon: <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />,
-              color: "text-emerald-600",
+              icon: <CheckCircle className="h-4 w-4 text-emerald-500" />,
+              gradient: "from-emerald-500 to-emerald-300",
             },
             {
               label: "Public",
               value: stats.publicCount,
               sub: "visible to all",
-              icon: <Globe className="h-3.5 w-3.5 text-sky-500" />,
-              color: "",
+              icon: <Globe className="h-4 w-4 text-sky-500" />,
+              gradient: "from-sky-500 to-sky-300",
             },
             {
               label: "Private",
               value: stats.privateCount,
               sub: "restricted",
-              icon: <Lock className="h-3.5 w-3.5 text-slate-400" />,
-              color: "",
+              icon: <Lock className="h-4 w-4 text-slate-400" />,
+              gradient: "from-amber-500 to-amber-300",
             },
             {
               label: "Granted Amount",
               value: fmt(stats.financials.totalAmountGranted),
               sub: "total funds",
-              icon: <DollarSign className="h-3.5 w-3.5 text-blue-500" />,
-              color: "text-blue-600",
+              icon: <DollarSign className="h-4 w-4 text-blue-500" />,
+              gradient: "from-blue-500 to-blue-300",
               small: true,
             },
             {
               label: "Amount Used",
               value: fmt(stats.financials.totalUsedAmount),
               sub: `${utilisation}% utilised`,
-              icon: <TrendingUp className="h-3.5 w-3.5 text-orange-500" />,
-              color: "text-orange-600",
+              icon: <TrendingUp className="h-4 w-4 text-orange-500" />,
+              gradient: "from-orange-500 to-orange-300",
               small: true,
             },
-          ].map(({ label, value, sub, icon, color, small }) => (
-            <Card key={label} className="col-span-1">
-              <CardHeader className="pb-1 pt-4 px-4">
-                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+          ].map(({ label, value, sub, icon, gradient, small }) => (
+            <Card key={label} className="col-span-1 border border-border/40 hover:-translate-y-1 hover:shadow-md transition-all duration-300 bg-card/60 backdrop-blur-sm relative overflow-hidden group">
+              <div className={`absolute top-0 left-0 w-1 h-full bg-gradient-to-b ${gradient}`} />
+              <CardHeader className="pb-1 pt-4 px-4 flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5 group-hover:text-foreground transition-colors">
                   {icon} {label}
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4">
-                <p
-                  className={`font-bold leading-tight ${small ? "text-lg" : "text-2xl"} ${color}`}
-                >
+                <p className={`font-bold leading-tight ${small ? "text-base" : "text-2xl"} tracking-tight text-foreground`}>
                   {value}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">{sub}</p>
               </CardContent>
             </Card>
           ))}
@@ -292,7 +298,7 @@ export default function GrantPage() {
       )}
 
       {/* ── Table ── */}
-      <div className="rounded-lg border bg-card shadow-sm">
+      <div className="rounded-2xl border border-border/45 bg-card/50 backdrop-blur-sm shadow-sm overflow-hidden p-1">
         {loading ? (
           <div className="p-6 space-y-3">
             <Skeleton className="h-9 w-full" />

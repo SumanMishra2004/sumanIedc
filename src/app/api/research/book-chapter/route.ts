@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { BookchapterStatus, TeacherStatus, UserRole } from '@prisma/client'
 import { bookChapterSchema } from '@/lib/validations/book-chapter'
-
+import { sendNotificationEmail } from '@/lib/mail'
 // GET - List all book chapters with filtering, pagination, and search
 export async function GET(req: NextRequest) {
   try {
@@ -304,6 +304,18 @@ export async function POST(request: Request) {
             link: `/dashboard/book-chapters?id=${bookChapter.id}`,
           }
         })
+
+        if (faculty.email) {
+          await sendNotificationEmail({
+            to: faculty.email,
+            recipientName: faculty.name || "Faculty",
+            type: "SUBMITTED",
+            resourceType: "book-chapter",
+            resourceTitle: bookChapter.title,
+            dashboardLink: `/dashboard/book-chapters?id=${bookChapter.id}`,
+            submittedBy: session.user.name || "A team member",
+          }).catch(err => console.error("[Email] Failed to send SUBMITTED email to faculty author:", err))
+        }
       } catch (err) {
         console.error("Failed to notify faculty co-author:", err)
       }

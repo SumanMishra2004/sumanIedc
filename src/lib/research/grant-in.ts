@@ -180,3 +180,15 @@ export const bulkDeleteGrantIns = async (
     return handleApiError(error);
   }
 };
+
+export const fetchBills = async (
+  status?: string
+): Promise<ApiResponse<{ bills: any[] }>> => {
+  try {
+    const url = status ? `${API_BASE_URL}/bills?status=${status}` : `${API_BASE_URL}/bills`;
+    const response = await axios.get<{ bills: any[] }>(url);
+    return { data: response.data };
+  } catch (error) {
+    return handleApiError(error);
+  }
+};

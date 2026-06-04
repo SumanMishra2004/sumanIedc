@@ -46,6 +46,7 @@ interface ProfileData {
     copyrights: number
     certificates: number
     fdps: number
+    achievements: number
   }
   research: {
     journals: unknown[]
@@ -55,6 +56,7 @@ interface ProfileData {
     copyrights: unknown[]
     certificates: unknown[]
     fdps: unknown[]
+    achievements: unknown[]
   }
 }
 

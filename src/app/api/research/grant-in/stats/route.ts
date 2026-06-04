@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
 
     // Build filter based on user role
     const roleFilter = user.role === UserRole.ADMIN 
-      ? {} 
+      ? { hideFromAdmin: false } 
       : user.role === UserRole.FACULTY
       ? {
           OR: [
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
       prisma.grantIn.count({ where: roleFilter }),
       prisma.grantIn.count({ 
         where: user.role === UserRole.ADMIN 
-          ? { isPublic: true }
+          ? { isPublic: true, hideFromAdmin: false }
           : { 
               AND: [
                 roleFilter,
@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.grantIn.count({ 
         where: user.role === UserRole.ADMIN 
-          ? { isPublic: false }
+          ? { isPublic: false, hideFromAdmin: false }
           : { 
               AND: [
                 roleFilter,

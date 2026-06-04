@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
       copyrights,
       certificates,
       fdps,
+      achievements,
     ] = await Promise.all([
       // Journals
       prisma.journal.findMany({
@@ -208,6 +209,26 @@ export async function GET(req: NextRequest) {
         },
         orderBy: { createdAt: "desc" },
       }),
+
+      // Achievements (only for own profile or if isPublic)
+      prisma.achievement.findMany({
+        where: {
+          userId: targetUserId,
+          ...(isOwnProfile ? {} : { isPublic: true }),
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          category: true,
+          year: true,
+          isPublic: true,
+          imageUrl: true,
+          documentUrl: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      }),
     ]);
 
     const stats = {
@@ -218,7 +239,8 @@ export async function GET(req: NextRequest) {
         patents.length +
         copyrights.length +
         certificates.length +
-        fdps.length,
+        fdps.length +
+        achievements.length,
       journals: journals.length,
       bookChapters: bookChapters.length,
       conferences: conferences.length,
@@ -226,6 +248,7 @@ export async function GET(req: NextRequest) {
       copyrights: copyrights.length,
       certificates: certificates.length,
       fdps: fdps.length,
+      achievements: achievements.length,
     };
 
     return NextResponse.json({
@@ -241,6 +264,7 @@ export async function GET(req: NextRequest) {
         copyrights,
         certificates,
         fdps,
+        achievements,
       },
     });
   } catch (error) {

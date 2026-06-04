@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 
 import { useForm } from "react-hook-form";
@@ -53,6 +53,7 @@ const grantSchema = z.object({
   durationOfProject: z.string().optional(),
   amountGranted: z.number().min(0).optional(),
   isPublic: z.boolean(),
+  hideFromAdmin: z.boolean().optional(),
 });
 
 type GrantFormValues = z.infer<typeof grantSchema>;
@@ -96,6 +97,7 @@ export function GrantEditDialog({
     defaultValues: {
       grantInStatus: GrantInStatus.APPLIED,
       isPublic: false,
+      hideFromAdmin: false,
     },
   });
 
@@ -125,6 +127,7 @@ export function GrantEditDialog({
             durationOfProject: g.durationOfProject || undefined,
             amountGranted: g.amountGranted ?? undefined,
             isPublic: g.isPublic,
+            hideFromAdmin: g.hideFromAdmin || false,
           });
 
           // Pre-populate author state from fetched grant
@@ -422,11 +425,46 @@ export function GrantEditDialog({
                           <Switch
                             checked={field.value}
                             onCheckedChange={field.onChange}
+                            disabled={userRole === UserRole.ADMIN && !loadedGrant?.isPublic}
                           />
                         </FormControl>
                       </FormItem>
                     )}
                   />
+
+                  {userRole !== UserRole.ADMIN && (
+                    <FormField
+                      control={form.control}
+                      name="hideFromAdmin"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-base text-destructive font-semibold">
+                              Hide from Admin
+                            </FormLabel>
+                            <FormDescription>
+                              Hide this grant and all associated expenses entirely from administrators.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  const confirmMsg = "Warning: Hiding this grant from administrators means Admins will not be able to view, edit, or verify any claims for this project. Are you sure you want to proceed?";
+                                  if (window.confirm(confirmMsg)) {
+                                    field.onChange(true);
+                                  }
+                                } else {
+                                  field.onChange(false);
+                                }
+                              }}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   <Separator />
 

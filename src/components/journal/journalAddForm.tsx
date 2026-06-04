@@ -42,6 +42,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { uploadFile } from "@/lib/appwrite";
+import { PosterUploadField } from "@/components/ui/PosterUploadField";
 import {
   TeacherStatus,
   JournalStatus,
@@ -134,27 +135,11 @@ export default function JournalDialog({
     }
   }, [indexing, form]);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    const input = e.currentTarget;
-    if (!file) return;
-
-    const allowedImageTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (!allowedImageTypes.includes(file.type)) {
-      toast.error("Allowed image formats: jpg, jpeg, png, webp");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB");
-      return;
-    }
-
-    setImageFile(file);
+  const handleImageUpload = async (croppedFile: File) => {
+    setImageFile(croppedFile);
     setUploadingImage(true);
-
     try {
-      const imageUrl = await uploadFile(file);
+      const imageUrl = await uploadFile(croppedFile);
       form.setValue("imageUrl", imageUrl);
       toast.success("Image uploaded successfully");
     } catch {
@@ -162,7 +147,6 @@ export default function JournalDialog({
       setImageFile(null);
     } finally {
       setUploadingImage(false);
-      input.value = "";
     }
   };
 
@@ -988,70 +972,15 @@ export default function JournalDialog({
                     name="imageUrl"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-base font-semibold mb-2 block">
-                          Cover Image
-                        </FormLabel>
                         <FormControl>
-                          <div>
-                            <label
-                              htmlFor="image-upload"
-                              className="cursor-pointer block h-full"
-                            >
-                              <Card className="border-2 border-dashed border-muted hover:border-primary/50 transition-colors p-6 text-center h-full group hover:shadow-md">
-                                <div className="space-y-2 flex flex-col justify-center items-center">
-                                  <Upload className="h-8 w-8 mx-auto text-muted-foreground group-hover:text-primary transition-colors" />
-                                  <div className="text-center">
-                                    <p className="font-medium text-sm">
-                                      Cover Image
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Max 5MB • JPG, PNG
-                                    </p>
-                                  </div>
-                                  {uploadingImage && (
-                                    <Loader2 className="h-5 w-5 animate-spin mx-auto" />
-                                  )}
-                                </div>
-                              </Card>
-                            </label>
-                            <Input
-                              id="image-upload"
-                              type="file"
-                              accept="image/*"
-                              onChange={handleImageUpload}
-                              disabled={uploadingImage}
-                              className="sr-only"
-                            />
-                          </div>
+                          <PosterUploadField
+                            value={field.value}
+                            onChange={handleImageUpload}
+                            onRemove={() => { setImageFile(null); form.setValue("imageUrl", ""); }}
+                            isUploading={uploadingImage}
+                            disabled={uploadingImage}
+                          />
                         </FormControl>
-                        <FormDescription className="text-xs text-center pt-2">
-                          {imageFile && (
-                            <span className="flex items-center justify-center gap-1 text-xs bg-muted/50 p-2 rounded max-w-full">
-                              <Upload className="h-3 w-3 flex-shrink-0" />
-                              <span className="truncate flex-1">
-                                {imageFile.name}
-                              </span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 flex-shrink-0 ml-1"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setImageFile(null);
-                                  form.setValue("imageUrl", "");
-                                }}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
-                            </span>
-                          )}
-                          {field.value && !imageFile && (
-                            <span className="text-xs text-green-600 font-medium flex items-center gap-1 justify-center block mt-2">
-                              ✓ Image uploaded
-                            </span>
-                          )}
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

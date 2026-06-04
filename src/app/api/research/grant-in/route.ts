@@ -4,6 +4,8 @@ import { GrantInRole, GrantInStatus, UserRole } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { GrantInPOSTRequestBodyData } from "@/types/grant-in";
 import { revalidateTag } from "next/cache";
+import { storage } from "@/lib/appwrite";
+import { notifyGrantApplied } from "@/lib/research/grantNotifications";
 
 /* ----------------------------
    Request Body Interfaces
@@ -210,6 +212,7 @@ export async function POST(req: NextRequest) {
         usedAmount: usedAmount ?? null,
 
         isPublic: isPublic ?? false,
+        hideFromAdmin: body.hideFromAdmin ?? false,
 
         facultyAuthors: {
           create: facultyAuthors.map((f) => ({
@@ -248,6 +251,9 @@ export async function POST(req: NextRequest) {
     involvedUserIds.forEach((id) => revalidateTag(`grants-sidebar-${id}`, {}))
     // Revalidate the admin shared cache for all-grants view
     revalidateTag(`grants-sidebar-all`, {})
+
+    // Trigger notification
+    await notifyGrantApplied(newGrant.id);
 
     return NextResponse.json(
       {
@@ -334,6 +340,10 @@ export async function GET(req: NextRequest) {
           userId: userId, // session student must be author
         },
       };
+    }
+
+    if (userRole === UserRole.ADMIN) {
+      whereClause.hideFromAdmin = false;
     }
 
     if (queryParams.projectCode) {
@@ -512,6 +522,23 @@ export async function DELETE(req: NextRequest) {
     /* ----------------------------
        6. Delete Grants
     ----------------------------- */
+    // Fetch associated bills to delete files from Appwrite
+    const bills = await prisma.grantInBill.findMany({
+      where: { grantInId: { in: grantIdArray } },
+      select: { fileId: true }
+    });
+
+    const BUCKET_ID = process.env.NEXT_PUBLIC_APPWRITE_BUCKET_ID!;
+    for (const bill of bills) {
+      if (bill.fileId) {
+        try {
+          await storage.deleteFile(BUCKET_ID, bill.fileId);
+        } catch (e) {
+          console.error(`Failed to delete bill file ${bill.fileId} from Appwrite`, e);
+        }
+      }
+    }
+
     const deleteResult = await prisma.grantIn.deleteMany({
       where: {
         id: { in: grantIdArray },

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { PatentStatus, TeacherStatus, UserRole } from '@prisma/client'
 import { patentSchema } from '@/lib/validations/patent'
+import { sendNotificationEmail, broadcastPublicationEmail } from '@/lib/mail'
 
 // GET - Get single patent by ID
 export async function GET(
@@ -431,18 +432,28 @@ export async function PATCH(
     // Trigger status transition notifications
     if (newTeacherStatus && newTeacherStatus !== currentTeacherStatus) {
       if (newTeacherStatus === TeacherStatus.ACCEPTED) {
-        for (const sId of studentUserIds) {
+        for (const sa of patent.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Patent Approved by Faculty",
             `Your patent '${patent.title}' has been accepted by the faculty reviewer.`,
             "PATENT_APPROVED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "APPROVED",
+              resourceType: "patent",
+              resourceTitle: patent.title,
+              dashboardLink: `/dashboard/patent?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
         // Notify Admins
         const admins = await prisma.user.findMany({
           where: { role: UserRole.ADMIN },
-          select: { id: true }
+          select: { id: true, email: true, name: true }
         })
         for (const admin of admins) {
           await notifyUser(
@@ -451,54 +462,136 @@ export async function PATCH(
             `The patent '${patent.title}' has been approved by the reviewer and is ready for admin action.`,
             "PATENT_APPROVED"
           )
+          if (admin.email) {
+            await sendNotificationEmail({
+              to: admin.email,
+              recipientName: admin.name || "Admin",
+              type: "APPROVED",
+              resourceType: "patent",
+              resourceTitle: patent.title,
+              dashboardLink: `/dashboard/patent?id=${id}`,
+              isAdminNotification: true,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.UPDATE) {
-        for (const sId of studentUserIds) {
+        for (const sa of patent.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Revision Requested for Patent",
             `The reviewer requested corrections for '${patent.title}'. Reason: ${body.updateComment || "Please view details."}`,
             "PATENT_UPDATE_REQUESTED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "REVISION",
+              resourceType: "patent",
+              resourceTitle: patent.title,
+              dashboardLink: `/dashboard/patent?id=${id}`,
+              message: body.updateComment || "Please view details.",
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.REJECTED) {
-        for (const sId of studentUserIds) {
+        for (const sa of patent.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Patent Rejected",
             `Your patent '${patent.title}' was rejected by the reviewer.`,
             "PATENT_REJECTED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "REJECTED",
+              resourceType: "patent",
+              resourceTitle: patent.title,
+              dashboardLink: `/dashboard/patent?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.UPLOADED) {
-        for (const fId of facultyUserIds) {
+        for (const fa of patent.facultyAuthors) {
           await notifyUser(
-            fId,
+            fa.userId,
             "Patent Resubmitted for Review",
             `A co-authored patent '${patent.title}' has been resubmitted for review.`,
             "PATENT_SUBMITTED"
           )
+          if (fa.user.email) {
+            await sendNotificationEmail({
+              to: fa.user.email,
+              recipientName: fa.user.name || "Faculty",
+              type: "SUBMITTED",
+              resourceType: "patent",
+              resourceTitle: patent.title,
+              dashboardLink: `/dashboard/patent?id=${id}`,
+              submittedBy: session.user.name || "A team member",
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       }
     }
 
     if (newPatentStatus && newPatentStatus !== currentPatentStatus) {
       if (newPatentStatus === PatentStatus.GRANTED) {
-        for (const sId of studentUserIds) {
+        for (const sa of patent.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Patent Granted!",
             `Your patent '${patent.title}' has been marked as GRANTED by the administrator.`,
             "PATENT_PUBLISHED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "PUBLISHED",
+              resourceType: "patent",
+              resourceTitle: patent.title,
+              dashboardLink: `/dashboard/patent?id=${id}`,
+              publicLink: `/publications/patents?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
-        for (const fId of facultyUserIds) {
+        for (const fa of patent.facultyAuthors) {
           await notifyUser(
-            fId,
+            fa.userId,
             "Patent Granted!",
             `The co-authored patent '${patent.title}' has been marked as GRANTED.`,
             "PATENT_PUBLISHED"
           )
+          if (fa.user.email) {
+            await sendNotificationEmail({
+              to: fa.user.email,
+              recipientName: fa.user.name || "Faculty",
+              type: "PUBLISHED",
+              resourceType: "patent",
+              resourceTitle: patent.title,
+              dashboardLink: `/dashboard/patent?id=${id}`,
+              publicLink: `/publications/patents?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
+        }
+        
+        // Broadcast to all users
+        if (body.isPublic || existingPatent.isPublic) {
+          const allAuthorNames = [
+            ...patent.studentAuthors.map(sa => sa.user.name).filter(Boolean),
+            ...patent.facultyAuthors.map(fa => fa.user.name).filter(Boolean),
+          ] as string[]
+          const allAuthorIds = [...studentUserIds, ...facultyUserIds]
+
+          broadcastPublicationEmail({
+            resourceType: "patent",
+            resourceTitle: patent.title,
+            resourceId: id,
+            authors: allAuthorNames,
+            excludeUserIds: allAuthorIds,
+          }).catch(err => console.error("[Email] Broadcast failed:", err))
         }
       }
     }

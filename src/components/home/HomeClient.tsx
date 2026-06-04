@@ -9,6 +9,7 @@ import LoadingScreen from "@/components/home/LoadingScreen";
 import LabCarousel from "./ViewImages";
 
 import Achievements from "./Achievements";
+import UpcomingEvents from "./UpcomingEvents";
 import Footer from "./Footer";
 
 const MIN_LOAD_MS = 2200; // minimum time to show the loader (aesthetic)
@@ -93,6 +94,7 @@ export default function HomeClient() {
           <AboutUs />
           <VelocityMarquee />
           <Achievements />
+          <UpcomingEvents />
           <LabCarousel />
          
           <Footer />

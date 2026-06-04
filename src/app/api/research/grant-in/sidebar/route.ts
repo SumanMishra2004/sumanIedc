@@ -20,8 +20,9 @@ export async function GET() {
       whereClause.facultyAuthors = { some: { userId } };
     } else if (userRole === UserRole.STUDENT) {
       whereClause.studentAuthors = { some: { userId } };
+    } else if (userRole === UserRole.ADMIN) {
+      whereClause.hideFromAdmin = false;
     }
-    // ADMIN sees all
 
     const grants = await prisma.grantIn.findMany({
       where: whereClause,

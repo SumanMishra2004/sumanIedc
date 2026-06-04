@@ -43,6 +43,8 @@ import { Separator } from "@/components/ui/separator";
 import { uploadFile } from "@/lib/appwrite";
 import { Journal } from "@/types/journal";
 import type { Session } from "next-auth";
+import { ImageCropModal } from "@/components/ui/ImageCropModal";
+import { useImageCrop } from "@/hooks/useImageCrop";
 
 // Use imported journalSchema from @/lib/validations/journal
 
@@ -79,6 +81,7 @@ export default function EditJournalDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [keywordInput, setKeywordInput] = useState("");
+  const { cropState, openCrop, closeCrop } = useImageCrop();
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -240,34 +243,25 @@ export default function EditJournalDialog({
     }
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    const allowedImageTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (!allowedImageTypes.includes(file.type)) {
-      toast.error("Allowed image formats: jpg, jpeg, png, webp");
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size should be less than 5MB");
-      return;
-    }
-
-    setImageFile(file);
-    setUploadingImage(true);
-
-    try {
-      const imageUrl = await uploadFile(file);
-      form.setValue("imageUrl", imageUrl);
-      toast.success("Image uploaded successfully");
-    } catch {
-      toast.error("Failed to upload image");
-      setImageFile(null);
-    } finally {
-      setUploadingImage(false);
-    }
+    e.target.value = "";
+    openCrop(file, "poster", async (croppedFile) => {
+      closeCrop();
+      setImageFile(croppedFile);
+      setUploadingImage(true);
+      try {
+        const imageUrl = await uploadFile(croppedFile);
+        form.setValue("imageUrl", imageUrl);
+        toast.success("Image uploaded successfully");
+      } catch {
+        toast.error("Failed to upload image");
+        setImageFile(null);
+      } finally {
+        setUploadingImage(false);
+      }
+    });
   };
 
   const handleDocumentUpload = async (
@@ -339,6 +333,8 @@ export default function EditJournalDialog({
   };
 
   return (
+    <>
+      {cropState.open && <ImageCropModal src={cropState.src} ratio={cropState.ratio} fileName={cropState.fileName} onCrop={cropState.onCrop} onCancel={closeCrop} />}
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="md:max-w-[96vw] max-h-[90vh] p-0">
         <DialogHeader className="px-6 pt-6 pb-2">
@@ -1273,5 +1269,6 @@ export default function EditJournalDialog({
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }

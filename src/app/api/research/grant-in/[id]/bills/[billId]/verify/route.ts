@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma";
 import { storage } from "@/lib/appwrite";
 import { BillStatus, UserRole, GrantInRole } from "@prisma/client";
 import { regenerateMasterPdf } from "@/lib/research/masterPdf.service";
+import { notifyBillAccepted, notifyBillRejected } from "@/lib/research/grantNotifications";
 
 const BUCKET_ID = process.env.NEXT_PUBLIC_APPWRITE_BUCKET_ID!;
 
@@ -36,6 +37,18 @@ export async function PATCH(
         role: { in: [GrantInRole.FACULTY_PI, GrantInRole.FACULTY_COPI] }
       }
     });
+
+    const grant = await prisma.grantIn.findUnique({
+      where: { id: grantId }
+    });
+
+    if (!grant) {
+      return new NextResponse("Grant not found", { status: 404 });
+    }
+
+    if (userRole === "ADMIN" && grant.hideFromAdmin) {
+      return new NextResponse("Forbidden: Grant is hidden from Admin", { status: 403 });
+    }
 
     const isAuthorized = userRole === "ADMIN" || !!facultyAuth;
 
@@ -75,6 +88,9 @@ export async function PATCH(
       // Trigger Master PDF Regeneration
       await regenerateMasterPdf(grantId);
 
+      // Trigger notification
+      await notifyBillAccepted(grantId, billId);
+
       return NextResponse.json(updatedBill);
     } 
     else if (action === "REJECT") {
@@ -86,6 +102,9 @@ export async function PATCH(
             console.error("Failed to delete rejected file from Appwrite", e);
         }
       }
+
+      // Trigger notification before deleting the bill
+      await notifyBillRejected(grantId, billId);
 
       await prisma.grantInBill.delete({
         where: { id: billId }

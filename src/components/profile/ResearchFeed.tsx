@@ -24,6 +24,7 @@ import {
   X,
   ChevronDown,
   Loader2,
+  Trophy,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,7 @@ interface ResearchData {
   copyrights: unknown[]
   certificates: unknown[]
   fdps: unknown[]
+  achievements: unknown[]
 }
 
 interface ResearchFeedProps {
@@ -58,6 +60,7 @@ type TabKey =
   | "copyrights"
   | "certificates"
   | "fdps"
+  | "achievements"
 
 type SortKey = "newest" | "oldest" | "az" | "za"
 
@@ -104,6 +107,7 @@ const baseTabs: Tab[] = [
   { key: "patents", label: "Patents", icon: <ScrollText className="h-3.5 w-3.5" />, color: "#fb923c" },
   { key: "copyrights", label: "Copyrights", icon: <Copyright className="h-3.5 w-3.5" />, color: "#34d399" },
   { key: "certificates", label: "Certificates", icon: <Award className="h-3.5 w-3.5" />, color: "#fbbf24" },
+  { key: "achievements", label: "Achievements", icon: <Trophy className="h-3.5 w-3.5" />, color: "#ef4444" },
 ]
 const fdpTab: Tab = { key: "fdps", label: "FDPs", icon: <GraduationCap className="h-3.5 w-3.5" />, color: "#e879f9" }
 
@@ -202,6 +206,17 @@ function normalise(research: ResearchData): NormalisedItem[] {
     })
   }
 
+  for (const a of (research.achievements || []) as AR[]) {
+    items.push({
+      _type: "achievements", _sortDate: new Date(a.createdAt).getTime(),
+      _title: a.title ?? "", _status: "",
+      id: a.id, title: a.title, subtitle: a.category,
+      abstract: a.description, keywords: [],
+      date: a.year ?? a.createdAt, documentUrl: a.documentUrl, imageUrl: a.imageUrl,
+      isPublic: a.isPublic,
+    })
+  }
+
   return items
 }
 
@@ -217,6 +232,7 @@ function renderCard(item: NormalisedItem, isOwnProfile: boolean) {
     copyrights: "copyright",
     certificates: "certificate",
     fdps: "fdp",
+    achievements: "achievement",
   }
   return (
     <ResearchPostCard
@@ -365,7 +381,7 @@ export function ResearchFeed({ research, isOwnProfile, userRole }: ResearchFeedP
     const counts: Record<TabKey, number> = {
       all: allItems.length,
       journals: 0, bookChapters: 0, conferences: 0,
-      patents: 0, copyrights: 0, certificates: 0, fdps: 0,
+      patents: 0, copyrights: 0, certificates: 0, fdps: 0, achievements: 0,
     }
     for (const item of allItems) counts[item._type] = (counts[item._type] ?? 0) + 1
     return counts

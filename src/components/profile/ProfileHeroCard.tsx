@@ -89,19 +89,24 @@ export function ProfileHeroCard({ user, isOwnProfile }: ProfileHeroCardProps) {
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border/40 bg-card/80 backdrop-blur-md shadow-xl">
-      {/* Cover gradient or Image */}
+      {/* Cover gradient or Image — LinkedIn ratio 4:1 */}
       <div
-        className="h-40 w-full relative bg-muted/30"
-        style={!user.coverImage ? {
-          background: "linear-gradient(135deg, oklch(0.18 0.06 115) 0%, oklch(0.12 0.035 115) 40%, oklch(0.09 0.02 115) 100%)",
-        } : {}}
+        className="w-full relative bg-muted/30"
+        style={{
+          aspectRatio: "4/1",
+          minHeight: "80px",
+          maxHeight: "200px",
+          ...((!user.coverImage) ? {
+            background: "linear-gradient(135deg, oklch(0.18 0.06 115) 0%, oklch(0.12 0.035 115) 40%, oklch(0.09 0.02 115) 100%)",
+          } : {}),
+        }}
       >
         {user.coverImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={user.coverImage} alt="Cover" className="w-full h-full object-cover" />
+          <img src={user.coverImage} alt="Cover" className="w-full h-full object-cover absolute inset-0" />
         ) : (
           <div
-            className="absolute inset-0 h-40 opacity-10"
+            className="absolute inset-0 opacity-10"
             style={{
               backgroundImage:
                 "radial-gradient(circle at 20% 50%, #c9f53b 0%, transparent 60%), radial-gradient(circle at 80% 20%, #c9f53b 0%, transparent 40%)",

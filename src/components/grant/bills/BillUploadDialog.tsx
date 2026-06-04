@@ -49,6 +49,7 @@ export function BillUploadDialog({
 }: BillUploadDialogProps) {
   const [loading, setLoading] = React.useState(false)
   const [billType, setBillType] = React.useState<BillType>(BillType.OTHER)
+  const [customType, setCustomType] = React.useState("")
   const [amount, setAmount] = React.useState("")
   const [billDate, setBillDate] = React.useState(
     new Date().toISOString().split("T")[0]
@@ -57,6 +58,7 @@ export function BillUploadDialog({
 
   const reset = () => {
     setBillType(BillType.OTHER)
+    setCustomType("")
     setAmount("")
     setBillDate(new Date().toISOString().split("T")[0])
     setFile(null)
@@ -76,6 +78,9 @@ export function BillUploadDialog({
     const formData = new FormData()
     formData.append("file", file)
     formData.append("billType", billType)
+    if (billType === BillType.OTHER && customType) {
+      formData.append("customBillType", customType)
+    }
     if (amount) formData.append("amount", amount)
     formData.append("billDate", billDate)
 
@@ -124,6 +129,19 @@ export function BillUploadDialog({
                 ))}
               </SelectContent>
             </Select>
+
+            {billType === BillType.OTHER && (
+              <div className="space-y-2 mt-2 animate-in slide-in-from-top-2 duration-200">
+                <Label htmlFor="customType">Specify Bill Type <span className="text-red-500">*</span></Label>
+                <Input
+                  id="customType"
+                  placeholder="e.g. Field Trip Transportation"
+                  value={customType}
+                  onChange={(e) => setCustomType(e.target.value)}
+                  required
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -48,8 +48,9 @@ export async function GET(req: NextRequest) {
       where.OR = [
         { facultyAuthors: { some: { userId: session.user.id } } }
       ]
+    } else if (session.user.role === UserRole.ADMIN) {
+      where.hideFromAdmin = false;
     }
-    // ADMIN sees everything
 
     if (grantInStatus) {
       where.grantInStatus = grantInStatus as GrantInStatus

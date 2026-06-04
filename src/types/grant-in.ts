@@ -33,6 +33,7 @@ export interface GrantInBill {
   fileId: string
   fileUrl: string | null
   billType: BillType
+  customBillType: string | null
   isMasterPdf: boolean
   billStatus: BillStatus
   billDate: Date
@@ -75,6 +76,7 @@ export interface GrantIn {
   amountGranted: number | null
   usedAmount: number | null
   isPublic: boolean
+  hideFromAdmin: boolean
   createdAt: Date
   updatedAt: Date
 
@@ -103,6 +105,7 @@ export interface GrantInPOSTRequestBodyData {
   amountGranted?: number;
   usedAmount?: number;
   isPublic?: boolean;
+  hideFromAdmin?: boolean;
 
   facultyAuthors: GrantInTeacherAuthorInput[];
   studentAuthors: GrantInStudentAuthorInput[];
@@ -125,6 +128,7 @@ export interface GrantInPATCHRequestBodyData {
   amountGranted?: number;
   usedAmount?: number;
   grantDate?: string;
+  hideFromAdmin?: boolean;
   facultyAuthors?: GrantInPATCHTeacherAuthorInput[];
   studentAuthors?: GrantInPATCHStudentAuthorInput[];
 }

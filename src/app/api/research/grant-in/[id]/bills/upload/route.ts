@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { ID, storage} from "@/lib/appwrite";
 import { BillType, BillStatus } from "@prisma/client";
+import { notifyBillUploaded } from "@/lib/research/grantNotifications";
 
 const BUCKET_ID = process.env.NEXT_PUBLIC_APPWRITE_BUCKET_ID!;
 
@@ -23,6 +24,7 @@ export async function POST(
     const formData = await req.formData();
     const file = formData.get("file") as File;
     const billTypeStr = formData.get("billType") as string;
+    const customBillType = formData.get("customBillType") as string || null;
     const amountStr = formData.get("amount") as string;
     const billDateStr = formData.get("billDate") as string;
 
@@ -80,6 +82,7 @@ export async function POST(
         fileId: uploadedFile.$id,
         fileUrl: fileUrl,
         billType: billType,
+        customBillType: customBillType,
         billStatus: BillStatus.PENDING,
         billDate: billDate,
         amount: amount,
@@ -88,6 +91,9 @@ export async function POST(
         grantInId: grantId
       }
     });
+
+    // Trigger notification
+    await notifyBillUploaded(grantId, bill.id);
 
     return NextResponse.json(bill, { status: 201 });
 

@@ -3,6 +3,8 @@ import prisma from "@/lib/prisma";
 import { GrantInRole, UserRole } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { GrantInPATCHRequestBodyData } from "@/types/grant-in";
+import { storage } from "@/lib/appwrite";
+import { notifyGrantStatusUpdated } from "@/lib/research/grantNotifications";
 
 export async function GET(
   req: NextRequest,
@@ -51,7 +53,10 @@ export async function GET(
       };
     }
 
-    // ADMIN → no extra restriction
+    // ADMIN → must not be hidden
+    if (userRole === UserRole.ADMIN) {
+      whereClause.hideFromAdmin = false;
+    }
 
     /* ----------------------------
        3. Fetch Grant Securely
@@ -174,8 +179,30 @@ export async function PATCH(
     }
 
     /* ----------------------------
-       5. Faculty Must be PI/CoPI
+       5. Faculty Must be PI/CoPI / Admin Restrictions
     ----------------------------- */
+    if (userRole === UserRole.ADMIN) {
+      if (existingGrant.hideFromAdmin) {
+        return NextResponse.json(
+          { message: "Grant not found." },
+          { status: 404 }
+        );
+      }
+      if (!existingGrant.isPublic) {
+        return NextResponse.json(
+          { message: "Forbidden. Admin can only edit public grants." },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (userRole === UserRole.ADMIN && body.hideFromAdmin !== undefined && body.hideFromAdmin !== existingGrant.hideFromAdmin) {
+      return NextResponse.json(
+        { message: "Forbidden. Admin cannot change hideFromAdmin visibility." },
+        { status: 403 }
+      );
+    }
+
     if (userRole === UserRole.FACULTY) {
       const facultyEntry = existingGrant.facultyAuthors.find(
         (fa) => fa.userId === userId
@@ -208,16 +235,18 @@ export async function PATCH(
         );
       }
 
-      // Prevent removing yourself as PI
-      const selfEntry = body.facultyAuthors.find(
-        (f: any) => f.userId === userId
-      );
-
-      if (!selfEntry) {
-        return NextResponse.json(
-          { message: "PI/CoPI cannot remove themselves from authors." },
-          { status: 400 }
+      // Prevent removing yourself as PI (only for Faculty)
+      if (userRole === UserRole.FACULTY) {
+        const selfEntry = body.facultyAuthors.find(
+          (f: any) => f.userId === userId
         );
+
+        if (!selfEntry) {
+          return NextResponse.json(
+            { message: "PI/CoPI cannot remove themselves from authors." },
+            { status: 400 }
+          );
+        }
       }
     }
 
@@ -263,6 +292,7 @@ export async function PATCH(
 
         amountGranted: body.amountGranted,
         usedAmount: body.usedAmount,
+        hideFromAdmin: body.hideFromAdmin,
 
         grantDate: body.grantDate ? new Date(body.grantDate) : undefined,
 
@@ -293,6 +323,11 @@ export async function PATCH(
         studentAuthors: true,
       },
     });
+
+    // Trigger notification if status changed
+    if (existingGrant.grantInStatus !== updatedGrant.grantInStatus) {
+      await notifyGrantStatusUpdated(updatedGrant.id, existingGrant.grantInStatus, updatedGrant.grantInStatus);
+    }
 
     return NextResponse.json(
       {
@@ -333,7 +368,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const grantsToDelete = await prisma.grantIn.findMany({
       where: {
         id,
-        ...(session.user.role === UserRole.ADMIN ? {} : {
+        ...(session.user.role === UserRole.ADMIN ? { hideFromAdmin: false } : {
           OR: [
             { facultyAuthors: { some: { userId: session.user.id } } },
             { studentAuthors: { some: { userId: session.user.id } } },
@@ -380,6 +415,23 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     /* ----------------------------
        6. Delete Grants
     ----------------------------- */
+    // Fetch associated bills to delete files from Appwrite
+    const bills = await prisma.grantInBill.findMany({
+      where: { grantInId: id },
+      select: { fileId: true }
+    });
+
+    const BUCKET_ID = process.env.NEXT_PUBLIC_APPWRITE_BUCKET_ID!;
+    for (const bill of bills) {
+      if (bill.fileId) {
+        try {
+          await storage.deleteFile(BUCKET_ID, bill.fileId);
+        } catch (e) {
+          console.error(`Failed to delete bill file ${bill.fileId} from Appwrite`, e);
+        }
+      }
+    }
+
      await prisma.grantIn.delete({
       where: {
         id,

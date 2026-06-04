@@ -151,7 +151,9 @@ export function BillsSection({
                   <TableRow key={bill.id}>
                     <TableCell>
                       <Badge variant="outline" className="text-xs capitalize">
-                        {BILL_TYPE_LABELS[bill.billType]}
+                        {bill.billType === BillType.OTHER && bill.customBillType
+                          ? bill.customBillType
+                          : BILL_TYPE_LABELS[bill.billType]}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-medium text-emerald-600">

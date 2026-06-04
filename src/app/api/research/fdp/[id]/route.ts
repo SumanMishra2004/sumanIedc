@@ -1,9 +1,9 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { UserRole } from "@prisma/client";
-
+import { UserRole, FDPStatus } from "@prisma/client";
+import { fdpSchema } from "@/lib/validations/fdp";
+import { sendNotificationEmail } from "@/lib/mail";
 // GET - Get single FDP
 export async function GET(
   req: NextRequest,
@@ -38,7 +38,7 @@ export async function GET(
       );
     }
 
-    // Access control
+    // Access control: admins see all, otherwise user must be owner
     const isOwner = session.user.id === fdp.userId;
     const isAdmin = session.user.role === "ADMIN";
 
@@ -77,8 +77,7 @@ export async function PATCH(
 
     // Check ownership
     const existingFDP = await prisma.fDP.findUnique({
-        where: { id },
-        select: { userId: true }
+        where: { id }
     });
 
     if (!existingFDP) {
@@ -99,22 +98,148 @@ export async function PATCH(
     }
     
     const body = await req.json();
-    
-    // Handle date conversion
-    const dataToUpdate = { ...body };
-    if (dataToUpdate.startDate) dataToUpdate.startDate = new Date(dataToUpdate.startDate);
-    if (dataToUpdate.endDate) dataToUpdate.endDate = new Date(dataToUpdate.endDate);
 
-    // Filter dangerous fields
-    delete dataToUpdate.id;
-    delete dataToUpdate.userId;
-    delete dataToUpdate.createdAt;
-    delete dataToUpdate.updatedAt;
+    // If faculty, they cannot modify status fields directly
+    if (!isAdmin) {
+      delete body.fdpStatus;
+      delete body.updateComment;
+    }
+
+    const currentStatus = existingFDP.fdpStatus;
+    const newStatus = body.fdpStatus as FDPStatus | undefined;
+
+    // Validate final merged record against Zod Schema
+    const mergedData = {
+      title: body.title !== undefined ? body.title : existingFDP.title,
+      description: body.description !== undefined ? body.description : existingFDP.description,
+      keywords: body.keywords !== undefined ? body.keywords : existingFDP.keywords,
+      organizedBy: body.organizedBy !== undefined ? body.organizedBy : existingFDP.organizedBy,
+      startDate: body.startDate !== undefined ? body.startDate : existingFDP.startDate,
+      endDate: body.endDate !== undefined ? body.endDate : existingFDP.endDate,
+      topic: body.topic !== undefined ? body.topic : existingFDP.topic,
+      duration: body.duration !== undefined ? body.duration : existingFDP.duration,
+      remark: body.remark !== undefined ? body.remark : existingFDP.remark,
+      isPublic: body.isPublic !== undefined ? body.isPublic : existingFDP.isPublic,
+      fdpStatus: body.fdpStatus !== undefined ? body.fdpStatus : existingFDP.fdpStatus,
+      updateComment: body.updateComment !== undefined ? body.updateComment : existingFDP.updateComment,
+    };
+
+    const validationResult = fdpSchema.safeParse(mergedData);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: validationResult.error.issues[0].message, details: validationResult.error.issues },
+        { status: 400 }
+      );
+    }
+
+    // Update FDP in DB
+    const dataToUpdate: any = {};
+    const directFields = [
+      "title",
+      "description",
+      "keywords",
+      "organizedBy",
+      "topic",
+      "duration",
+      "remark",
+      "isPublic",
+      "fdpStatus",
+      "updateComment",
+    ];
+
+    for (const field of directFields) {
+      if (body[field] !== undefined) {
+        dataToUpdate[field] = body[field];
+      }
+    }
+
+    if (body.startDate !== undefined) {
+      dataToUpdate.startDate = body.startDate ? new Date(body.startDate) : null;
+    }
+    if (body.endDate !== undefined) {
+      dataToUpdate.endDate = body.endDate ? new Date(body.endDate) : null;
+    }
+
+    // Automated transitions
+    if (!isAdmin && currentStatus === FDPStatus.APPROVED) {
+      // Re-submit if user edits their own approved FDP
+      dataToUpdate.fdpStatus = FDPStatus.SUBMITTED;
+      dataToUpdate.updateComment = null;
+    }
 
     const updatedFDP = await prisma.fDP.update({
       where: { id },
       data: dataToUpdate,
+      include: {
+        user: { select: { name: true, email: true } }
+      }
     });
+
+    // Send notifications on status transitions
+    if (newStatus && newStatus !== currentStatus) {
+      const notifyUser = async (uId: string, title: string, message: string, type: string) => {
+        try {
+          await prisma.notification.create({
+            data: {
+              userId: uId,
+              title,
+              message,
+              type,
+              link: `/dashboard/fdp?id=${id}`,
+            }
+          });
+        } catch (err) {
+          console.error("Failed to notify user on FDP status update:", err);
+        }
+      };
+
+      if (newStatus === FDPStatus.APPROVED) {
+        await notifyUser(
+          updatedFDP.userId,
+          "FDP Approved",
+          `Your FDP record '${updatedFDP.title}' has been verified and approved by the administrator.`,
+          "FDP_APPROVED"
+        );
+        if (updatedFDP.user?.email) {
+          await sendNotificationEmail({
+            to: updatedFDP.user.email,
+            recipientName: updatedFDP.user.name || "User",
+            type: "APPROVED",
+            resourceType: "fdp",
+            resourceTitle: updatedFDP.title,
+            dashboardLink: `/dashboard/fdp?id=${id}`,
+          }).catch(err => console.error("[Email] Failed to send email", err))
+        }
+      }
+    }
+
+    // If updateComment was added or modified by admin, notify the owner
+    if (isAdmin && body.updateComment && body.updateComment !== existingFDP.updateComment) {
+      try {
+        await prisma.notification.create({
+          data: {
+            userId: updatedFDP.userId,
+            title: "Revision Requested for FDP",
+            message: `The administrator requested corrections for your FDP record '${updatedFDP.title}'. Reason: ${body.updateComment}`,
+            type: "FDP_UPDATE_REQUESTED",
+            link: `/dashboard/fdp?id=${id}`,
+          }
+        });
+        if (updatedFDP.user?.email) {
+          await sendNotificationEmail({
+            to: updatedFDP.user.email,
+            recipientName: updatedFDP.user.name || "User",
+            type: "REVISION",
+            resourceType: "fdp",
+            resourceTitle: updatedFDP.title,
+            dashboardLink: `/dashboard/fdp?id=${id}`,
+            message: body.updateComment,
+          }).catch(err => console.error("[Email] Failed to send email", err))
+        }
+      } catch (err) {
+        console.error("Failed to notify user of FDP comment update:", err);
+      }
+    }
 
     return NextResponse.json(updatedFDP);
   } catch (error) {

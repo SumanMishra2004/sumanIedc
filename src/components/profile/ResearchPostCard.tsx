@@ -15,6 +15,7 @@ import {
   Copyright,
   Award,
   GraduationCap,
+  Trophy,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ResearchDetailDialog } from "./ResearchDetailDialog"
@@ -27,6 +28,7 @@ export type ResearchType =
   | "copyright"
   | "certificate"
   | "fdp"
+  | "achievement"
 
 interface Author {
   id: string
@@ -99,6 +101,12 @@ export const typeConfig: Record<
     color: "#e879f9",
     badgeBg: "bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20",
     icon: <GraduationCap className="h-3.5 w-3.5" />,
+  },
+  achievement: {
+    label: "Achievement",
+    color: "#ef4444",
+    badgeBg: "bg-red-500/10 text-red-400 border-red-500/20",
+    icon: <Trophy className="h-3.5 w-3.5" />,
   },
 }
 

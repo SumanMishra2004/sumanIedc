@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { CopyrightStatus, TeacherStatus, UserRole } from '@prisma/client'
 import { copyrightSchema } from '@/lib/validations/copyright'
-
+import { sendNotificationEmail } from '@/lib/mail'
 // GET - List all copyrights with filtering, pagination, and search
 export async function GET(req: NextRequest) {
   try {
@@ -307,20 +307,31 @@ export async function POST(request: Request) {
     })
 
     // Notify faculty authors (co-authors / reviewers)
-    const facultyUserIds = copyright.facultyAuthors.map((fa) => fa.userId)
-    for (const fId of facultyUserIds) {
+    for (const fa of copyright.facultyAuthors) {
       try {
         await prisma.notification.create({
           data: {
-            userId: fId,
+            userId: fa.userId,
             title: "Co-authored Copyright Submitted",
             message: `A new co-authored copyright '${copyright.title}' has been submitted for review.`,
             type: "COPYRIGHT_SUBMITTED",
             link: `/dashboard/copyright?id=${copyright.id}`,
           },
         })
+
+        if (fa.user.email) {
+          await sendNotificationEmail({
+            to: fa.user.email,
+            recipientName: fa.user.name || "Faculty",
+            type: "SUBMITTED",
+            resourceType: "copyright",
+            resourceTitle: copyright.title,
+            dashboardLink: `/dashboard/copyright?id=${copyright.id}`,
+            submittedBy: session.user.name || "A team member",
+          }).catch(err => console.error("[Email] Failed to send SUBMITTED email to faculty author:", err))
+        }
       } catch (err) {
-        console.error("Failed to create notification for faculty author", fId, err)
+        console.error("Failed to create notification for faculty author", fa.userId, err)
       }
     }
 

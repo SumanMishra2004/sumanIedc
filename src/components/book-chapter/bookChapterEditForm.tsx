@@ -44,6 +44,8 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { uploadFile } from "@/lib/appwrite";
 import { bookChapterSchema } from "@/lib/validations/book-chapter";
+import { ImageCropModal } from "@/components/ui/ImageCropModal";
+import { useImageCrop } from "@/hooks/useImageCrop";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type BookChapterFormValues = z.infer<typeof bookChapterSchema>;
@@ -257,6 +259,7 @@ export default function EditBookChapterDialog({
   const [isLoading, setIsLoading] = useState(true);
   const [bookChapter, setBookChapter] = useState<BookChapter | null>(null);
   const [keywordInput, setKeywordInput] = useState("");
+  const { cropState, openCrop, closeCrop } = useImageCrop();
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -362,33 +365,26 @@ export default function EditBookChapterDialog({
   }, [open, bookChapterId, loadBookChapterData]);
 
   // ── File handlers (attached to outside inputs) ───────────────────────────
-  const handleImageChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Please upload a valid image file (JPG, PNG, WebP)");
-      e.target.value = "";
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image must be smaller than 5 MB");
-      e.target.value = "";
-      return;
-    }
-    setImageFile(file);
-    setUploadingImage(true);
-    try {
-      const url = await uploadFile(file);
-      form.setValue("imageUrl", url, { shouldValidate: true });
-      toast.success("Cover image uploaded");
-    } catch {
-      toast.error("Image upload failed — please try again");
-      setImageFile(null);
-    } finally {
-      setUploadingImage(false);
-      e.target.value = "";
-    }
-  }, [form]);
+    e.target.value = "";
+    openCrop(file, "poster", async (croppedFile) => {
+      closeCrop();
+      setImageFile(croppedFile);
+      setUploadingImage(true);
+      try {
+        const url = await uploadFile(croppedFile);
+        form.setValue("imageUrl", url, { shouldValidate: true });
+        toast.success("Cover image uploaded");
+      } catch {
+        toast.error("Image upload failed — please try again");
+        setImageFile(null);
+      } finally {
+        setUploadingImage(false);
+      }
+    });
+  }, [form, openCrop, closeCrop]);
 
   const handleDocumentChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -458,6 +454,7 @@ export default function EditBookChapterDialog({
 
   return (
     <>
+      {cropState.open && <ImageCropModal src={cropState.src} ratio={cropState.ratio} fileName={cropState.fileName} onCrop={cropState.onCrop} onCancel={closeCrop} />}
       {/*
         ── THE FIX: Hidden file inputs are OUTSIDE <DialogContent> ────────────
         Same pattern as CreateDialog — inputs live outside the portal so they

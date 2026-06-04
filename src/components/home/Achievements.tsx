@@ -148,12 +148,15 @@ export default function ResearchGlory() {
   const lineRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
 
-  // activeReal: 0..N-1 (real slide index)
+  const [slides, setSlides] = useState<any[]>(() => [...BASE_SLIDES, ...BASE_SLIDES, ...BASE_SLIDES])
+  const [nVal, setNVal] = useState(BASE_SLIDES.length)
+
+  // activeReal: 0..nVal-1 (real slide index)
   const [activeReal, setActiveReal] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
 
-  // virtualIdx: position in the SLIDES triple array, starts at N (middle copy)
-  const virtualIdx = useRef(N);
+  // virtualIdx: position in the slides triple array, starts at nVal (middle copy)
+  const virtualIdx = useRef(BASE_SLIDES.length);
   const isAnimating = useRef(false);
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -198,8 +201,39 @@ export default function ResearchGlory() {
   /* ── init positions ────────────────────────────────────────────────── */
   useEffect(() => {
     // small delay so refs populate
-    const raf = requestAnimationFrame(() => applyCovertflow(N, false));
+    const raf = requestAnimationFrame(() => applyCovertflow(nVal, false));
     return () => cancelAnimationFrame(raf);
+  }, [applyCovertflow, nVal]);
+
+  // Fetch dynamic achievements from backend
+  useEffect(() => {
+    const loadAchievements = async () => {
+      try {
+        const res = await fetch("/api/public/achievements")
+        if (res.ok) {
+          const data = await res.json()
+          if (data.achievements && data.achievements.length > 0) {
+            const formatted = data.achievements.map((a: any) => ({
+              id: a.id,
+              img: a.imageUrl || "https://res.cloudinary.com/dvky83edw/image/upload/v1774099839/iot/6be548f0-60d7-4556-a311-20d28ee10539.png",
+              tag: a.category || "Achievement",
+              title: a.title,
+              year: a.year
+            }))
+            const tripled = [...formatted, ...formatted, ...formatted]
+            setSlides(tripled)
+            setNVal(formatted.length)
+            virtualIdx.current = formatted.length
+            setTimeout(() => {
+              applyCovertflow(formatted.length, false)
+            }, 50)
+          }
+        }
+      } catch (err) {
+        console.error("Error loading homepage achievements:", err)
+      }
+    }
+    loadAchievements()
   }, [applyCovertflow]);
 
   // resize
@@ -214,7 +248,7 @@ export default function ResearchGlory() {
     (delta: number) => {
       if (isAnimating.current) return;
       const nextVi = virtualIdx.current + delta;
-      const nextReal = ((nextVi % N) + N) % N;
+      const nextReal = ((nextVi % nVal) + nVal) % nVal;
 
       isAnimating.current = true;
       virtualIdx.current = nextVi;
@@ -224,14 +258,14 @@ export default function ResearchGlory() {
       // after animation, jump to middle copy if we've drifted
       gsap.delayedCall(0.6, () => {
         isAnimating.current = false;
-        if (nextVi < N || nextVi >= N * 2) {
-          const corrected = N + nextReal;
+        if (nextVi < nVal || nextVi >= nVal * 2) {
+          const corrected = nVal + nextReal;
           virtualIdx.current = corrected;
           applyCovertflow(corrected, false);
         }
       });
     },
-    [applyCovertflow],
+    [applyCovertflow, nVal],
   );
 
   /* ── auto-rotate ───────────────────────────────────────────────────── */
@@ -687,8 +721,8 @@ export default function ResearchGlory() {
               }}
             />
 
-            {SLIDES.map((slide, i) => {
-              const realIndex = i % N;
+            {slides.map((slide, i) => {
+              const realIndex = i % nVal;
               return (
                 <div
                   key={`${slide.id}-${i}`}
@@ -816,7 +850,7 @@ export default function ResearchGlory() {
               alignItems: "center",
             }}
           >
-            {BASE_SLIDES.map((_, i) => (
+            {Array.from({ length: nVal }).map((_, i) => (
               <button
                 key={i}
                 onClick={() => navigate(i - activeReal)}
@@ -843,7 +877,7 @@ export default function ResearchGlory() {
               }}
             >
               {String(activeReal + 1).padStart(2, "0")} /{" "}
-              {String(N).padStart(2, "0")}
+              {String(nVal).padStart(2, "0")}
             </span>
           </div>
         </div>

@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { UserRole, TeacherStatus, ConferenceStatus, ConferenceMode } from '@prisma/client'
 import { conferenceSchema } from '@/lib/validations/conference'
+import { sendNotificationEmail, broadcastPublicationEmail } from '@/lib/mail'
 
 // GET - Get single conference by ID
 export async function GET(
@@ -382,18 +383,28 @@ export async function PATCH(
 
     if (newTeacherStatus && newTeacherStatus !== currentTeacherStatus) {
       if (newTeacherStatus === TeacherStatus.ACCEPTED) {
-        for (const sId of studentUserIds) {
+        for (const sa of conference.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Conference Approved by Faculty",
             `Your conference '${conference.conferenceName}' has been accepted by the faculty reviewer.`,
             "CONFERENCE_APPROVED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "APPROVED",
+              resourceType: "conference",
+              resourceTitle: conference.conferenceName,
+              dashboardLink: `/dashboard/conferences?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
         // Notify Admins
         const admins = await prisma.user.findMany({
           where: { role: UserRole.ADMIN },
-          select: { id: true }
+          select: { id: true, email: true, name: true }
         })
         for (const admin of admins) {
           await notifyUser(
@@ -402,54 +413,136 @@ export async function PATCH(
             `The conference '${conference.conferenceName}' has been approved by the reviewer and is ready for final publication.`,
             "CONFERENCE_APPROVED"
           )
+          if (admin.email) {
+            await sendNotificationEmail({
+              to: admin.email,
+              recipientName: admin.name || "Admin",
+              type: "APPROVED",
+              resourceType: "conference",
+              resourceTitle: conference.conferenceName,
+              dashboardLink: `/dashboard/conferences?id=${id}`,
+              isAdminNotification: true,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.UPDATE) {
-        for (const sId of studentUserIds) {
+        for (const sa of conference.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Revision Requested for Conference",
             `The reviewer requested corrections for '${conference.conferenceName}'. Reason: ${body.updateComment || "Please view details."}`,
             "CONFERENCE_UPDATE_REQUESTED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "REVISION",
+              resourceType: "conference",
+              resourceTitle: conference.conferenceName,
+              dashboardLink: `/dashboard/conferences?id=${id}`,
+              message: body.updateComment || "Please view details.",
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.REJECTED) {
-        for (const sId of studentUserIds) {
+        for (const sa of conference.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Conference Rejected",
             `Your conference '${conference.conferenceName}' was rejected by the reviewer.`,
             "CONFERENCE_REJECTED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "REJECTED",
+              resourceType: "conference",
+              resourceTitle: conference.conferenceName,
+              dashboardLink: `/dashboard/conferences?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.UPLOADED) {
-        for (const fId of facultyUserIds) {
+        for (const fa of conference.facultyAuthors) {
           await notifyUser(
-            fId,
+            fa.userId,
             "Conference Resubmitted for Review",
             `A co-authored conference '${conference.conferenceName}' has been resubmitted for review.`,
             "CONFERENCE_SUBMITTED"
           )
+          if (fa.user.email) {
+            await sendNotificationEmail({
+              to: fa.user.email,
+              recipientName: fa.user.name || "Faculty",
+              type: "SUBMITTED",
+              resourceType: "conference",
+              resourceTitle: conference.conferenceName,
+              dashboardLink: `/dashboard/conferences?id=${id}`,
+              submittedBy: session.user.name || "A team member",
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       }
     }
 
     if (newConfStatus && newConfStatus !== currentConfStatus) {
       if (newConfStatus === ConferenceStatus.PUBLISHED) {
-        for (const sId of studentUserIds) {
+        for (const sa of conference.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Conference Published!",
             `Your conference '${conference.conferenceName}' has been successfully verified and published by the administrator.`,
             "CONFERENCE_PUBLISHED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "PUBLISHED",
+              resourceType: "conference",
+              resourceTitle: conference.conferenceName,
+              dashboardLink: `/dashboard/conferences?id=${id}`,
+              publicLink: `/publications/conferences?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
-        for (const fId of facultyUserIds) {
+        for (const fa of conference.facultyAuthors) {
           await notifyUser(
-            fId,
+            fa.userId,
             "Conference Published!",
             `The co-authored conference '${conference.conferenceName}' has been successfully published.`,
             "CONFERENCE_PUBLISHED"
           )
+          if (fa.user.email) {
+            await sendNotificationEmail({
+              to: fa.user.email,
+              recipientName: fa.user.name || "Faculty",
+              type: "PUBLISHED",
+              resourceType: "conference",
+              resourceTitle: conference.conferenceName,
+              dashboardLink: `/dashboard/conferences?id=${id}`,
+              publicLink: `/publications/conferences?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
+        }
+        
+        // Broadcast to all users
+        if (body.isPublic || existingConference.isPublic) {
+          const allAuthorNames = [
+            ...conference.studentAuthors.map(sa => sa.user.name).filter(Boolean),
+            ...conference.facultyAuthors.map(fa => fa.user.name).filter(Boolean),
+          ] as string[]
+          const allAuthorIds = [...studentUserIds, ...facultyUserIds]
+
+          broadcastPublicationEmail({
+            resourceType: "conference",
+            resourceTitle: conference.conferenceName,
+            resourceId: id,
+            authors: allAuthorNames,
+            excludeUserIds: allAuthorIds,
+          }).catch(err => console.error("[Email] Broadcast failed:", err))
         }
       }
     }

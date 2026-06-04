@@ -9,6 +9,7 @@ import {
   ScrollText,
   GraduationCap,
   LayoutGrid,
+  Trophy,
 } from "lucide-react"
 
 interface Stats {
@@ -20,6 +21,7 @@ interface Stats {
   copyrights: number
   certificates: number
   fdps: number
+  achievements: number
 }
 
 interface ProfileStatsRowProps {
@@ -77,6 +79,13 @@ export function ProfileStatsRow({ stats, userRole }: ProfileStatsRowProps) {
       icon: <Award className="h-5 w-5" />,
       accent: "#fbbf24",
       bg: "from-amber-500/10 to-transparent",
+    },
+    {
+      label: "Achievements",
+      value: stats.achievements,
+      icon: <Trophy className="h-5 w-5" />,
+      accent: "#ef4444",
+      bg: "from-red-500/10 to-transparent",
     },
     ...(userRole === "FACULTY" || userRole === "ADMIN"
       ? [

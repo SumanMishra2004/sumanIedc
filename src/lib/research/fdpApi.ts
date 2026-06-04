@@ -143,3 +143,17 @@ export const exportFDPsToCSV = async (filters?: FDPFilters) => {
         return handleApiError(error);
     }
 }
+
+export const bulkDeleteFDPs = async (
+  ids: string[]
+): Promise<ApiResponse<{ count: number }>> => {
+  try {
+    const response = await axios.delete<{ count: number }>(
+      API_BASE_URL,
+      { data: { ids } }
+    )
+    return { data: response.data }
+  } catch (error) {
+    return handleApiError(error)
+  }
+}

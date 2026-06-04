@@ -39,6 +39,8 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { uploadFile } from "@/lib/appwrite";
 import { getConferenceById, updateConference } from "@/lib/research/conferenceApi";
+import { ImageCropModal } from "@/components/ui/ImageCropModal";
+import { useImageCrop } from "@/hooks/useImageCrop";
 
 const conferenceSchema = z.object({
   conferenceName: z.string().min(1, "Conference Name is required").max(200, "Name is too long"),
@@ -89,6 +91,7 @@ export default function ConferenceEditForm({
   const [loading, setLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [keywordInput, setKeywordInput] = useState("");
+  const { cropState, openCrop, closeCrop } = useImageCrop();
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [documentFile, setDocumentFile] = useState<File | null>(null);
@@ -179,23 +182,26 @@ export default function ConferenceEditForm({
     fetchConference();
   }, [conferenceId, open, form]);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setImageFile(file);
-    setUploadingImage(true);
-    try {
-      const fileId = await uploadFile(file);
-      const fileUrl = `https://cloud.appwrite.io/v1/storage/buckets/${process.env.NEXT_PUBLIC_APPWRITE_BUCKET_ID}/files/${fileId}/view?project=${process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID}`;
-      form.setValue("imageUrl", fileUrl);
-      toast.success("Image uploaded successfully");
-    } catch (error) {
-      toast.error("Failed to upload image");
-      console.error(error);
-    } finally {
-      setUploadingImage(false);
-    }
+    e.target.value = "";
+    openCrop(file, "poster", async (croppedFile) => {
+      closeCrop();
+      setImageFile(croppedFile);
+      setUploadingImage(true);
+      try {
+        const fileId = await uploadFile(croppedFile);
+        const fileUrl = `https://cloud.appwrite.io/v1/storage/buckets/${process.env.NEXT_PUBLIC_APPWRITE_BUCKET_ID}/files/${fileId}/view?project=${process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID}`;
+        form.setValue("imageUrl", fileUrl);
+        toast.success("Image uploaded successfully");
+      } catch (error) {
+        toast.error("Failed to upload image");
+        console.error(error);
+      } finally {
+        setUploadingImage(false);
+      }
+    });
   };
 
   const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -274,6 +280,8 @@ export default function ConferenceEditForm({
   };
 
   return (
+    <>
+      {cropState.open && <ImageCropModal src={cropState.src} ratio={cropState.ratio} fileName={cropState.fileName} onCrop={cropState.onCrop} onCancel={closeCrop} />}
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 py-4 border-b">
@@ -698,5 +706,6 @@ export default function ConferenceEditForm({
         )}
       </DialogContent>
     </Dialog>
+    </>
   );
 }

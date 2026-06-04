@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -17,15 +16,42 @@ import {
   Info,
   Clock,
   Layout,
+  MessageSquare,
 } from "lucide-react";
 import { FDP } from "@/types/fdp";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 
 interface FDPViewDialogProps {
   fdp: FDP | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+// Status configuration
+const getStatusConfig = (status: string) => {
+  const configs: Record<string, { bg: string; text: string; border: string; dot: string }> = {
+    APPROVED: {
+      bg: "bg-emerald-50 dark:bg-emerald-950/30",
+      text: "text-emerald-700 dark:text-emerald-400",
+      border: "border-emerald-200 dark:border-emerald-800",
+      dot: "bg-emerald-500",
+    },
+    SUBMITTED: {
+      bg: "bg-blue-50 dark:bg-blue-950/30",
+      text: "text-blue-700 dark:text-blue-400",
+      border: "border-blue-200 dark:border-blue-800",
+      dot: "bg-blue-500",
+    },
+    UNDER_REVIEW: {
+      bg: "bg-amber-50 dark:bg-amber-950/30",
+      text: "text-amber-700 dark:text-amber-400",
+      border: "border-amber-200 dark:border-amber-800",
+      dot: "bg-amber-500",
+    },
+  };
+  return configs[status] || configs.SUBMITTED;
+};
 
 export function FDPViewDialog({
   fdp,
@@ -34,21 +60,43 @@ export function FDPViewDialog({
 }: FDPViewDialogProps) {
   if (!fdp) return null;
 
+  const statusConfig = fdp.fdpStatus ? getStatusConfig(fdp.fdpStatus) : null;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0">
         <DialogHeader className="px-6 py-4 border-b">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <DialogTitle className="text-xl font-bold leading-tight mb-2">
-                {fdp.title}
-              </DialogTitle>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {fdp.fdpStatus && (
+                <Badge variant="outline" className={cn("text-[10px] font-semibold px-2 py-0.5", statusConfig?.bg, statusConfig?.text, statusConfig?.border)}>
+                  {fdp.fdpStatus}
+                </Badge>
+              )}
+              <Badge variant={fdp.isPublic ? "outline" : "secondary"} className="text-[10px]">
+                {fdp.isPublic ? "🌐 Public" : "🔒 Private"}
+              </Badge>
             </div>
+            <DialogTitle className="text-xl font-bold leading-tight mt-1 text-foreground">
+              {fdp.title}
+            </DialogTitle>
           </div>
         </DialogHeader>
 
         <ScrollArea className="flex-1">
           <div className="p-6 space-y-6">
+            {fdp.updateComment && (
+              <div className="bg-amber-500/5 p-4 rounded-xl border border-dashed border-amber-500/20 space-y-1.5">
+                <h4 className="text-xs font-semibold text-amber-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  Correction Requested by Reviewer
+                </h4>
+                <p className="text-xs text-amber-700 font-medium leading-relaxed whitespace-pre-wrap">
+                  {fdp.updateComment}
+                </p>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Left Column: Details */}
               <div className="space-y-6">
@@ -100,7 +148,7 @@ export function FDPViewDialog({
                     <Info className="h-4 w-4" />
                     Description
                   </div>
-                  <div className="text-sm text-muted-foreground leading-relaxed">
+                  <div className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
                     {fdp.description || "No description provided."}
                   </div>
                 </div>

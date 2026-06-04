@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { UserRole, TeacherStatus, BookchapterStatus } from '@prisma/client'
 import { bookChapterSchema } from '@/lib/validations/book-chapter'
+import { sendNotificationEmail, broadcastPublicationEmail } from '@/lib/mail'
 
 // GET - Get single book chapter by ID with permission checks
 export async function GET(
@@ -429,18 +430,28 @@ export async function PATCH(
     // Trigger status transition notifications
     if (newTeacherStatus && newTeacherStatus !== currentTeacherStatus) {
       if (newTeacherStatus === TeacherStatus.ACCEPTED) {
-        for (const sId of studentUserIds) {
+        for (const sa of bookChapter.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Book Chapter Approved by Faculty",
             `Your book chapter '${bookChapter.title}' has been accepted by the faculty reviewer.`,
             "BOOK_CHAPTER_APPROVED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "APPROVED",
+              resourceType: "book-chapter",
+              resourceTitle: bookChapter.title,
+              dashboardLink: `/dashboard/book-chapters?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
         // Notify Admins
         const admins = await prisma.user.findMany({
           where: { role: UserRole.ADMIN },
-          select: { id: true }
+          select: { id: true, email: true, name: true }
         })
         for (const admin of admins) {
           await notifyUser(
@@ -449,54 +460,136 @@ export async function PATCH(
             `The book chapter '${bookChapter.title}' has been approved by the reviewer and is ready for final publication.`,
             "BOOK_CHAPTER_APPROVED"
           )
+          if (admin.email) {
+            await sendNotificationEmail({
+              to: admin.email,
+              recipientName: admin.name || "Admin",
+              type: "APPROVED",
+              resourceType: "book-chapter",
+              resourceTitle: bookChapter.title,
+              dashboardLink: `/dashboard/book-chapters?id=${id}`,
+              isAdminNotification: true,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.UPDATE) {
-        for (const sId of studentUserIds) {
+        for (const sa of bookChapter.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Revision Requested for Book Chapter",
             `The reviewer requested corrections for '${bookChapter.title}'. Reason: ${body.updateComment || "Please view details."}`,
             "BOOK_CHAPTER_UPDATE_REQUESTED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "REVISION",
+              resourceType: "book-chapter",
+              resourceTitle: bookChapter.title,
+              dashboardLink: `/dashboard/book-chapters?id=${id}`,
+              message: body.updateComment || "Please view details.",
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.REJECTED) {
-        for (const sId of studentUserIds) {
+        for (const sa of bookChapter.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Book Chapter Rejected",
             `Your book chapter '${bookChapter.title}' was rejected by the reviewer.`,
             "BOOK_CHAPTER_REJECTED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "REJECTED",
+              resourceType: "book-chapter",
+              resourceTitle: bookChapter.title,
+              dashboardLink: `/dashboard/book-chapters?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.UPLOADED) {
-        for (const fId of facultyUserIds) {
+        for (const fa of bookChapter.facultyAuthors) {
           await notifyUser(
-            fId,
+            fa.userId,
             "Book Chapter Resubmitted for Review",
             `A co-authored book chapter '${bookChapter.title}' has been resubmitted for review.`,
             "BOOK_CHAPTER_SUBMITTED"
           )
+          if (fa.user.email) {
+            await sendNotificationEmail({
+              to: fa.user.email,
+              recipientName: fa.user.name || "Faculty",
+              type: "SUBMITTED",
+              resourceType: "book-chapter",
+              resourceTitle: bookChapter.title,
+              dashboardLink: `/dashboard/book-chapters?id=${id}`,
+              submittedBy: session.user.name || "A team member",
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       }
     }
 
     if (newChapterStatus && newChapterStatus !== currentChapterStatus) {
       if (newChapterStatus === BookchapterStatus.PUBLISHED) {
-        for (const sId of studentUserIds) {
+        for (const sa of bookChapter.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Book Chapter Published!",
             `Your book chapter '${bookChapter.title}' has been successfully verified and published by the administrator.`,
             "BOOK_CHAPTER_PUBLISHED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "PUBLISHED",
+              resourceType: "book-chapter",
+              resourceTitle: bookChapter.title,
+              dashboardLink: `/dashboard/book-chapters?id=${id}`,
+              publicLink: `/publications/book-chapters?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
-        for (const fId of facultyUserIds) {
+        for (const fa of bookChapter.facultyAuthors) {
           await notifyUser(
-            fId,
+            fa.userId,
             "Book Chapter Published!",
             `The co-authored book chapter '${bookChapter.title}' has been successfully published.`,
             "BOOK_CHAPTER_PUBLISHED"
           )
+          if (fa.user.email) {
+            await sendNotificationEmail({
+              to: fa.user.email,
+              recipientName: fa.user.name || "Faculty",
+              type: "PUBLISHED",
+              resourceType: "book-chapter",
+              resourceTitle: bookChapter.title,
+              dashboardLink: `/dashboard/book-chapters?id=${id}`,
+              publicLink: `/publications/book-chapters?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
+        }
+        
+        // Broadcast to all users
+        if (body.isPublic || existingChapter.isPublic) {
+          const allAuthorNames = [
+            ...bookChapter.studentAuthors.map(sa => sa.user.name).filter(Boolean),
+            ...bookChapter.facultyAuthors.map(fa => fa.user.name).filter(Boolean),
+          ] as string[]
+          const allAuthorIds = [...studentUserIds, ...facultyUserIds]
+
+          broadcastPublicationEmail({
+            resourceType: "book-chapter",
+            resourceTitle: bookChapter.title,
+            resourceId: id,
+            authors: allAuthorNames,
+            excludeUserIds: allAuthorIds,
+          }).catch(err => console.error("[Email] Broadcast failed:", err))
         }
       }
     }

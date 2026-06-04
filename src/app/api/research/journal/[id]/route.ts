@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { TeacherStatus, UserRole, JournalStatus } from "@prisma/client"
 import { journalSchema } from "@/lib/validations/journal"
-
+import { sendNotificationEmail, broadcastPublicationEmail } from "@/lib/mail"
 // GET - Get single journal by ID with permission checks
 export async function GET(
   req: NextRequest,
@@ -476,18 +476,28 @@ export async function PATCH(
     if (newTeacherStatus && newTeacherStatus !== currentTeacherStatus) {
       if (newTeacherStatus === TeacherStatus.ACCEPTED) {
         // Notify student authors
-        for (const sId of studentUserIds) {
+        for (const sa of journal.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Journal Approved by Faculty",
             `Your publication '${journal.title}' has been accepted by the faculty reviewer.`,
             "JOURNAL_APPROVED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "APPROVED",
+              resourceType: "journal",
+              resourceTitle: journal.title,
+              dashboardLink: `/dashboard/journal?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
         // Notify all admins
         const admins = await prisma.user.findMany({
           where: { role: UserRole.ADMIN },
-          select: { id: true },
+          select: { id: true, email: true, name: true },
         })
         for (const admin of admins) {
           await notifyUser(
@@ -496,36 +506,79 @@ export async function PATCH(
             `The publication '${journal.title}' has been approved by the reviewer and is ready for final publication.`,
             "JOURNAL_APPROVED"
           )
+          if (admin.email) {
+            await sendNotificationEmail({
+              to: admin.email,
+              recipientName: admin.name || "Admin",
+              type: "APPROVED",
+              resourceType: "journal",
+              resourceTitle: journal.title,
+              dashboardLink: `/dashboard/journal?id=${id}`,
+              isAdminNotification: true,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.UPDATE) {
         // Notify student authors
-        for (const sId of studentUserIds) {
+        for (const sa of journal.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Revision Requested for Journal",
             `The reviewer requested changes for '${journal.title}'. Reason: ${body.updateComment || "Please view details."}`,
             "JOURNAL_UPDATE_REQUESTED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "REVISION",
+              resourceType: "journal",
+              resourceTitle: journal.title,
+              dashboardLink: `/dashboard/journal?id=${id}`,
+              message: body.updateComment || "Please view details.",
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.REJECTED) {
         // Notify student authors
-        for (const sId of studentUserIds) {
+        for (const sa of journal.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Journal Rejected",
             `Your publication '${journal.title}' was rejected by the reviewer.`,
             "JOURNAL_REJECTED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "REJECTED",
+              resourceType: "journal",
+              resourceTitle: journal.title,
+              dashboardLink: `/dashboard/journal?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       } else if (newTeacherStatus === TeacherStatus.UPLOADED) {
         // Notify faculty co-authors
-        for (const fId of facultyUserIds) {
+        for (const fa of journal.facultyAuthors) {
           await notifyUser(
-            fId,
+            fa.userId,
             "Journal Resubmitted for Review",
             `A co-authored publication '${journal.title}' has been resubmitted for review.`,
             "JOURNAL_SUBMITTED"
           )
+          if (fa.user.email) {
+            await sendNotificationEmail({
+              to: fa.user.email,
+              recipientName: fa.user.name || "Faculty",
+              type: "SUBMITTED",
+              resourceType: "journal",
+              resourceTitle: journal.title,
+              dashboardLink: `/dashboard/journal?id=${id}`,
+              submittedBy: session.user.name || "A team member",
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
       }
     }
@@ -533,22 +586,61 @@ export async function PATCH(
     if (newJournalStatus && newJournalStatus !== currentJournalStatus) {
       if (newJournalStatus === JournalStatus.PUBLISHED) {
         // Notify student authors
-        for (const sId of studentUserIds) {
+        for (const sa of journal.studentAuthors) {
           await notifyUser(
-            sId,
+            sa.userId,
             "Journal Published!",
             `Your publication '${journal.title}' has been successfully verified and published by the administrator.`,
             "JOURNAL_PUBLISHED"
           )
+          if (sa.user.email) {
+            await sendNotificationEmail({
+              to: sa.user.email,
+              recipientName: sa.user.name || "Student",
+              type: "PUBLISHED",
+              resourceType: "journal",
+              resourceTitle: journal.title,
+              dashboardLink: `/dashboard/journal?id=${id}`,
+              publicLink: `/publications/journals?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
         }
         // Notify faculty co-authors
-        for (const fId of facultyUserIds) {
+        for (const fa of journal.facultyAuthors) {
           await notifyUser(
-            fId,
+            fa.userId,
             "Journal Published!",
             `The co-authored publication '${journal.title}' has been successfully published.`,
             "JOURNAL_PUBLISHED"
           )
+          if (fa.user.email) {
+            await sendNotificationEmail({
+              to: fa.user.email,
+              recipientName: fa.user.name || "Faculty",
+              type: "PUBLISHED",
+              resourceType: "journal",
+              resourceTitle: journal.title,
+              dashboardLink: `/dashboard/journal?id=${id}`,
+              publicLink: `/publications/journals?id=${id}`,
+            }).catch(err => console.error("[Email] Failed to send email", err))
+          }
+        }
+
+        // Broadcast to all users
+        if (body.isPublic || existingJournal.isPublic) {
+          const allAuthorNames = [
+            ...journal.studentAuthors.map(sa => sa.user.name).filter(Boolean),
+            ...journal.facultyAuthors.map(fa => fa.user.name).filter(Boolean),
+          ] as string[]
+          const allAuthorIds = [...studentUserIds, ...facultyUserIds]
+
+          broadcastPublicationEmail({
+            resourceType: "journal",
+            resourceTitle: journal.title,
+            resourceId: id,
+            authors: allAuthorNames,
+            excludeUserIds: allAuthorIds,
+          }).catch(err => console.error("[Email] Broadcast failed:", err))
         }
       }
     }

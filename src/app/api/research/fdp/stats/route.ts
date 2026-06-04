@@ -1,8 +1,7 @@
-
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-
 import { auth } from "@/lib/auth";
+import { FDPStatus } from "@prisma/client";
 
 // GET - Get statistics for FDPs
 export async function GET(req: NextRequest) {
@@ -31,20 +30,46 @@ export async function GET(req: NextRequest) {
         where.userId = user.id;
     }
 
-    // Get total count
-    const total = await prisma.fDP.count({ where });
+    // Get counts
+    const [total, submitted, underReview, approved, fdpsForTrends] = await Promise.all([
+      prisma.fDP.count({ where }),
+      prisma.fDP.count({
+        where: { ...where, fdpStatus: FDPStatus.SUBMITTED }
+      }),
+      prisma.fDP.count({
+        where: { ...where, fdpStatus: FDPStatus.UNDER_REVIEW }
+      }),
+      prisma.fDP.count({
+        where: { ...where, fdpStatus: FDPStatus.APPROVED }
+      }),
+      prisma.fDP.findMany({
+        where,
+        select: { startDate: true },
+        orderBy: { startDate: "asc" },
+      }),
+    ]);
 
-    // Maybe group by topic or organizedBy?
-    // Let's provide some breakdown if useful, or just total for now.
-    // Group by 'topic' might be too sparse.
-    
-    // Let's just return total and maybe 'my FDPs' vs 'all' if admin.
-    
+    // Calculate monthWiseCounts based on startDate
+    const monthlyCounts: Record<string, number> = {};
+    for (const f of fdpsForTrends) {
+      const date = f.startDate ? new Date(f.startDate) : null;
+      if (date) {
+        const monthKey = date.toISOString().slice(0, 7); // YYYY-MM
+        monthlyCounts[monthKey] = (monthlyCounts[monthKey] || 0) + 1;
+      }
+    }
+
+    const monthWiseCounts = Object.entries(monthlyCounts).map(([month, count]) => ({
+      month,
+      count,
+    })).sort((a, b) => a.month.localeCompare(b.month));
+
     return NextResponse.json({
-        total,
-        // Since FDP doesn't have status enums like 'teacherStatus' or 'bookChapterStatus',
-        // we can't provide those breakdowns.
-        // We can add a count for "current year" if we want, but keeping it simple like 'total' is safer.
+      total,
+      submitted,
+      underReview,
+      approved,
+      monthWiseCounts,
     });
 
   } catch (error) {

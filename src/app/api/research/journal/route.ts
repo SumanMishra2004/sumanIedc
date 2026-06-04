@@ -13,7 +13,7 @@ import {
   JournalPublicationMode
 } from "@prisma/client"
 import { journalSchema } from "@/lib/validations/journal"
-
+import { sendNotificationEmail } from "@/lib/mail"
 // GET - List all journals with filtering, pagination, and search
 export async function GET(req: NextRequest) {
   try {
@@ -376,20 +376,31 @@ export async function POST(request: Request) {
     })
 
     // Notify faculty authors (co-authors / reviewers)
-    const facultyUserIds = journal.facultyAuthors.map((fa) => fa.userId)
-    for (const fId of facultyUserIds) {
+    for (const fa of journal.facultyAuthors) {
       try {
         await prisma.notification.create({
           data: {
-            userId: fId,
+            userId: fa.userId,
             title: "Co-authored Publication Submitted",
             message: `A new co-authored publication '${journal.title}' has been submitted for review.`,
             type: "JOURNAL_SUBMITTED",
             link: `/dashboard/journal?id=${journal.id}`,
           },
         })
+
+        if (fa.user.email) {
+          await sendNotificationEmail({
+            to: fa.user.email,
+            recipientName: fa.user.name || "Faculty",
+            type: "SUBMITTED",
+            resourceType: "journal",
+            resourceTitle: journal.title,
+            dashboardLink: `/dashboard/journal?id=${journal.id}`,
+            submittedBy: session.user.name || "A team member",
+          }).catch(err => console.error("[Email] Failed to send SUBMITTED email to faculty author:", err))
+        }
       } catch (err) {
-        console.error("Failed to create notification for faculty author", fId, err)
+        console.error("Failed to create notification for faculty author", fa.userId, err)
       }
     }
 
