@@ -1,203 +1,64 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { gsap } from "gsap";
 
-
-// ─── COMPONENT ────────────────────────────────────────────────────────────────
 export default function CardCarousel() {
- 
-
-
   return (
     <div
-      style={{
-        position: "relative",
-        zIndex: 2,
-        minHeight: "100vh",
-        overflowX: "clip",
-        overflowY: "visible",
-        userSelect: "none",
-        background: "url(https://res.cloudinary.com/dvky83edw/image/upload/v1774103669/iot/e7aa4373-5920-499d-af38-7d109e14ecef.png) center/cover no-repeat, #0c0c0c",
-        fontFamily: "'DM Sans', sans-serif",
-        width: "100%",
-        perspective: 1400,
-        perspectiveOrigin: "50% 100%",
-      }}
-      className="md:mb-36 pt-10"
+      className="relative z-2 min-h-screen w-full select-none overflow-x-clip overflow-y-visible bg-[url('https://res.cloudinary.com/dvky83edw/image/upload/v1774103669/iot/e7aa4373-5920-499d-af38-7d109e14ecef.png')] bg-center bg-cover bg-no-repeat bg-background font-sans [perspective:1400px] [perspective-origin:50%_100%] transition-colors duration-300"
     >
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap');
-        @keyframes blobA { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-24px) scale(1.06)} }
-        @keyframes blobB { 0%,100%{transform:translateY(0) scale(1)} 50%{transform:translateY(-14px) scale(0.95)} }
-        @keyframes pulseGlow { 0%,100%{opacity:0.5} 50%{opacity:1} }
-      `}</style>
-
       {/* ── Left to Right Overlay ── */}
       <div
-        className="absolute inset-0 z-1 pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(to right, rgba(12,12,12,1) 0%, rgba(12,12,12,0.95) 30%, rgba(12,12,12,0.65) 60%, rgba(12,12,12,0.1) 100%)",
-        }}
+        className="absolute inset-0 z-[1] pointer-events-none bg-[linear-gradient(to_right,var(--background)_0%,oklch(from_var(--background)_l_c_h_/_0.95)_30%,oklch(from_var(--background)_l_c_h_/_0.65)_60%,oklch(from_var(--background)_l_c_h_/_0.1)_100%)]"
       />
       <div
-        className="absolute inset-0 z-1 pointer-events-none"
-        style={{
-          background:
-            "linear-gradient(to top, rgba(12,12,12,1) 0%, rgba(12,12,12,0.45) 30%, rgba(12,12,12,0.15) 60%, rgba(12,12,12,0) 100%)",
-        }}
+        className="absolute inset-0 z-[1] pointer-events-none bg-[linear-gradient(to_top,var(--background)_0%,oklch(from_var(--background)_l_c_h_/_0.45)_30%,oklch(from_var(--background)_l_c_h_/_0.15)_60%,transparent_100%)]"
       />
 
-    <div
-  style={{
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: "-14rem",
-    zIndex: 4,
-    pointerEvents: "none",
-    background: `
-      linear-gradient(
-        to bottom,
-        rgba(12,12,12,0) 0%,
-        rgba(12,12,12,0.1) 20%,
-        rgba(12,12,12,0.25) 40%,
-        rgba(12,12,12,0.5) 60%,
-        rgba(12,12,12,0.75) 80%,
-        #0c0c0c 100%
-      )
-    `,
-  }}
-/>
+      <div
+        className="absolute inset-x-0 bottom-[-14rem] top-0 z-[4] pointer-events-none bg-[linear-gradient(to_bottom,transparent_0%,oklch(from_var(--background)_l_c_h/0.1)_20%,oklch(from_var(--background)_l_c_h/0.25)_40%,oklch(from_var(--background)_l_c_h/0.5)_60%,oklch(from_var(--background)_l_c_h/0.75)_80%,var(--background)_100%)]"
+      />
+
       {/* ── MAIN CONTENT — sits above scrim ── */}
-      <div
-        style={{
-          position: "relative",
-          zIndex: 10,
-          display: "flex",
-          flexDirection: "row",
-          width: "100%",
-          minHeight: "100vh",
-          padding: "48px 0 0 0",
-          alignItems: "stretch",
-        }}
-      >
+      <div className="relative z-10 flex flex-row w-full min-h-screen items-stretch">
         {/* ── LEFT / CENTER — Institution name block ── */}
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            padding: "0 6vw",
-            minWidth: 0,
-          }}
-        >
-          {/* Top label row */}
-
+        <div className="flex-1 flex flex-col justify-start pt-12 min-h-screen  px-[6vw] min-w-0">
           {/* ── PRIMARY GIANT HEADING ── */}
-          {/* Cell name */}
           <h1
-            style={{
-              fontFamily: "'Bebas Neue', 'Arial Narrow', sans-serif",
-              fontSize: "clamp(3rem, 7vw, 6rem)",
-              fontWeight: 400,
-              lineHeight: 0.95,
-              letterSpacing: "0.01em",
-              color: "#fff",
-              margin: 0,
-              marginBottom: 4,
-            }}
+            className="font-['Bebas_Neue'] font-normal leading-[0.95] tracking-[0.01em] text-foreground margin-0 mb-1 text-4xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl"
           >
             Innovation &amp;
             <br />
             Entrepreneurship
             <br />
-            <span
-              style={{
-                color: "#c9f53b",
-              }}
-            >
+            <span className="text-primary">
               Development Cell
             </span>
           </h1>
 
           {/* Acronym badge */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 14,
-         
-              marginBottom: 12,
-            }}
-          >
-            <span
-              style={{
-                fontFamily: "monospace",
-                fontSize: "clamp(1.1rem, 2.5vw, 1.8rem)",
-                fontWeight: 700,
-                color: "#0c0c0c",
-                background: "#c9f53b",
-                padding: "4px 20px",
-                letterSpacing: "0.25em",
-                borderRadius: 4,
-              }}
-            >
+          <div className="flex items-center gap-3.5 mb-3">
+            <span className="font-mono text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-background bg-primary px-5 py-1 tracking-[0.25em] rounded">
               I.E.D.C
             </span>
-            <div
-              style={{
-                height: 2,
-                flex: 1,
-                maxWidth: 120,
-                background: "linear-gradient(to right, #c9f53b, transparent)",
-              }}
-            />
+            <div className="h-0.5 flex-1 max-w-[120px] bg-gradient-to-r from-primary to-transparent" />
           </div>
 
           {/* Horizontal rule */}
-          <div
-            style={{
-              height: 1,
-              background:
-                "linear-gradient(to right, rgba(201,245,59,0.4), transparent)",
-              marginBottom: 10,
-              width: "70%",
-            }}
-          />
+          <div className="h-px w-[70%] bg-gradient-to-r from-primary/40 to-transparent mb-2.5" />
 
           {/* ── DEPARTMENT NAME ── */}
-          <h2
-            style={{
-              fontFamily: "'Bebas Neue', 'Arial Narrow', sans-serif",
-              fontSize: "clamp(1.5rem, 3.4vw, 3.2rem)",
-              fontWeight: 400,
-              lineHeight: 1.0,
-              letterSpacing: "0.015em",
-              color: "rgba(255,255,255,0.78)",
-              margin: 0,
-              marginBottom: 10,
-            }}
-          >
+          <h2 className="font-['Bebas_Neue'] text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-normal leading-none tracking-[0.015em] text-foreground/80 margin-0 mb-2.5">
             <span className="hidden md:block">
               Department of
-              </span>
-               Computer Science and Engineering
+            </span>
+            Computer Science and Engineering
           </h2>
 
           {/* Specialisations */}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap" as const,
-              gap: 8,
-              marginBottom: 16,
-            }}
-          >
+          <div className="flex flex-wrap gap-2 mb-4">
             {[
               "Internet of Things",
               "Cyber Security",
@@ -205,17 +66,7 @@ export default function CardCarousel() {
             ].map((s) => (
               <span
                 key={s}
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "clamp(0.45rem, 0.8vw, 0.6rem)",
-                  letterSpacing: "0.06em",
-                  textTransform: "uppercase" as const,
-                  color: "#c9f53b",
-                  border: "1px solid rgba(201,245,59,0.35)",
-                  background: "rgba(201,245,59,0.06)",
-                  padding: "5px 14px",
-                  borderRadius: 4,
-                }}
+                className="font-mono text-[9px] sm:text-[10px] md:text-[11px] tracking-[0.06em] uppercase text-primary border border-primary/35 bg-primary/5 px-3.5 py-1.25 rounded"
               >
                 {s}
               </span>
@@ -223,134 +74,34 @@ export default function CardCarousel() {
           </div>
 
           {/* CTA buttons */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" as const }}>
-            <button
-              style={{
-                padding: "10px 34px",
-                borderRadius: 4,
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                color: "#0c0c0c",
-                border: "none",
-                cursor: "pointer",
-                background: "linear-gradient(135deg,#c9f53b,#a8d62a)",
-                boxShadow: "0 4px 28px rgba(201,245,59,0.35)",
-                textTransform: "uppercase" as const,
-              }}
-            >
+          <div className="flex gap-3 flex-wrap">
+            <button className="px-8 py-2.5 rounded text-[10px] font-bold tracking-[0.06em] text-background bg-gradient-to-br from-primary to-[#a8d62a] shadow-lg shadow-primary/35 uppercase cursor-pointer hover:opacity-90 transition-all">
               Explore Programs →
             </button>
-            <button
-              style={{
-                padding: "13px 34px",
-                borderRadius: 4,
-                fontSize: 13,
-                fontWeight: 700,
-                letterSpacing: "0.06em",
-                color: "#c9f53b",
-                border: "1px solid rgba(201,245,59,0.4)",
-                cursor: "pointer",
-                background: "transparent",
-                textTransform: "uppercase" as const,
-              }}
-            >
+            <button className="px-8 py-2.5 rounded text-[10px] font-bold tracking-[0.06em] text-primary border border-primary/45 bg-transparent uppercase cursor-pointer hover:bg-primary/5 transition-all">
               Meet the Team
             </button>
           </div>
 
-          {/* Mobile tagline: horizontal below CTA buttons */}
-          <div
-            className="mt-6 flex items-center gap-3 md:hidden"
-            style={{ maxWidth: 420 }}
-          >
-            <div
-              style={{
-                height: 1,
-                flex: 1,
-                background:
-                  "linear-gradient(to right, rgba(201,245,59,0.5), rgba(201,245,59,0))",
-              }}
-            />
-            <span
-              style={{
-                fontFamily: "monospace",
-                fontSize: 11,
-                letterSpacing: "0.18em",
-                textTransform: "uppercase" as const,
-                color: "rgba(201,245,59,0.9)",
-                userSelect: "none",
-                whiteSpace: "nowrap",
-                fontWeight: 800,
-              }}
-            >
+          {/* Mobile tagline */}
+          <div className="mt-6 flex items-center gap-3 md:hidden max-w-[420px]">
+            <div className="h-px flex-1 bg-gradient-to-r from-primary/50 to-transparent" />
+            <span className="font-mono text-[11px] tracking-[0.18em] uppercase text-primary/90 select-none whitespace-nowrap font-extrabold">
               Innovate · Build · Disrupt
             </span>
-            <div
-              style={{
-                height: 1,
-                flex: 1,
-                background:
-                  "linear-gradient(to left, rgba(201,245,59,0.5), rgba(201,245,59,0))",
-              }}
-            />
+            <div className="h-px flex-1 bg-gradient-to-l from-primary/50 to-transparent" />
           </div>
         </div>
 
         {/* ── RIGHT — Vertical tagline strip ── */}
-        <div
-          className="hidden md:flex"
-          style={{
-            width: 56,
-            flexShrink: 0,
-            
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            borderLeft: "1px solid rgba(201,245,59,0.12)",
-            padding: "40px 0",
-            gap: 32,
-            position: "relative",
-           
-          }}
-        >
+        <div className="hidden md:flex w-14 shrink-0 flex-col items-center justify-center border-l border-border/40 py-10 gap-8 relative">
           {/* Vertical scrolling indicator line */}
-          <div
-            style={{
-              position: "absolute",
-              top: 0,
-              left: "50%",
-              transform: "translateX(-50%)",
-              width: 1,
-              height: "100%",
-              background:
-                "linear-gradient(to bottom, transparent, rgba(201,245,59,0.2) 30%, rgba(201,245,59,0.2) 70%, transparent)",
-              pointerEvents: "none",
-            }}
-          />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-px h-full bg-gradient-to-b from-transparent via-primary/20 to-transparent pointer-events-none" />
 
           {/* Vertical text — tagline */}
-          <div
-            style={{
-              writingMode: "vertical-rl" as const,
-              textOrientation: "mixed" as const,
-              transform: "rotate(180deg)",
-              fontFamily: "monospace",
-              fontSize: 12,
-              letterSpacing: "0.35em",
-              textTransform: "uppercase" as const,
-              color: "rgba(201,245,59,0.9)",
-              userSelect: "none",
-            }}
-            className="font-extrabold"
-          >
+          <div className="[writing-mode:vertical-rl] [text-orientation:mixed] rotate-180 font-mono text-[12px] tracking-[0.35em] uppercase text-primary/90 select-none font-extrabold">
             Innovate · Build · Disrupt
           </div>
-
-          {/* Divider dot */}
-          
-
-       
         </div>
       </div>
     </div>

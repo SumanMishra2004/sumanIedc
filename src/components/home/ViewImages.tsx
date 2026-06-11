@@ -273,38 +273,31 @@ export default function LabCarousel() {
   const slide = LAB_SLIDES[current];
 
   return (
-    <section className="relative w-full">
+    <section className="relative w-full bg-background transition-colors duration-300">
       {/* ── Blend seam from section above ─────────────────────────────────── */}
       <div
-        className="absolute top-0 left-0 right-0 z-10 pointer-events-none"
-        style={{
-          height: 80,
-          background:
-            "linear-gradient(to bottom, #0c0c0c 0%, transparent 100%)",
-        }}
+        className="absolute top-0 left-0 right-0 z-10 pointer-events-none h-20 bg-gradient-to-b from-background to-transparent"
       />
       {/* Ambient gradient blobs */}
-      <div className="absolute pointer-events-none" style={{ top: "10%", left: "-6%", width: 460, height: 460, borderRadius: "50%", background: "radial-gradient(circle, rgba(201,245,59,0.08) 0%, transparent 65%)", filter: "blur(2px)", zIndex: 0 }} />
-      <div className="absolute pointer-events-none" style={{ top: "30%", right: "-5%", width: 380, height: 380, borderRadius: "50%", background: "radial-gradient(circle, rgba(124,58,237,0.09) 0%, transparent 65%)", filter: "blur(2px)", zIndex: 0 }} />
-      <div className="absolute pointer-events-none" style={{ bottom: "10%", left: "30%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(219,39,119,0.07) 0%, transparent 65%)", filter: "blur(2px)", zIndex: 0 }} />
+      <div className="absolute pointer-events-none top-[10%] left-[-6%] w-[460px] h-[460px] rounded-full bg-[radial-gradient(circle,rgba(201,245,59,0.08)_0%,transparent_65%)] blur-[2px] z-0" />
+      <div className="absolute pointer-events-none top-[30%] right-[-5%] w-[380px] h-[380px] rounded-full bg-[radial-gradient(circle,rgba(124,58,237,0.09)_0%,transparent_65%)] blur-[2px] z-0" />
+      <div className="absolute pointer-events-none bottom-[10%] left-[30%] w-[320px] h-[320px] rounded-full bg-[radial-gradient(circle,rgba(219,39,119,0.07)_0%,transparent_65%)] blur-[2px] z-0" />
 
       {/* ── Section label ─────────────────────────────────────────────────── */}
-      <div className="relative z-10 max-w-[1400px] mx-auto px-8 sm:px-12 lg:px-20  flex items-center gap-4">
-        <div className="h-px flex-1 bg-white/[0.06]" />
+      <div className="relative z-10 max-w-[1400px] mx-auto px-8 sm:px-12 lg:px-20 flex items-center gap-4">
+        <div className="h-px flex-1 bg-border/40" />
         <span
-          className="text-[20px] font-bold tracking-[0.4em] uppercase py-10"
-          style={{ color: "#c9f53b" }}
+          className="text-primary text-[20px] font-bold tracking-[0.4em] uppercase py-10"
         >
           ◆ Research Gallery ◆
         </span>
-        <div className="h-px flex-1 bg-white/[0.06]" />
+        <div className="h-px flex-1 bg-border/40" />
       </div>
 
       {/* ── Carousel ──────────────────────────────────────────────────────── */}
       <div
         ref={containerRef}
-        className="relative w-full overflow-hidden select-none"
-        style={{ height: "90vh", minHeight: 520, maxHeight: 900 }}
+        className="relative w-full overflow-hidden select-none h-[90vh] min-h-[520px] max-h-[900px]"
       >
         {/* Slides track */}
         <div
@@ -336,18 +329,10 @@ export default function LabCarousel() {
               />
               {/* Left-heavy vignette so text stays readable */}
               <div
-                className="absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(to right, rgba(12,12,12,0.95) 0%, rgba(12,12,12,0.6) 55%, rgba(12,12,12,0.15) 100%)",
-                }}
+                className="absolute inset-0 bg-gradient-to-r from-[#0c0c0c]/95 via-[#0c0c0c]/60 to-[#0c0c0c]/15"
               />
               <div
-                className="absolute inset-0 opacity-[0.03]"
-                style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,1) 2px,rgba(0,0,0,1) 4px)",
-                }}
+                className="absolute inset-0 opacity-[0.03] bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,1)_2px,rgba(0,0,0,1)_4px)]"
               />
             </div>
           ))}
@@ -356,8 +341,7 @@ export default function LabCarousel() {
         {/* Flash overlay */}
         <div
           ref={overlayRef}
-          className="absolute inset-0 pointer-events-none z-20"
-          style={{ opacity: 0, background: "#c9f53b" }}
+          className="absolute inset-0 pointer-events-none z-20 opacity-0 bg-primary"
         />
 
         {/* Top HUD */}
@@ -381,12 +365,12 @@ export default function LabCarousel() {
 
         {/* Corner hairlines */}
         <div className="absolute top-0 left-0 w-16 h-16 z-30 pointer-events-none">
-          <div className="absolute top-4 left-4 w-8 h-px bg-white/20" />
-          <div className="absolute top-4 left-4 h-8 w-px bg-white/20" />
+          <div className="absolute top-4 left-4 w-8 h-px bg-white/20 dark:bg-white/20" />
+          <div className="absolute top-4 left-4 h-8 w-px bg-white/20 dark:bg-white/20" />
         </div>
         <div className="absolute top-0 right-0 w-16 h-16 z-30 pointer-events-none">
-          <div className="absolute top-4 right-4 w-8 h-px bg-white/20" />
-          <div className="absolute top-4 right-4 h-8 w-px bg-white/20" />
+          <div className="absolute top-4 right-4 w-8 h-px bg-white/20 dark:bg-white/20" />
+          <div className="absolute top-4 right-4 h-8 w-px bg-white/20 dark:bg-white/20" />
         </div>
 
         {/* Main content */}
@@ -406,11 +390,7 @@ export default function LabCarousel() {
 
           <h2
             ref={titleRef}
-            className="text-5xl md:text-7xl xl:text-8xl font-bold text-white leading-none mb-5"
-            style={{
-              fontFamily: "'Bebas Neue','Arial Narrow',sans-serif",
-              letterSpacing: "0.02em",
-            }}
+            className="text-5xl md:text-7xl xl:text-8xl font-bold text-white leading-none mb-5 font-['Bebas_Neue'] tracking-[0.02em]"
           >
             {slide.label}
           </h2>
@@ -441,14 +421,14 @@ export default function LabCarousel() {
             <div className="flex items-center gap-3 pointer-events-auto">
               <button
                 onClick={prev}
-                className="w-9 h-9 border border-white/15 flex items-center justify-center text-white/50 hover:border-[#c9f53b]/60 hover:text-[#c9f53b] transition-all duration-300 rounded-sm"
+                className="w-9 h-9 border border-white/15 flex items-center justify-center text-white/50 hover:border-primary/60 hover:text-primary transition-all duration-300 rounded-sm cursor-pointer"
                 aria-label="Previous"
               >
                 ←
               </button>
               <button
                 onClick={next}
-                className="w-9 h-9 border border-white/15 flex items-center justify-center text-white/50 hover:border-[#c9f53b]/60 hover:text-[#c9f53b] transition-all duration-300 rounded-sm"
+                className="w-9 h-9 border border-white/15 flex items-center justify-center text-white/50 hover:border-primary/60 hover:text-primary transition-all duration-300 rounded-sm cursor-pointer"
                 aria-label="Next"
               >
                 →
@@ -461,13 +441,13 @@ export default function LabCarousel() {
                   key={i}
                   onClick={() => goTo(i, i > current ? 1 : -1)}
                   aria-label={`Go to slide ${i + 1}`}
-                  className="transition-all duration-300"
+                  className="transition-all duration-300 cursor-pointer"
                   style={{
                     width: i === current ? 24 : 6,
                     height: 3,
                     borderRadius: 2,
                     backgroundColor:
-                      i === current ? "#c9f53b" : "rgba(255,255,255,0.2)",
+                      i === current ? slide.color : "rgba(255,255,255,0.2)",
                   }}
                 />
               ))}
@@ -477,13 +457,12 @@ export default function LabCarousel() {
 
         {/* Progress bar */}
         <div className="absolute bottom-0 left-0 right-0 z-30">
-          <div className="relative h-px bg-white/[0.08]">
+          <div className="relative h-px bg-foreground/10">
             <div
               ref={progressBarRef}
-              className="absolute top-0 left-0 h-full origin-left"
+              className="absolute top-0 left-0 h-full origin-left w-full"
               style={{
                 backgroundColor: slide.color,
-                width: "100%",
                 transform: "scaleX(0.2)",
               }}
             />
@@ -494,15 +473,8 @@ export default function LabCarousel() {
 
       {/* Bottom bleed */}
       <div
-        className="pointer-events-none"
-        style={{
-          height: 60,
-          background:
-            "linear-gradient(to bottom, transparent 0%, #0c0c0c 100%)",
-        }}
+        className="pointer-events-none h-15 bg-gradient-to-b from-transparent to-background"
       />
-
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap');`}</style>
     </section>
   );
 }

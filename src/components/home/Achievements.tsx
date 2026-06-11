@@ -367,112 +367,38 @@ export default function ResearchGlory() {
   return (
     <section
       ref={sectionRef}
-      className="relative w-full overflow-hidden"
-      style={{
-        fontFamily: "'Syne', sans-serif",
-        color: "#f0ede6",
-        background: "#080808",
-      }}
+      className="relative w-full overflow-hidden font-['Syne'] text-foreground bg-background transition-colors duration-300"
     >
       {/* grain */}
       <div
+        className="absolute inset-0 pointer-events-none z-0 opacity-50"
         style={{
-          position: "absolute",
-          inset: 0,
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")`,
-          pointerEvents: "none",
-          zIndex: 0,
-          opacity: 0.5,
         }}
       />
       <div
-        style={{
-          position: "absolute",
-          top: "-10%",
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: "80vw",
-          height: "50vh",
-          background:
-            "radial-gradient(ellipse, rgba(201,245,59,0.07) 0%, transparent 70%)",
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
+        className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[80vw] h-[50vh] bg-[radial-gradient(ellipse,rgba(201,245,59,0.07)_0%,transparent_70%)] pointer-events-none z-0"
       />
       {/* Ambient color blobs */}
       <div
-        style={{
-          position: "absolute",
-          top: "5%",
-          left: "-5%",
-          width: 500,
-          height: 500,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 65%)",
-          pointerEvents: "none",
-          zIndex: 0,
-          filter: "blur(2px)",
-        }}
+        className="absolute top-[5%] left-[-5%] w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,rgba(124,58,237,0.08)_0%,transparent_65%)] pointer-events-none z-0 blur-[2px]"
       />
       <div
-        style={{
-          position: "absolute",
-          bottom: "10%",
-          right: "-6%",
-          width: 420,
-          height: 420,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(219,39,119,0.08) 0%, transparent 65%)",
-          pointerEvents: "none",
-          zIndex: 0,
-          filter: "blur(2px)",
-        }}
+        className="absolute bottom-[10%] right-[-6%] w-[420px] h-[420px] rounded-full bg-[radial-gradient(circle,rgba(219,39,119,0.08)_0%,transparent_65%)] pointer-events-none z-0 blur-[2px]"
       />
       <div
-        style={{
-          position: "absolute",
-          bottom: "30%",
-          left: "15%",
-          width: 280,
-          height: 280,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(201,245,59,0.05) 0%, transparent 65%)",
-          pointerEvents: "none",
-          zIndex: 0,
-          filter: "blur(2px)",
-        }}
+        className="absolute bottom-[30%] left-[15%] w-[280px] h-[280px] rounded-full bg-[radial-gradient(circle,rgba(201,245,59,0.05)_0%,transparent_65%)] pointer-events-none z-0 blur-[2px]"
       />
 
-      <div style={{ position: "relative", zIndex: 1 }}>
+      <div className="relative z-10">
         {/* ── HEADER ── */}
-        <div
-          style={{ padding: "clamp(48px,8vw,96px) 6vw clamp(24px,4vw,48px)" }}
-        >
-          <p
-            style={{
-              fontFamily: "monospace",
-              fontSize: "11px",
-              letterSpacing: "0.4em",
-              textTransform: "uppercase",
-              color: "#c9f53b",
-              marginBottom: "24px",
-            }}
-          >
+        <div className="px-[6vw] py-12 md:py-20 lg:py-24">
+          <p className="font-mono text-[11px] tracking-[0.4em] uppercase text-primary mb-6">
             — Research & Glory
           </p>
           <h2
             ref={headingRef}
-            style={{
-              fontSize: "clamp(3rem, 7vw, 6.5rem)",
-              fontWeight: 700,
-              lineHeight: 1.02,
-              letterSpacing: "-0.03em",
-              margin: 0,
-              overflow: "hidden",
-            }}
+            className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-bold font-['Syne'] tracking-tighter leading-[1.02] m-0 overflow-hidden"
           >
             {["Decades", "of", "Relentless"].map((w, i) => (
               <span
@@ -486,7 +412,7 @@ export default function ResearchGlory() {
                 }}
               >
                 {i === 2 ? (
-                  <em style={{ fontStyle: "italic", color: "#c9f53b" }}>{w}</em>
+                  <em className="font-normal italic text-primary">{w}</em>
                 ) : (
                   w
                 )}
@@ -506,113 +432,34 @@ export default function ResearchGlory() {
           </h2>
           <div
             ref={lineRef}
-            style={{
-              height: "1px",
-              background: "linear-gradient(90deg, #c9f53b, transparent)",
-              marginTop: "48px",
-              transformOrigin: "left",
-            }}
+            className="h-px bg-gradient-to-r from-primary to-transparent mt-12 origin-left"
           />
         </div>
 
         {/* ── STATS ── */}
         <div
           ref={statsRowRef}
-          className="stats-grid"
-          style={{
-            gap: "1px",
-            background: "rgba(255,255,255,0.05)",
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            borderBottom: "1px solid rgba(255,255,255,0.06)",
-            perspective: "1000px",
-          }}
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-border/20 border-y border-border/40 [perspective:1000px]"
         >
           {stats.map((s, i) => (
             <div
               key={i}
-              className="stat-card"
-              style={{
-                background: "#080808",
-                padding: "clamp(20px,4vw,48px) clamp(16px,3vw,32px)",
-                position: "relative",
-                cursor: "default",
-                overflow: "hidden",
-                opacity: 0,
-                transition: "background 0.3s",
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background =
-                  "#0f0f0f";
-                gsap.to(e.currentTarget.querySelector(".sa"), {
-                  scaleY: 1,
-                  duration: 0.4,
-                  ease: "power2.out",
-                });
-                gsap.to(e.currentTarget.querySelector(".sn"), {
-                  color: "#c9f53b",
-                  duration: 0.3,
-                });
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background =
-                  "#080808";
-                gsap.to(e.currentTarget.querySelector(".sa"), {
-                  scaleY: 0,
-                  duration: 0.4,
-                  ease: "power2.in",
-                });
-                gsap.to(e.currentTarget.querySelector(".sn"), {
-                  color: "#f0ede6",
-                  duration: 0.3,
-                });
-              }}
+              className="stat-card bg-background dark:bg-card text-foreground px-4 sm:px-6 lg:px-8 py-8 sm:py-12 relative cursor-default overflow-hidden opacity-0 hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors duration-300 group"
             >
               <div
-                className="sa"
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  width: "3px",
-                  height: "100%",
-                  background: "#c9f53b",
-                  transform: "scaleY(0)",
-                  transformOrigin: "bottom",
-                }}
+                className="sa absolute bottom-0 left-0 w-[3px] h-full bg-primary scale-y-0 transition-transform duration-300 origin-bottom group-hover:scale-y-100"
               />
               <div
-                className="sn"
-                style={{
-                  fontSize: "clamp(2.2rem, 3.5vw, 3.8rem)",
-                  fontWeight: 700,
-                  letterSpacing: "-0.04em",
-                  lineHeight: 1,
-                  marginBottom: "12px",
-                  transition: "color 0.3s",
-                }}
+                className="sn text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tighter leading-none mb-3 text-foreground transition-colors duration-300 group-hover:text-primary"
               >
                 {s.prefix || ""}
                 <Counter target={parseInt(s.value)} duration={2} />
                 {s.suffix}
               </div>
-              <div
-                style={{
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  letterSpacing: "0.05em",
-                  textTransform: "uppercase",
-                  marginBottom: "6px",
-                }}
-              >
+              <div className="text-[13px] font-semibold tracking-wider uppercase mb-1.5 text-foreground">
                 {s.label}
               </div>
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "rgba(240,237,230,0.35)",
-                  lineHeight: 1.5,
-                }}
-              >
+              <div className="text-[12px] text-foreground/45 dark:text-white/35 leading-normal">
                 {s.sub}
               </div>
             </div>
@@ -622,68 +469,24 @@ export default function ResearchGlory() {
         {/* ── COVERFLOW CAROUSEL ── */}
         <div
           ref={carouselRef}
-          style={{ padding: "clamp(48px,8vw,96px) 0 80px" }}
+          className="py-12 md:py-20 lg:py-24"
         >
           {/* header */}
-          <div
-            className="carousel-header"
-            style={{ padding: "0 6vw", marginBottom: "56px" }}
-          >
+          <div className="flex flex-wrap gap-6 items-end justify-between px-[6vw] mb-14">
             <div>
-              <p
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "11px",
-                  letterSpacing: "0.4em",
-                  textTransform: "uppercase",
-                  color: "#c9f53b",
-                  marginBottom: "12px",
-                }}
-              >
+              <p className="font-mono text-[11px] tracking-[0.4em] uppercase text-primary mb-3">
                 — Visual Archive
               </p>
-              <h3
-                style={{
-                  fontSize: "clamp(1.6rem, 3vw, 2.6rem)",
-                  fontWeight: 700,
-                  letterSpacing: "-0.03em",
-                  margin: 0,
-                }}
-              >
+              <h3 className="text-3xl sm:text-4xl lg:text-5xl font-bold font-['Syne'] tracking-tighter leading-none m-0 text-foreground">
                 Labs & Breakthroughs
               </h3>
             </div>
-            <div style={{ display: "flex", gap: "12px" }}>
+            <div className="flex gap-3">
               {(["←", "→"] as const).map((arrow, dir) => (
                 <button
                   key={dir}
                   onClick={() => navigate(dir === 0 ? -1 : 1)}
-                  style={{
-                    width: "52px",
-                    height: "52px",
-                    borderRadius: "50%",
-                    border: "1px solid rgba(255,255,255,0.15)",
-                    background: "transparent",
-                    color: "#f0ede6",
-                    fontSize: "18px",
-                    cursor: "pointer",
-                    transition: "all 0.25s",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                  onMouseEnter={(e) => {
-                    const el = e.currentTarget;
-                    el.style.background = "#c9f53b";
-                    el.style.color = "#080808";
-                    el.style.borderColor = "#c9f53b";
-                  }}
-                  onMouseLeave={(e) => {
-                    const el = e.currentTarget;
-                    el.style.background = "transparent";
-                    el.style.color = "#f0ede6";
-                    el.style.borderColor = "rgba(255,255,255,0.15)";
-                  }}
+                  className="w-13 h-13 rounded-full border border-border/40 bg-transparent text-foreground text-lg cursor-pointer flex items-center justify-center transition-all duration-200 hover:bg-primary hover:text-background hover:border-primary"
                 >
                   {arrow}
                 </button>
@@ -694,14 +497,7 @@ export default function ResearchGlory() {
           {/* coverflow viewport */}
           <div
             ref={viewportRef}
-            style={{
-              position: "relative",
-              height: `${SLIDE_H + 40}px`,
-              overflow: "hidden",
-              cursor: "grab",
-              perspective: "1200px",
-              perspectiveOrigin: "50% 50%",
-            }}
+            className="relative h-[500px] overflow-hidden cursor-grab [perspective:1200px] [perspective-origin:50%_50%]"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
@@ -711,14 +507,7 @@ export default function ResearchGlory() {
           >
             {/* edge fade masks */}
             <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                zIndex: 10,
-                pointerEvents: "none",
-                background:
-                  "linear-gradient(90deg, #080808 0%, transparent 20%, transparent 80%, #080808 100%)",
-              }}
+              className="absolute inset-0 z-10 pointer-events-none bg-[linear-gradient(90deg,var(--background)_0%,transparent_20%,transparent_80%,var(--background)_100%)]"
             />
 
             {slides.map((slide, i) => {
@@ -733,91 +522,38 @@ export default function ResearchGlory() {
                     const delta = i - virtualIdx.current;
                     if (delta !== 0) navigate(Math.sign(delta));
                   }}
-                  style={{
-                    position: "absolute",
-                    top: "20px",
-                    left: 0,
-                    width: `${SLIDE_W}px`,
-                    height: `${SLIDE_H}px`,
-                    borderRadius: "18px",
-                    overflow: "hidden",
-                    cursor: realIndex === activeReal ? "default" : "pointer",
-                    willChange: "transform, filter, opacity",
-                    transformStyle: "preserve-3d",
-                    opacity: 0,
-                  }}
+                  className={`absolute top-5 left-0 w-[340px] h-[460px] rounded-[18px] overflow-hidden [transform-style:preserve-3d] opacity-0 will-change-[transform,filter,opacity] ${realIndex === activeReal ? "cursor-default" : "cursor-pointer"}`}
                 >
                   {/* image */}
                   <div
+                    className="absolute inset-[-4px] bg-cover bg-center"
                     style={{
-                      position: "absolute",
-                      inset: "-4px",
                       backgroundImage: `url(${slide.img})`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center",
                     }}
                   />
                   {/* overlay */}
                   <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background:
-                        "linear-gradient(170deg, rgba(0,0,0,0.0) 30%, rgba(8,8,8,0.9) 100%)",
-                    }}
+                    className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/90"
                   />
 
                   {/* year badge */}
                   <div
-                    style={{
-                      position: "absolute",
-                      top: "16px",
-                      right: "16px",
-                      fontFamily: "monospace",
-                      fontSize: "11px",
-                      letterSpacing: "0.15em",
-                      background: "rgba(255,255,255,0.1)",
-                      backdropFilter: "blur(10px)",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      borderRadius: "4px",
-                      padding: "4px 10px",
-                      color: "#f0ede6",
-                    }}
+                    className="absolute top-4 right-4 font-mono text-[11px] tracking-[0.15em] bg-foreground/10 backdrop-blur-md border border-foreground/15 rounded px-2.5 py-1 text-foreground"
                   >
                     {slide.year}
                   </div>
 
                   {/* text */}
                   <div
-                    style={{
-                      position: "absolute",
-                      bottom: "24px",
-                      left: "24px",
-                      right: "24px",
-                    }}
+                    className="absolute bottom-6 left-6 right-6"
                   >
                     <p
-                      style={{
-                        fontFamily: "monospace",
-                        fontSize: "10px",
-                        letterSpacing: "0.35em",
-                        textTransform: "uppercase",
-                        color: "#c9f53b",
-                        marginBottom: "8px",
-                      }}
+                      className="font-mono text-[10px] tracking-[0.35em] uppercase text-primary mb-2"
                     >
                       {slide.tag}
                     </p>
                     <h4
-                      style={{
-                        fontSize: "1.55rem",
-                        fontWeight: 700,
-                        letterSpacing: "-0.03em",
-                        margin: 0,
-                        lineHeight: 1.1,
-                        color: "#f0ede6",
-                        fontFamily: "'Syne', sans-serif",
-                      }}
+                      className="text-[1.55rem] font-bold tracking-tight m-0 leading-[1.1] text-foreground font-['Syne']"
                     >
                       {slide.title}
                     </h4>
@@ -826,14 +562,7 @@ export default function ResearchGlory() {
                   {/* active bottom line */}
                   {realIndex === activeReal && (
                     <div
-                      style={{
-                        position: "absolute",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: "3px",
-                        background: "#c9f53b",
-                      }}
+                      className="absolute bottom-0 inset-x-0 h-[3px] bg-primary"
                     />
                   )}
                 </div>
@@ -843,38 +572,19 @@ export default function ResearchGlory() {
 
           {/* dots + counter */}
           <div
-            style={{
-              display: "flex",
-              gap: "8px",
-              padding: "32px 6vw 0",
-              alignItems: "center",
-            }}
+            className="flex gap-2 px-[6vw] pt-8 items-center"
           >
             {Array.from({ length: nVal }).map((_, i) => (
               <button
                 key={i}
                 onClick={() => navigate(i - activeReal)}
-                style={{
-                  width: i === activeReal ? "32px" : "8px",
-                  height: "8px",
-                  borderRadius: "4px",
-                  background:
-                    i === activeReal ? "#c9f53b" : "rgba(255,255,255,0.2)",
-                  border: "none",
-                  cursor: "pointer",
-                  padding: 0,
-                  transition:
-                    "width 0.4s cubic-bezier(0.34,1.56,0.64,1), background 0.3s",
-                }}
+                className={`h-2 rounded-full cursor-pointer p-0 border-0 transition-all duration-450 cubic-bezier(0.34,1.56,0.64,1) ${
+                  i === activeReal ? "w-8 bg-primary" : "w-2 bg-foreground/20"
+                }`}
               />
             ))}
             <span
-              style={{
-                marginLeft: "auto",
-                fontFamily: "monospace",
-                fontSize: "12px",
-                color: "rgba(240,237,230,0.35)",
-              }}
+              className="ml-auto font-mono text-[12px] text-foreground/35"
             >
               {String(activeReal + 1).padStart(2, "0")} /{" "}
               {String(nVal).padStart(2, "0")}
@@ -882,28 +592,6 @@ export default function ResearchGlory() {
           </div>
         </div>
       </div>
-      {/* ← FIXED: closing tag for <div style={{ position: "relative", zIndex: 1 }}> */}
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap');
-        .stats-grid {
-          display: grid;
-          grid-template-columns: repeat(2, 1fr);
-        }
-        @media (min-width: 640px) {
-          .stats-grid { grid-template-columns: repeat(3, 1fr); }
-        }
-        @media (min-width: 1024px) {
-          .stats-grid { grid-template-columns: repeat(6, 1fr); }
-        }
-        .carousel-header {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 24px;
-          align-items: flex-end;
-          justify-content: space-between;
-        }
-      `}</style>
     </section>
   );
 }

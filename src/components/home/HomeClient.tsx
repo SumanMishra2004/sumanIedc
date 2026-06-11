@@ -9,6 +9,7 @@ import LoadingScreen from "@/components/home/LoadingScreen";
 import LabCarousel from "./ViewImages";
 
 import Achievements from "./Achievements";
+import OurJourney from "./OurJourney";
 import UpcomingEvents from "./UpcomingEvents";
 import Footer from "./Footer";
 
@@ -88,12 +89,13 @@ export default function HomeClient() {
           pointerEvents: showScreen ? "none" : "auto",
         }}
       >
-        <div className="flex flex-col w-full bg-[#0c0c0c]">
+        <div className="flex flex-col w-full bg-background text-foreground transition-colors duration-300">
           <Navbar />
           <HeroSection />
           <AboutUs />
           <VelocityMarquee />
           <Achievements />
+          <OurJourney />
           <UpcomingEvents />
           <LabCarousel />
          

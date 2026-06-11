@@ -38,16 +38,16 @@ function StatCardItem({ stat }: { stat: StatCard }) {
         w-52 h-36
         mx-3
         rounded-2xl
-        border border-white/[0.08]
-        bg-white/[0.03]
+        border border-border/40 dark:border-white/[0.08]
+        bg-muted/10 dark:bg-white/[0.03]
         backdrop-blur-sm
         overflow-hidden
         group
         cursor-default
         select-none
         transition-all duration-500
-        hover:border-[#c9f53b]/40
-        hover:bg-white/[0.06]
+        hover:border-primary/40
+        hover:bg-muted/20 dark:hover:bg-white/[0.06]
       "
     >
       {/* Hover glow */}
@@ -55,7 +55,7 @@ function StatCardItem({ stat }: { stat: StatCard }) {
         className="
         absolute inset-0 opacity-0 group-hover:opacity-100
         transition-opacity duration-500
-        bg-gradient-to-br from-[#c9f53b]/10 via-transparent to-transparent
+        bg-gradient-to-br from-primary/10 via-transparent to-transparent
         pointer-events-none
       "
       />
@@ -64,7 +64,7 @@ function StatCardItem({ stat }: { stat: StatCard }) {
       <div
         className="
         absolute top-0 right-0 w-16 h-16
-        bg-gradient-to-bl from-[#c9f53b]/20 to-transparent
+        bg-gradient-to-bl from-primary/20 to-transparent
         rounded-bl-3xl pointer-events-none
       "
       />
@@ -72,8 +72,8 @@ function StatCardItem({ stat }: { stat: StatCard }) {
       {/* Decorative icon */}
       <span
         className="
-        absolute top-4 left-4 text-[#c9f53b]/40 text-xs tracking-widest font-mono
-        group-hover:text-[#c9f53b] transition-colors duration-300
+        absolute top-4 left-4 text-primary/40 text-xs tracking-widest font-mono
+        group-hover:text-primary transition-colors duration-300
       "
       >
         {stat.icon}
@@ -82,15 +82,14 @@ function StatCardItem({ stat }: { stat: StatCard }) {
       {/* Content */}
       <div className="absolute bottom-4 left-5 right-5">
         <div
-          className="font-black text-4xl leading-none text-[#c9f53b] tracking-tight"
-          style={{ fontFamily: "'Bebas Neue', 'Arial Narrow', sans-serif" }}
+          className="font-black text-4xl leading-none text-primary tracking-tight font-['Bebas_Neue']"
         >
           {stat.value}
         </div>
         <div
           className="
           mt-1 text-[10px] uppercase tracking-[0.2em]
-          text-white/35 group-hover:text-white/65
+          text-foreground/45 dark:text-white/35 group-hover:text-foreground/75 dark:group-hover:text-white/65
           transition-colors duration-300 font-semibold
         "
         >
@@ -179,112 +178,67 @@ export default function VelocityMarquee() {
   }, []);
 
   return (
-    <>
-      {/* Font import */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Sora:wght@300;400;600;700&display=swap');
-        *, *::before, *::after { box-sizing: border-box; }
-        body { font-family: 'Sora', sans-serif; background: #0c0c0c; }
-      `}</style>
+    <div className="text-foreground overflow-x-hidden w-full bg-background transition-colors duration-300">
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <section className="relative flex flex-col items-center justify-start text-center px-6 pt-16 pb-8">
+        {/* Gradient blobs */}
+        <div
+          className="absolute pointer-events-none top-[-10%] left-[-8%] w-[480px] h-[480px] rounded-full bg-[radial-gradient(circle,rgba(124,58,237,0.1)_0%,transparent_65%)] blur-[1px]"
+        />
+        <div
+          className="absolute pointer-events-none top-0 right-[-5%] w-[360px] h-[360px] rounded-full bg-[radial-gradient(circle,rgba(201,245,59,0.09)_0%,transparent_65%)] blur-[1px]"
+        />
+        <div
+          className="absolute pointer-events-none bottom-[-20%] left-[35%] w-[300px] h-[300px] rounded-full bg-[radial-gradient(circle,rgba(219,39,119,0.08)_0%,transparent_65%)] blur-[1px]"
+        />
+        {/* Background glow */}
 
-      <div className=" text-white overflow-x-hidden w-full">
-        {/* ── Hero ─────────────────────────────────────────────────────────── */}
-        <section className="relative flex flex-col items-center justify-start text-center px-6 pt-16 pb-8">
-          {/* Gradient blobs */}
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              top: "-10%",
-              left: "-8%",
-              width: 480,
-              height: 480,
-              borderRadius: "50%",
-              background:
-                "radial-gradient(circle, rgba(124,58,237,0.1) 0%, transparent 65%)",
-              filter: "blur(1px)",
-            }}
-          />
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              top: "0%",
-              right: "-5%",
-              width: 360,
-              height: 360,
-              borderRadius: "50%",
-              background:
-                "radial-gradient(circle, rgba(201,245,59,0.09) 0%, transparent 65%)",
-              filter: "blur(1px)",
-            }}
-          />
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              bottom: "-20%",
-              left: "35%",
-              width: 300,
-              height: 300,
-              borderRadius: "50%",
-              background:
-                "radial-gradient(circle, rgba(219,39,119,0.08) 0%, transparent 65%)",
-              filter: "blur(1px)",
-            }}
-          />
-          {/* Background glow */}
+        <p className="text-primary text-[10px] tracking-[0.45em] uppercase font-semibold mb-8">
+          ◆ Innovation and Entrepreneurship Development Cell ◆
+        </p>
 
-          <p className="text-[#c9f53b] text-[10px] tracking-[0.45em] uppercase font-semibold mb-8">
-            ◆ Innovation and Entrepreneurship Development Cell ◆
-          </p>
+        <h1
+          className="text-[clamp(4.5rem,13vw,9rem)] leading-[0.86] font-black uppercase text-foreground mb-8 relative font-['Bebas_Neue']"
+        >
+          Numbers
+          <br />
+          <span className="text-primary">That</span>{" "}
+          <span className="relative inline-block">
+            Speak
+            {/* underline accent */}
+            <span className="absolute -bottom-2 left-0 w-full h-[3px] bg-primary/40 rounded-full" />
+          </span>
+        </h1>
+      </section>
 
-          <h1
-            className="text-[clamp(4.5rem,13vw,9rem)] leading-[0.86] font-black uppercase text-white mb-8 relative"
-            style={{ fontFamily: "'Bebas Neue', sans-serif" }}
-          >
-            Numbers
-            <br />
-            <span className="text-[#c9f53b]">That</span>{" "}
-            <span className="relative inline-block">
-              Speak
-              {/* underline accent */}
-              <span className="absolute -bottom-2 left-0 w-full h-[3px] bg-[#c9f53b]/40 rounded-full" />
-            </span>
-          </h1>
-        </section>
+      {/* ── Stats Marquee ─────────────────────────────────────────────────── */}
+      <section ref={sectionRef} className="relative overflow-hidden">
+        {/* Edge fade masks */}
+        <div
+          className="pointer-events-none absolute inset-y-0 left-0 w-48 bg-gradient-to-r from-background to-transparent z-10"
+        />
+        <div
+          className="pointer-events-none absolute inset-y-0 right-0 w-48 bg-gradient-to-l from-background to-transparent z-10"
+        />
 
-        {/* ── Stats Marquee ─────────────────────────────────────────────────── */}
-        <section ref={sectionRef} className="relative overflow-hidden">
-          {/* Edge fade masks */}
-          <div
-            className="pointer-events-none absolute inset-y-0 left-0 w-48
-            bg-gradient-to-r from-[#0c0c0c] to-transparent z-10"
-          />
-          <div
-            className="pointer-events-none absolute inset-y-0 right-0 w-48
-            bg-gradient-to-l from-[#0c0c0c] to-transparent z-10"
-          />
-
-          {/* ── Row 1: LEFT ── */}
-          <div className="fade-up mb-4 flex overflow-hidden">
-            <div ref={row1Ref} className="flex will-change-transform">
-              {ROW1.map((stat, i) => (
-                <StatCardItem key={`r1-${i}`} stat={stat} />
-              ))}
-            </div>
+        {/* ── Row 1: LEFT ── */}
+        <div className="fade-up mb-4 flex overflow-hidden">
+          <div ref={row1Ref} className="flex will-change-transform">
+            {ROW1.map((stat, i) => (
+              <StatCardItem key={`r1-${i}`} stat={stat} />
+            ))}
           </div>
+        </div>
 
-          {/* ── Row 2: RIGHT ── */}
-          <div className="fade-up flex overflow-hidden">
-            <div ref={row2Ref} className="flex will-change-transform">
-              {ROW2.map((stat, i) => (
-                <StatCardItem key={`r2-${i}`} stat={stat} />
-              ))}
-            </div>
+        {/* ── Row 2: RIGHT ── */}
+        <div className="fade-up flex overflow-hidden">
+          <div ref={row2Ref} className="flex will-change-transform">
+            {ROW2.map((stat, i) => (
+              <StatCardItem key={`r2-${i}`} stat={stat} />
+            ))}
           </div>
-        </section>
-
-        {/* bottom blend seam */}
-
-      </div>
-    </>
+        </div>
+      </section>
+    </div>
   );
 }

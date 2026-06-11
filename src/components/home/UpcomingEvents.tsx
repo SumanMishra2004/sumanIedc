@@ -92,10 +92,9 @@ export default function UpcomingEvents() {
 
   if (isLoading) {
     return (
-      <div style={{ background: "#080808", padding: "100px 6vw", textAlign: "center" }}>
-        <div style={{ display: "inline-block", border: "3px solid #c9f53b", borderTopColor: "transparent", borderRadius: "50%", width: 40, height: 40, animation: "spin 1s linear infinite" }} />
-        <p style={{ color: "#f0ede6", marginTop: 16, fontFamily: "monospace", fontSize: 12, letterSpacing: "0.15em" }}>LOADING INITIATIVES...</p>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <div className="bg-background px-[6vw] py-24 text-center transition-colors duration-300">
+        <div className="inline-block border-3 border-primary border-t-transparent rounded-full w-10 h-10 animate-spin" />
+        <p className="text-foreground/80 mt-4 font-mono text-[12px] tracking-[0.15em]">LOADING INITIATIVES...</p>
       </div>
     )
   }
@@ -104,66 +103,28 @@ export default function UpcomingEvents() {
   return (
     <section
       ref={sectionRef}
-      style={{
-        background: "#080808",
-        padding: "clamp(60px,10vw,120px) 6vw",
-        position: "relative",
-        overflow: "hidden",
-        fontFamily: "'Syne', sans-serif",
-      }}
+      className="relative overflow-hidden px-[6vw] py-16 md:py-24 lg:py-32 font-['Syne'] bg-background text-foreground transition-colors duration-300"
     >
       {/* Background Blobs */}
       <div
-        style={{
-          position: "absolute",
-          top: "40%",
-          left: "-10%",
-          width: 500,
-          height: 500,
-          borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(201,245,59,0.04) 0%, transparent 70%)",
-          pointerEvents: "none",
-        }}
+        className="absolute top-[40%] left-[-10%] w-[500px] h-[500px] rounded-full bg-[radial-gradient(circle,rgba(201,245,59,0.04)_0%,transparent_70%)] pointer-events-none z-0"
       />
 
-      <div style={{ position: "relative", zIndex: 1 }}>
+      <div className="relative z-10">
         {/* Header */}
-        <div ref={headerRef} style={{ marginBottom: "clamp(40px,6vw,80px)" }}>
+        <div ref={headerRef} className="mb-12 md:mb-16 lg:mb-20">
           <p
-            className="anim-text"
-            style={{
-              fontFamily: "monospace",
-              fontSize: "11px",
-              letterSpacing: "0.4em",
-              textTransform: "uppercase",
-              color: "#c9f53b",
-              marginBottom: "16px",
-            }}
+            className="anim-text font-mono text-[11px] tracking-[0.4em] uppercase text-primary mb-4"
           >
             — Live & Direct
           </p>
           <h2
-            className="anim-text"
-            style={{
-              fontSize: "clamp(2.5rem, 6vw, 5rem)",
-              fontWeight: 700,
-              lineHeight: 1.05,
-              color: "#f0ede6",
-              margin: 0,
-              letterSpacing: "-0.02em",
-            }}
+            className="anim-text text-4xl sm:text-5xl lg:text-6xl font-bold font-['Syne'] tracking-tight leading-[1.05] m-0 text-foreground"
           >
-            Upcoming <em style={{ fontStyle: "italic", color: "#c9f53b" }}>Events</em>
+            Upcoming <em className="font-normal italic text-primary">Events</em>
           </h2>
           <p
-            className="anim-text"
-            style={{
-              color: "rgba(240,237,230,0.5)",
-              fontSize: "16px",
-              marginTop: "16px",
-              maxWidth: "500px",
-              lineHeight: 1.6,
-            }}
+            className="anim-text text-foreground/50 text-base mt-4 max-w-[500px] leading-relaxed"
           >
             Get involved in hackathons, innovation workshops, entrepreneurship camps, and funding pitches.
           </p>
@@ -171,21 +132,13 @@ export default function UpcomingEvents() {
 
         {events.length === 0 ? (
           <div
-            style={{
-              border: "1px border-dashed rgba(255,255,255,0.1)",
-              borderRadius: "24px",
-              background: "rgba(255,255,255,0.02)",
-              padding: "60px 40px",
-              textAlign: "center",
-              maxWidth: "800px",
-              margin: "0 auto",
-            }}
+            className="border border-dashed border-border/40 rounded-[24px] bg-muted/10 dark:bg-white/[0.02] px-10 py-16 text-center max-w-[800px] mx-auto"
           >
-            <Sparkles className="h-10 w-10 text-[#c9f53b] mx-auto" style={{ marginBottom: "20px" }} />
-            <h3 style={{ fontSize: "20px", fontWeight: 600, color: "#f0ede6", marginBottom: "8px" }}>
+            <Sparkles className="h-10 w-10 text-primary mx-auto mb-5" />
+            <h3 className="text-xl font-semibold text-foreground mb-2">
               Calm Before the Storm
             </h3>
-            <p style={{ color: "rgba(240,237,230,0.4)", fontSize: "14px", lineHeight: 1.6, maxWidth: "450px", margin: "0 auto" }}>
+            <p className="text-muted-foreground text-sm leading-relaxed max-w-[450px] mx-auto">
               We are curating high-impact hackathons and ideation programs. Check back soon or register in the dashboard to receive notifications.
             </p>
           </div>
@@ -193,12 +146,7 @@ export default function UpcomingEvents() {
           /* Cards Grid */
           <div
             ref={cardsRef}
-            className="events-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
-              gap: "32px",
-            }}
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
           >
             {events.map((ev) => {
               const formattedDate = new Date(ev.eventDate).toLocaleDateString("default", {
@@ -215,104 +163,41 @@ export default function UpcomingEvents() {
               return (
                 <div
                   key={ev.id}
-                  className="event-card"
-                  style={{
-                    background: "#0f0f0f",
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: "20px",
-                    overflow: "hidden",
-                    display: "flex",
-                    flexDirection: "column",
-                    transition: "all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)",
-                    cursor: "default",
-                    position: "relative",
-                  }}
-                  onMouseEnter={(e) => {
-                    const el = e.currentTarget
-                    el.style.borderColor = "#c9f53b"
-                    el.style.transform = "translateY(-5px)"
-                    const img = el.querySelector(".event-img") as HTMLDivElement
-                    if (img) img.style.transform = "scale(1.05)"
-                  }}
-                  onMouseLeave={(e) => {
-                    const el = e.currentTarget
-                    el.style.borderColor = "rgba(255,255,255,0.08)"
-                    el.style.transform = "translateY(0)"
-                    const img = el.querySelector(".event-img") as HTMLDivElement
-                    if (img) img.style.transform = "scale(1)"
-                  }}
+                  className="event-card group flex flex-col bg-card border border-border/40 rounded-[20px] overflow-hidden transition-all duration-300 cubic-bezier(0.25,0.8,0.25,1) hover:border-primary hover:-translate-y-1.5 cursor-default relative text-foreground"
                 >
                   {/* Poster Image — 3:4 portrait ratio */}
                   <div
-                    style={{
-                      position: "relative",
-                      overflow: "hidden",
-                      background: "rgba(255,255,255,0.02)",
-                      /* 3:4 → paddingBottom = (4/3)*100 = 133.33% */
-                      paddingBottom: "133.33%",
-                    }}
+                    className="relative overflow-hidden bg-muted/20 pb-[133.33%]"
                   >
                     {ev.posterUrl ? (
                       <div
-                        className="event-img"
+                        className="event-img absolute inset-0 bg-cover bg-center transition-transform duration-500 ease-out group-hover:scale-105"
                         style={{
-                          position: "absolute",
-                          inset: 0,
                           backgroundImage: `url(${ev.posterUrl})`,
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                          transition: "transform 0.5s ease",
                         }}
                       />
                     ) : (
                       <div
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          background: "linear-gradient(135deg, #121212 0%, #1e1e1e 100%)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
+                        className="absolute inset-0 bg-gradient-to-br from-background to-muted flex items-center justify-center"
                       >
-                        <Calendar className="h-12 w-12 text-white/10" />
+                        <Calendar className="h-12 w-12 text-foreground/10" />
                       </div>
                     )}
 
                     {/* Date badge */}
                     <div
-                      style={{
-                        position: "absolute",
-                        bottom: "16px",
-                        left: "16px",
-                        background: "rgba(8,8,8,0.75)",
-                        backdropFilter: "blur(12px)",
-                        border: "1px solid rgba(255,255,255,0.12)",
-                        borderRadius: "8px",
-                        padding: "6px 12px",
-                        fontSize: "11px",
-                        color: "#f0ede6",
-                        fontFamily: "monospace",
-                        letterSpacing: "0.05em",
-                      }}
+                      className="absolute bottom-4 left-4 bg-background/80 backdrop-blur-md border border-border/40 rounded-lg px-3 py-1.5 font-mono text-[11px] text-foreground tracking-wider"
                     >
                       {formattedDate} @ {formattedTime}
                     </div>
 
                     {/* Cost Badge */}
                     <div
-                      style={{
-                        position: "absolute",
-                        top: "16px",
-                        right: "16px",
-                        background: ev.registrationCost && ev.registrationCost > 0 ? "rgba(201,245,59,0.15)" : "rgba(16,185,129,0.15)",
-                        border: ev.registrationCost && ev.registrationCost > 0 ? "1px solid rgba(201,245,59,0.3)" : "1px solid rgba(16,185,129,0.3)",
-                        borderRadius: "6px",
-                        padding: "4px 8px",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        color: ev.registrationCost && ev.registrationCost > 0 ? "#c9f53b" : "#34d399",
-                      }}
+                      className={`absolute top-4 right-4 border rounded-md px-2.5 py-1 text-[11px] font-semibold ${
+                        ev.registrationCost && ev.registrationCost > 0
+                          ? "bg-primary/10 border-primary/30 text-primary"
+                          : "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                      }`}
                     >
                       {ev.registrationCost && ev.registrationCost > 0 ? `$${ev.registrationCost}` : "Free Entry"}
                     </div>
@@ -320,37 +205,16 @@ export default function UpcomingEvents() {
 
                   {/* Body Content */}
                   <div
-                    style={{
-                      padding: "24px",
-                      display: "flex",
-                      flexDirection: "column",
-                      flexGrow: 1,
-                      justifyContent: "between",
-                    }}
+                    className="p-6 flex flex-col flex-grow justify-between"
                   >
-                    <div style={{ flexGrow: 1 }}>
+                    <div className="flex-grow">
                       <h4
-                        style={{
-                          fontSize: "20px",
-                          fontWeight: 700,
-                          color: "#f0ede6",
-                          margin: "0 0 12px",
-                          lineHeight: 1.25,
-                        }}
+                        className="text-xl font-bold text-foreground m-0 mb-3 leading-snug"
                       >
                         {ev.name}
                       </h4>
                       <p
-                        style={{
-                          fontSize: "13px",
-                          color: "rgba(240,237,230,0.55)",
-                          lineHeight: 1.5,
-                          margin: "0 0 20px",
-                          display: "-webkit-box",
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
-                        }}
+                        className="text-foreground/60 text-[13px] leading-relaxed m-0 mb-5 line-clamp-3"
                       >
                         {ev.description}
                       </p>
@@ -358,60 +222,32 @@ export default function UpcomingEvents() {
 
                     {/* Footer / Meta details */}
                     <div
-                      style={{
-                        borderTop: "1px solid rgba(255,255,255,0.06)",
-                        paddingTop: "16px",
-                        marginTop: "16px",
-                      }}
+                      className="border-t border-border/40 pt-4 mt-4"
                     >
                       {/* Coordinator details */}
                       <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          marginBottom: "20px",
-                        }}
+                        className="flex items-center justify-between mb-5"
                       >
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                          <User className="h-4 w-4 text-[#c9f53b]" />
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-primary" />
                           <div>
-                            <span style={{ fontSize: "11px", color: "rgba(240,237,230,0.4)", display: "block" }}>Coordinator</span>
-                            <span style={{ fontSize: "12px", fontWeight: 600, color: "#f0ede6" }}>{ev.contactName}</span>
+                            <span className="text-[11px] text-muted-foreground block font-sans">Coordinator</span>
+                            <span className="text-[12px] font-semibold text-foreground">{ev.contactName}</span>
                           </div>
                         </div>
 
-                        <a href={`tel:${ev.contactPhone}`} style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "4px" }}>
-                          <Phone className="h-3 w-3 text-white/50" />
-                          <span style={{ fontSize: "11px", color: "rgba(240,237,230,0.4)" }}>{ev.contactPhone}</span>
+                        <a href={`tel:${ev.contactPhone}`} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-primary transition-colors duration-200">
+                          <Phone className="h-3 w-3 text-muted-foreground/60" />
+                          <span>{ev.contactPhone}</span>
                         </a>
                       </div>
 
                       {/* Register Button */}
                       <a
+                        href={ev.registrationLink}
                         target="_blank"
                         rel="noreferrer"
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: "8px",
-                          width: "100%",
-                          background: "#c9f53b",
-                          color: "#080808",
-                          textDecoration: "none",
-                          padding: "12px 16px",
-                          borderRadius: "12px",
-                          fontSize: "13px",
-                          fontWeight: 700,
-                          transition: "background 0.2s",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "#d6ff47"
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "#c9f53b"
-                        }}
+                        className="flex items-center justify-center gap-2 w-full bg-primary hover:bg-primary/90 text-background py-3 px-4 rounded-xl text-[13px] font-bold transition-all duration-200"
                       >
                         Register For Event <ArrowUpRight className="h-4 w-4" />
                       </a>
@@ -423,14 +259,6 @@ export default function UpcomingEvents() {
           </div>
         )}
       </div>
-
-      <style>{`
-        @media (max-width: 640px) {
-          .events-grid {
-            grid-template-columns: 1fr !important;
-          }
-        }
-      `}</style>
     </section>
   )
 }

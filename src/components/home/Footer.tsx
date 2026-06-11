@@ -135,176 +135,46 @@ export default function Footer() {
     return () => ctx.revert();
   }, []);
 
-  // Magnetic hover for social icons
-  const onSocialEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    gsap.to(e.currentTarget, {
-      scale: 1.15,
-      color: "#c9f53b",
-      duration: 0.25,
-      ease: "power2.out",
-    });
-  };
-  const onSocialLeave = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    gsap.to(e.currentTarget, {
-      scale: 1,
-      color: "rgba(240,237,230,0.45)",
-      duration: 0.25,
-      ease: "power2.out",
-    });
-  };
-
-  const onLinkEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    gsap.to(e.currentTarget, {
-      x: 6,
-      color: "#c9f53b",
-      duration: 0.2,
-      ease: "power2.out",
-    });
-  };
-  const onLinkLeave = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    gsap.to(e.currentTarget, {
-      x: 0,
-      color: "rgba(240,237,230,0.45)",
-      duration: 0.2,
-      ease: "power2.out",
-    });
-  };
-
   return (
     <footer
       ref={footerRef}
-      style={{
-        position: "relative",
-        width: "100%",
-        backgroundColor: "#0c0c0c",
-        color: "#f0ede6",
-        fontFamily: "'Syne', sans-serif",
-        overflow: "hidden",
-      }}
+      className="relative w-full bg-background text-foreground font-['Syne'] overflow-hidden transition-colors duration-300"
     >
       {/* Top blend seam */}
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: 100,
-          background:
-            "linear-gradient(to bottom, #0c0c0c 0%, transparent 100%)",
-          pointerEvents: "none",
-          zIndex: 2,
-        }}
-      />
+      <div className="absolute top-0 left-0 right-0 h-[100px] bg-gradient-to-b from-background to-transparent pointer-events-none z-10" />
 
       {/* Subtle grid texture */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          opacity: 0.025,
-          pointerEvents: "none",
-          backgroundImage:
-            "repeating-linear-gradient(0deg,#fff 0,#fff 1px,transparent 1px,transparent 44px),repeating-linear-gradient(90deg,#fff 0,#fff 1px,transparent 1px,transparent 44px)",
-        }}
-      />
+      <div className="absolute inset-0 opacity-[0.035] pointer-events-none bg-[repeating-linear-gradient(0deg,var(--border)_0,var(--border)_1px,transparent_1px,transparent_44px),repeating-linear-gradient(90deg,var(--border)_0,var(--border)_1px,transparent_1px,transparent_44px)]" />
 
       {/* Accent glow */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: "-20%",
-          left: "50%",
-          transform: "translateX(-50%)",
-          width: "70vw",
-          height: "40vh",
-          background:
-            "radial-gradient(ellipse, rgba(201,245,59,0.055) 0%, transparent 70%)",
-          pointerEvents: "none",
-        }}
-      />
+      <div className="absolute bottom-[-20%] left-1/2 -translate-x-1/2 w-[70vw] h-[40vh] pointer-events-none bg-[radial-gradient(ellipse,rgba(201,245,59,0.055)_0%,transparent_70%)]" />
       {/* Additional ambient blobs */}
-      <div
-        style={{
-          position: "absolute",
-          top: "10%",
-          left: "-5%",
-          width: 460,
-          height: 460,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(124,58,237,0.07) 0%, transparent 65%)",
-          pointerEvents: "none",
-          filter: "blur(2px)",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          top: "20%",
-          right: "-5%",
-          width: 380,
-          height: 380,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(219,39,119,0.07) 0%, transparent 65%)",
-          pointerEvents: "none",
-          filter: "blur(2px)",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          bottom: "35%",
-          left: "25%",
-          width: 280,
-          height: 280,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(201,245,59,0.05) 0%, transparent 65%)",
-          pointerEvents: "none",
-          filter: "blur(2px)",
-        }}
-      />
+      <div className="absolute top-[10%] left-[-5%] w-[460px] h-[460px] rounded-full bg-[radial-gradient(circle,rgba(124,58,237,0.07)_0%,transparent_65%)] pointer-events-none blur-[2px]" />
+      <div className="absolute top-[20%] right-[-5%] w-[380px] h-[380px] rounded-full bg-[radial-gradient(circle,rgba(219,39,119,0.07)_0%,transparent_65%)] pointer-events-none blur-[2px]" />
+      <div className="absolute bottom-[35%] left-[25%] w-[280px] h-[280px] rounded-full bg-[radial-gradient(circle,rgba(201,245,59,0.05)_0%,transparent_65%)] pointer-events-none blur-[2px]" />
 
-      <div style={{ position: "relative", zIndex: 1, padding: "0 6vw" }}>
+      <div className="relative z-10 px-[6vw]">
         {/* ── Top divider ── */}
         <div
           ref={topLineRef}
-          style={{
-            height: 1,
-            background:
-              "linear-gradient(90deg, transparent, #c9f53b 40%, rgba(255,255,255,0.12) 100%)",
-            transformOrigin: "left",
-            marginBottom: 72,
-            marginTop: 80,
-          }}
+          className="h-px bg-gradient-to-r from-transparent via-primary to-border/30 origin-left mb-[72px] mt-[80px]"
         />
 
         {/* ── Giant wordmark ── */}
         <div
           ref={bigTextRef}
-          style={{ overflow: "hidden", marginBottom: 80, lineHeight: 0.9 }}
+          className="overflow-hidden mb-20 leading-[0.9]"
         >
           {["IEDC", "Research", "Lab"].map((word, i) => (
-            <div key={i} style={{ overflow: "hidden", display: "block" }}>
+            <div key={i} className="overflow-hidden block">
               <span
-                className="ft-word"
-                style={{
-                  display: "inline-block",
-                  fontSize: "clamp(2.7rem, 10vw, 9rem)",
-                  fontWeight: 800,
-                  letterSpacing: "-0.04em",
-                  color:
-                    i === 2
-                      ? "#c9f53b"
-                      : i === 1
-                        ? "rgba(240,237,230,0.55)"
-                        : "#f0ede6",
-                  fontStyle: i === 1 ? "italic" : "normal",
-                  opacity: 0,
-                  willChange: "transform",
-                }}
+                className={`ft-word inline-block text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-extrabold tracking-[-0.04em] opacity-0 will-change-transform ${
+                  i === 2
+                    ? "text-primary"
+                    : i === 1
+                      ? "text-foreground/55 italic"
+                      : "text-foreground"
+                }`}
               >
                 {word}
               </span>
@@ -315,34 +185,14 @@ export default function Footer() {
         {/* ── Columns grid ── */}
         <div
           ref={gridRef}
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "48px 40px",
-            marginBottom: 72,
-          }}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-12 mb-[72px]"
         >
           {/* About col */}
-          <div className="ft-col" style={{ opacity: 0 }}>
-            <p
-              style={{
-                fontSize: 10,
-                letterSpacing: "0.38em",
-                textTransform: "uppercase",
-                color: "#c9f53b",
-                fontFamily: "monospace",
-                marginBottom: 16,
-              }}
-            >
+          <div className="ft-col opacity-0">
+            <p className="text-[10px] tracking-[0.38em] uppercase text-primary font-mono mb-4">
               About Us
             </p>
-            <p
-              style={{
-                fontSize: 14,
-                color: "rgba(240,237,230,0.45)",
-                lineHeight: 1.8,
-              }}
-            >
+            <p className="text-sm text-foreground/55 leading-relaxed">
               A multidisciplinary research lab at the frontier of computing, AI,
               and life sciences — shaping tomorrow through rigorous inquiry and
               bold collaboration.
@@ -350,35 +200,16 @@ export default function Footer() {
           </div>
 
           {/* Links col */}
-          <div className="ft-col" style={{ opacity: 0 }}>
-            <p
-              style={{
-                fontSize: 10,
-                letterSpacing: "0.38em",
-                textTransform: "uppercase",
-                color: "#c9f53b",
-                fontFamily: "monospace",
-                marginBottom: 16,
-              }}
-            >
+          <div className="ft-col opacity-0">
+            <p className="text-[10px] tracking-[0.38em] uppercase text-primary font-mono mb-4">
               Navigate
             </p>
-            <nav style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <nav className="flex flex-col gap-2.5">
               {NAV_LINKS.map((link) => (
                 <a
                   key={link.label}
                   href={link.href}
-                  onMouseEnter={onLinkEnter}
-                  onMouseLeave={onLinkLeave}
-                  style={{
-                    fontSize: 14,
-                    color: "rgba(240,237,230,0.45)",
-                    textDecoration: "none",
-                    fontFamily: "monospace",
-                    letterSpacing: "0.04em",
-                    willChange: "transform",
-                    display: "inline-block",
-                  }}
+                  className="text-sm text-foreground/45 hover:text-primary hover:translate-x-1.5 transition-all duration-200 ease-out font-mono tracking-wide inline-block"
                 >
                   {link.label}
                 </a>
@@ -387,41 +218,17 @@ export default function Footer() {
           </div>
 
           {/* Contact col */}
-          <div className="ft-col" style={{ opacity: 0 }}>
-            <p
-              style={{
-                fontSize: 10,
-                letterSpacing: "0.38em",
-                textTransform: "uppercase",
-                color: "#c9f53b",
-                fontFamily: "monospace",
-                marginBottom: 16,
-              }}
-            >
+          <div className="ft-col opacity-0">
+            <p className="text-[10px] tracking-[0.38em] uppercase text-primary font-mono mb-4">
               Contact
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="flex flex-col gap-3.5">
               {CONTACT_ITEMS.map((item) => (
                 <div key={item.label}>
-                  <p
-                    style={{
-                      fontSize: 9,
-                      letterSpacing: "0.25em",
-                      textTransform: "uppercase",
-                      color: "rgba(240,237,230,0.25)",
-                      fontFamily: "monospace",
-                      marginBottom: 3,
-                    }}
-                  >
+                  <p className="text-[9px] tracking-[0.25em] uppercase text-foreground/35 font-mono mb-1">
                     {item.label}
                   </p>
-                  <p
-                    style={{
-                      fontSize: 13,
-                      color: "rgba(240,237,230,0.55)",
-                      lineHeight: 1.5,
-                    }}
-                  >
+                  <p className="text-sm text-foreground/65 leading-normal">
                     {item.value}
                   </p>
                 </div>
@@ -430,37 +237,16 @@ export default function Footer() {
           </div>
 
           {/* Social col */}
-          <div className="ft-col" style={{ opacity: 0 }}>
-            <p
-              style={{
-                fontSize: 10,
-                letterSpacing: "0.38em",
-                textTransform: "uppercase",
-                color: "#c9f53b",
-                fontFamily: "monospace",
-                marginBottom: 16,
-              }}
-            >
+          <div className="ft-col opacity-0">
+            <p className="text-[10px] tracking-[0.38em] uppercase text-primary font-mono mb-4">
               Follow
             </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className="flex flex-col gap-3.5">
               {SOCIALS.map((s) => (
                 <a
                   key={s.label}
                   href={s.href}
-                  onMouseEnter={onSocialEnter}
-                  onMouseLeave={onSocialLeave}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    color: "rgba(240,237,230,0.45)",
-                    textDecoration: "none",
-                    fontSize: 13,
-                    fontFamily: "monospace",
-                    letterSpacing: "0.04em",
-                    willChange: "transform",
-                  }}
+                  className="flex items-center gap-[10px] text-sm text-foreground/45 hover:text-primary hover:translate-x-1.5 transition-all duration-200 ease-out font-mono tracking-wide"
                 >
                   {s.icon}
                   {s.label}
@@ -473,48 +259,17 @@ export default function Footer() {
         {/* ── Bottom bar ── */}
         <div
           ref={bottomRef}
-          style={{
-            opacity: 0,
-            borderTop: "1px solid rgba(255,255,255,0.06)",
-            paddingBlock: 24,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 12,
-          }}
+          className="opacity-0 border-t border-border/40 py-6 flex items-center justify-between flex-wrap gap-3"
         >
-          <p
-            style={{
-              fontSize: 11,
-              color: "rgba(240,237,230,0.25)",
-              fontFamily: "monospace",
-              letterSpacing: "0.08em",
-            }}
-          >
+          <p className="text-[11px] text-foreground/35 font-mono tracking-wider">
             © {new Date().getFullYear()} IEDC Research Lab. All rights reserved.
           </p>
-          <div style={{ display: "flex", gap: 24 }}>
+          <div className="flex gap-6">
             {["Privacy Policy", "Terms of Use", "Sitemap"].map((t) => (
               <a
                 key={t}
                 href="#"
-                style={{
-                  fontSize: 11,
-                  color: "rgba(240,237,230,0.25)",
-                  fontFamily: "monospace",
-                  letterSpacing: "0.06em",
-                  textDecoration: "none",
-                }}
-                onMouseEnter={(e) =>
-                  gsap.to(e.currentTarget, { color: "#c9f53b", duration: 0.2 })
-                }
-                onMouseLeave={(e) =>
-                  gsap.to(e.currentTarget, {
-                    color: "rgba(240,237,230,0.25)",
-                    duration: 0.2,
-                  })
-                }
+                className="text-[11px] text-foreground/35 hover:text-primary transition-colors duration-200 font-mono tracking-wider"
               >
                 {t}
               </a>
@@ -522,8 +277,7 @@ export default function Footer() {
           </div>
         </div>
       </div>
-
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap');`}</style>
     </footer>
   );
 }
+
