@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Image from "next/image";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-
+import type { HomePageData } from "../../../sanity/lib/queries";
 
 gsap.registerPlugin(ScrollTrigger);
+
+const FALLBACK_BODY =
+  "The IEDC CSE Research Lab is a premier hub for innovation, deep-tech research, and entrepreneurship. We empower students and faculty to ideate, prototype, and launch impactful solutions at the intersection of IoT, Blockchain, and Cyber Security — bridging academia with industry through patents, publications, and incubated startups.";
 
 function AnimatedParagraph({ text }: { text: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,7 +39,7 @@ function AnimatedParagraph({ text }: { text: string }) {
         if (st.vars.trigger === containerRef.current) st.kill();
       });
     };
-  }, []);
+  }, [text]);
 
   return (
     <div ref={containerRef} className="flex flex-wrap gap-x-[0.35em] gap-y-1 justify-center">
@@ -50,13 +52,21 @@ function AnimatedParagraph({ text }: { text: string }) {
   );
 }
 
-
 /* ─── Main Component ──────────────────────────────── */
-export default function AboutUs() {
+interface AboutUsProps {
+  data?: HomePageData | null;
+}
+
+export default function AboutUs({ data }: AboutUsProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const subRef = useRef<HTMLDivElement>(null);
   const decorRef = useRef<HTMLDivElement>(null);
   const orbContainerRef = useRef<HTMLDivElement>(null);
+
+  const eyebrow = data?.aboutEyebrow ?? "◆ Who We Are ◆";
+  const heading = data?.aboutHeading ?? "Crafting stories that resonate.";
+  const body = data?.aboutBody?.trim() || FALLBACK_BODY;
+  const ctaLabel = data?.aboutCtaLabel ?? "Explore More";
 
   useEffect(() => {
     gsap.fromTo(
@@ -120,18 +130,23 @@ export default function AboutUs() {
       <div className="relative z-10 max-w-[1400px] mx-auto">
         <div className="flex flex-col items-center text-center mb-24">
           <span className="text-primary text-xs font-bold tracking-[0.35em] uppercase mb-6 block">
-            ◆ Who We Are ◆
+            {eyebrow}
           </span>
           <h2
             ref={headingRef}
             className="text-5xl sm:text-6xl lg:text-7xl font-bold text-foreground leading-[1.05] mb-6 opacity-0 font-['Bebas_Neue'] tracking-[0.02em]"
           >
-            Crafting{" "}
-            <em className="text-primary not-italic">
-              stories
-            </em>
-            <br />
-            that resonate.
+            {/* Render last word(s) after the period in primary colour */}
+            {heading.includes("stories") ? (
+              <>
+                Crafting{" "}
+                <em className="text-primary not-italic">stories</em>
+                <br />
+                {heading.split("stories")[1]?.trim() || "that resonate."}
+              </>
+            ) : (
+              heading
+            )}
           </h2>
           <div
             ref={decorRef}
@@ -141,13 +156,13 @@ export default function AboutUs() {
             ref={subRef}
             className="max-w-4xl text-xl sm:text-2xl font-light text-foreground/80 leading-relaxed"
           >
-            <AnimatedParagraph text="Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Lorem ipsum dolor, sit amet consectetur adipisicing elit. Cumque est recusandae voluptatibus aperiam molestiae tempora sed ut ab! Cumque animi magnam natus consequatur asperiores hic fugiat voluptatem odit in ipsa. Lorem ipsum dolor sit amet consectetur adipisicing elit. Aut at autem non dicta? Nemo aut officiis accusamus, placeat quis ut. Vero suscipit ea aperiam deleniti dicta magni eveniet obcaecati officia?" />
+            <AnimatedParagraph text={body} />
           </div>
         </div>
 
         <div className="flex justify-center mt-20">
           <button className="group relative px-10 py-4 border border-primary/45 text-foreground text-sm font-bold tracking-widest uppercase hover:text-background transition-all duration-500 rounded-full overflow-hidden shadow-[0_0_20px_rgba(201,245,59,0.12)]">
-            <span className="relative z-10">Explore More</span>
+            <span className="relative z-10">{ctaLabel}</span>
             <span className="absolute inset-0 bg-primary scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left" />
           </button>
         </div>

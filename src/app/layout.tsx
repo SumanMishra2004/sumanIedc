@@ -10,11 +10,15 @@ import ConditionalNavbar from "@/components/home/ConditionalNavbar";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  preload: false,
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  preload: false,
+  display: "swap",
 });
 
 export const metadata: Metadata = {

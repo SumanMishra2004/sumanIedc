@@ -7,18 +7,25 @@ import Navbar from "@/components/home/Navbar";
 import VelocityMarquee from "@/components/home/ScrollMarquee";
 import LoadingScreen from "@/components/home/LoadingScreen";
 import LabCarousel from "./ViewImages";
-
 import Achievements from "./Achievements";
 import OurJourney from "./OurJourney";
 import UpcomingEvents from "./UpcomingEvents";
 import Footer from "./Footer";
 
-const MIN_LOAD_MS = 2200; // minimum time to show the loader (aesthetic)
+import type { HomePageData, MilestoneData, GallerySlideData } from "../../../sanity/lib/queries";
 
-export default function HomeClient() {
-  const [progress, setProgress]       = useState(0);
-  const [isComplete, setIsComplete]   = useState(false);
-  const [showScreen, setShowScreen]   = useState(true);
+const MIN_LOAD_MS = 2200;
+
+interface HomeClientProps {
+  homePageData?: HomePageData | null;
+  milestones?: MilestoneData[] | null;
+  gallerySlides?: GallerySlideData[] | null;
+}
+
+export default function HomeClient({ homePageData, milestones, gallerySlides }: HomeClientProps) {
+  const [progress, setProgress]     = useState(0);
+  const [isComplete, setIsComplete] = useState(false);
+  const [showScreen, setShowScreen] = useState(true);
 
   const startTimeRef  = useRef<number>(0);
   const intervalRef   = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -30,7 +37,6 @@ export default function HomeClient() {
     let current = 0;
 
     intervalRef.current = setInterval(() => {
-      // Slow down as we approach 88
       const remaining = 88 - current;
       if (remaining <= 0) {
         clearInterval(intervalRef.current!);
@@ -58,7 +64,6 @@ export default function HomeClient() {
       setTimeout(() => {
         if (intervalRef.current) clearInterval(intervalRef.current);
         setProgress(100);
-        // Small pause so the counter visually reaches 100 before exit
         setTimeout(() => setIsComplete(true), 350);
       }, delay);
     };
@@ -91,14 +96,13 @@ export default function HomeClient() {
       >
         <div className="flex flex-col w-full bg-background text-foreground transition-colors duration-300">
           <Navbar />
-          <HeroSection />
-          <AboutUs />
+          <HeroSection data={homePageData} />
+          <AboutUs data={homePageData} />
           <VelocityMarquee />
           <Achievements />
-          <OurJourney />
+          <OurJourney milestones={milestones} />
           <UpcomingEvents />
-          <LabCarousel />
-         
+          <LabCarousel slides={gallerySlides} />
           <Footer />
         </div>
       </div>

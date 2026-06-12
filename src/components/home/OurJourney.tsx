@@ -3,16 +3,30 @@
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { Sparkles, Rocket, Award, Cpu, Globe, LucideIcon } from "lucide-react";
+import { Sparkles, Rocket, Award, Cpu, Globe, Lightbulb, Star, Zap, type LucideIcon } from "lucide-react";
+import type { MilestoneData } from "../../../sanity/lib/queries";
 
 // Register GSAP ScrollTrigger plugin safely for SSR
 if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-/* ─── Milestone Data ─── */
-const milestones = [
+// ─── Icon map from Sanity iconName string → Lucide component ─────────────────
+const ICON_MAP: Record<string, LucideIcon> = {
+  Sparkles,
+  Rocket,
+  Award,
+  Cpu,
+  Globe,
+  Lightbulb,
+  Star,
+  Zap,
+};
+
+// ─── Fallback milestones (shown when Sanity has no data yet) ──────────────────
+const FALLBACK_MILESTONES: MilestoneData[] = [
   {
+    _id: "f1",
     year: "2018",
     tag: "GENESIS",
     title: "The Spark of Innovation",
@@ -23,9 +37,11 @@ const milestones = [
       "Opened the first dedicated co-working space and electronics prototyping lab.",
       "Hosted the inaugural bootcamp with 500+ student attendees.",
     ],
-    icon: Sparkles,
+    iconName: "Sparkles",
+    orderRank: 1,
   },
   {
+    _id: "f2",
     year: "2020",
     tag: "INCUBATION",
     title: "Incubation Program Launch",
@@ -36,9 +52,11 @@ const milestones = [
       "Secured ₹50 Lakhs in seed support from government and venture partners.",
       "Established legal advisory support for intellectual property and patent filing.",
     ],
-    icon: Rocket,
+    iconName: "Rocket",
+    orderRank: 2,
   },
   {
+    _id: "f3",
     year: "2022",
     tag: "GROWTH",
     title: "Patent & Innovation Surge",
@@ -49,9 +67,11 @@ const milestones = [
       "Exited 3 student startups with successful follow-on investment.",
       "Signed research partnership agreements with 5 international technology institutes.",
     ],
-    icon: Award,
+    iconName: "Award",
+    orderRank: 3,
   },
   {
+    _id: "f4",
     year: "2024",
     tag: "FRONTIER",
     title: "Quantum & Advanced AI Lab",
@@ -62,9 +82,11 @@ const milestones = [
       "Received ₹2 Crore national-level grant for deep-tech R&D programs.",
       "Launched cross-disciplinary fellowship programs in quantum-AI convergence.",
     ],
-    icon: Cpu,
+    iconName: "Cpu",
+    orderRank: 4,
   },
   {
+    _id: "f5",
     year: "2026",
     tag: "GLOBAL",
     title: "International Expansion",
@@ -75,17 +97,18 @@ const milestones = [
       "Hosted first international deep-tech innovation summit with 2000+ participants.",
       "Deployed open-source research platform used by 50+ institutions worldwide.",
     ],
-    icon: Globe,
+    iconName: "Globe",
+    orderRank: 5,
   },
 ];
 
 interface MilestoneCardProps {
-  milestone: typeof milestones[number];
+  milestone: MilestoneData;
   index: number;
 }
 
 function MilestoneCard({ milestone, index }: MilestoneCardProps) {
-  const Icon = milestone.icon;
+  const Icon = ICON_MAP[milestone.iconName] ?? Sparkles;
   return (
     <div
       className={`journey-card-${index} relative bg-card/40 dark:bg-zinc-900/30 backdrop-blur-md border border-zinc-200/80 dark:border-zinc-800/60 rounded-3xl p-6 md:p-8 shadow-sm transition-all duration-500 hover:shadow-xl hover:border-primary/40 dark:hover:border-primary/30 hover:-translate-y-1 group overflow-hidden`}
@@ -131,7 +154,14 @@ function MilestoneCard({ milestone, index }: MilestoneCardProps) {
   );
 }
 
-export default function OurJourney() {
+interface OurJourneyProps {
+  milestones?: MilestoneData[] | null;
+}
+
+export default function OurJourney({ milestones: propMilestones }: OurJourneyProps) {
+  const milestones =
+    propMilestones && propMilestones.length > 0 ? propMilestones : FALLBACK_MILESTONES;
+
   const containerRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLDivElement>(null);
 
@@ -140,9 +170,7 @@ export default function OurJourney() {
     const activeLine = activeLineRef.current;
     if (!container || !activeLine) return;
 
-    // Use GSAP context for clean garbage collection on unmount
     const ctx = gsap.context(() => {
-      // 1. Animate height of active line on scroll
       gsap.fromTo(
         activeLine,
         { height: "0%" },
@@ -158,18 +186,11 @@ export default function OurJourney() {
         }
       );
 
-      // 2. Animate cards and node dots individually
       milestones.forEach((_, idx) => {
         const isEven = idx % 2 === 0;
-
-        // Animate the card sliding in from left/right
         gsap.fromTo(
           `.journey-card-${idx}`,
-          {
-            opacity: 0,
-            x: isEven ? -45 : 45,
-            scale: 0.95,
-          },
+          { opacity: 0, x: isEven ? -45 : 45, scale: 0.95 },
           {
             opacity: 1,
             x: 0,
@@ -184,7 +205,6 @@ export default function OurJourney() {
           }
         );
 
-        // Toggle active states for nodes based on scroll progress
         ScrollTrigger.create({
           trigger: `.journey-card-${idx}`,
           start: "top 72%",
@@ -197,11 +217,9 @@ export default function OurJourney() {
       });
     }, container);
 
-    // Refresh ScrollTrigger values once DOM is ready
     ScrollTrigger.refresh();
-
     return () => ctx.revert();
-  }, []);
+  }, [milestones]);
 
   return (
     <section
@@ -227,9 +245,6 @@ export default function OurJourney() {
 
       {/* Timeline Layout */}
       <div className="relative w-full max-w-6xl mx-auto px-4">
-        {/* Vertical tracks */}
-        {/* Mobile: track is aligned at left-8 (32px from left margin) */}
-        {/* Desktop: track is centered (left-1/2) */}
         <div className="absolute left-8 md:left-1/2 top-4 bottom-4 w-[2px] -translate-x-1/2 bg-zinc-200 dark:bg-zinc-800/80 z-0">
           {/* Active Progress Line */}
           <div
@@ -237,7 +252,6 @@ export default function OurJourney() {
             className="absolute top-0 left-0 w-full bg-gradient-to-b from-primary/30 via-primary to-primary origin-top shadow-[0_0_10px_var(--primary)]"
             style={{ height: "0%" }}
           >
-            {/* Self-positioning Glowing Pulse Orb cursor */}
             <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-20">
               <div className="w-6 h-6 bg-primary rounded-full animate-ping absolute inset-0 opacity-40" />
               <div className="relative w-5 h-5 bg-primary rounded-full border-2 border-background shadow-[0_0_12px_var(--primary)] flex items-center justify-center">
@@ -247,20 +261,16 @@ export default function OurJourney() {
           </div>
         </div>
 
-        {/* Milestone Rows */}
         <div className="relative z-10 space-y-16 md:space-y-24">
           {milestones.map((milestone, idx) => {
             const isEven = idx % 2 === 0;
-            const Icon = milestone.icon;
+            const Icon = ICON_MAP[milestone.iconName] ?? Sparkles;
 
             return (
               <div
-                key={idx}
+                key={milestone._id}
                 className="relative grid grid-cols-1 md:grid-cols-9 gap-4 md:gap-8 items-center pl-16 md:pl-0"
               >
-                {/* Node dot column */}
-                {/* Mobile: absolutely positioned over the left track */}
-                {/* Desktop: relatively placed in column 5 */}
                 <div className="absolute left-8 -translate-x-1/2 top-6 md:relative md:left-auto md:translate-x-0 md:top-auto md:col-span-1 md:col-start-5 flex justify-center z-10">
                   <div
                     id={`node-${idx}`}
@@ -274,13 +284,8 @@ export default function OurJourney() {
                   </div>
                 </div>
 
-                {/* Milestone Card Column */}
-                {/* Mobile: spans full grid width */}
-                {/* Desktop: Alternates between left-side (col-start-1) and right-side (col-start-6) */}
                 <div
-                  className={`md:col-span-4 ${
-                    isEven ? "md:col-start-1" : "md:col-start-6"
-                  }`}
+                  className={`md:col-span-4 ${isEven ? "md:col-start-1" : "md:col-start-6"}`}
                 >
                   <MilestoneCard milestone={milestone} index={idx} />
                 </div>
