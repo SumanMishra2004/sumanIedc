@@ -1,5 +1,5 @@
 import * as z from "zod"
-import { CertificateStatus } from "@prisma/client"
+import { CERTIFICATE_STATUSES } from "@/types/certificate"
 
 export const certificateSchema = z.object({
   title: z
@@ -47,7 +47,7 @@ export const certificateSchema = z.object({
     .nullable()
     .optional(),
   isPublic: z.boolean().default(true),
-  certificateStatus: z.nativeEnum(CertificateStatus).default(CertificateStatus.SUBMITTED),
+  certificateStatus: z.enum(CERTIFICATE_STATUSES).default("SUBMITTED"),
   updateComment: z.string().trim().nullable().optional(),
 })
 .superRefine((data, ctx) => {

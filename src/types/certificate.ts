@@ -1,4 +1,11 @@
-import { UserRole, CertificateStatus, TeacherStatus } from "@prisma/client"
+export const USER_ROLES = ["ADMIN", "FACULTY", "STUDENT"] as const
+export type UserRole = (typeof USER_ROLES)[number]
+
+export const CERTIFICATE_STATUSES = ["SUBMITTED", "UNDER_REVIEW", "APPROVED"] as const
+export type CertificateStatus = (typeof CERTIFICATE_STATUSES)[number]
+
+export const TEACHER_STATUSES = ["UPLOADED", "ACCEPTED", "UPDATE", "REJECTED", "PUBLISHED"] as const
+export type TeacherStatus = (typeof TEACHER_STATUSES)[number]
 
 export interface User {
   id: string
