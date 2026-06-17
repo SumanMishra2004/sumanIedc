@@ -78,10 +78,7 @@ function SignInContent() {
       if (result?.error) {
         setError(result.error)
       } else {
-        // Successful loginAction redirects automatically from the server,
-        // but if it somehow returns without error, we push manually.
-        router.push(callbackUrl)
-        router.refresh()
+        window.location.href = callbackUrl
       }
     } catch {
       setError('Something went wrong. Please try again.')

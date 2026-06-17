@@ -37,8 +37,9 @@ export async function loginAction(formData: FormData) {
     await signIn('credentials', {
       email: raw.email,
       password: raw.password,
-      redirectTo: '/dashboard',
+      redirect: false,
     })
+    return { success: true }
   } catch (error: any) {
     if (error?.message?.includes('NEXT_REDIRECT')) {
       throw error
