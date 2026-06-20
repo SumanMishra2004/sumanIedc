@@ -16,7 +16,6 @@ export default function ConditionalNavbar({ children }: { children: React.ReactN
     pathname?.startsWith("/dashboard") || 
     pathname?.startsWith("/admin") || 
     pathname?.startsWith("/auth") || 
-    pathname?.startsWith("/setup-profile") ||
     pathname?.startsWith("/studio");
 
   if (shouldHideNavbar) {

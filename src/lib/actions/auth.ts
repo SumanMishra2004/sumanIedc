@@ -378,3 +378,60 @@ export async function resetPasswordAction(formData: FormData): Promise<{ success
     return { error: 'Failed to reset password.' }
   }
 }
+
+// ── Change Password Action (for logged in users) ──────────────────────────────
+export async function changePasswordAction(formData: FormData): Promise<{ success: true; message: string } | { error: string }> {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return { error: 'Not authenticated.' }
+    }
+
+    const currentPassword = formData.get('currentPassword') as string
+    const newPassword = formData.get('newPassword') as string
+    const confirmPassword = formData.get('confirmPassword') as string
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return { error: 'All fields are required.' }
+    }
+
+    if (newPassword !== confirmPassword) {
+      return { error: 'New passwords do not match.' }
+    }
+
+    if (newPassword.length < 8) {
+      return { error: 'Password must be at least 8 characters long.' }
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id }
+    })
+
+    if (!user || !user.password) {
+      return { error: 'User not found or password not set.' }
+    }
+
+    const isValid = await argon2.verify(user.password, currentPassword)
+    if (!isValid) {
+      return { error: 'Incorrect current password.' }
+    }
+
+    const hashedPassword = await argon2.hash(newPassword, {
+      type: argon2.argon2id,
+      memoryCost: 65536,
+      timeCost: 3,
+      parallelism: 4,
+    })
+
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: { password: hashedPassword },
+    })
+
+    return { success: true, message: 'Password updated successfully!' }
+  } catch (error) {
+    console.error('[changePasswordAction]', error)
+    return { error: 'Failed to change password.' }
+  }
+}
+

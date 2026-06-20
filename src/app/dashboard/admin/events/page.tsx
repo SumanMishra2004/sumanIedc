@@ -130,7 +130,11 @@ export default function AdminEventsPage() {
 
   React.useEffect(() => {
     if (session?.user?.role === "ADMIN") {
-      fetchEvents()
+      // Schedule fetch asynchronously to avoid triggering synchronous setState within the effect
+      const id = window.setTimeout(() => {
+        fetchEvents()
+      }, 0)
+      return () => window.clearTimeout(id)
     }
   }, [session])
 

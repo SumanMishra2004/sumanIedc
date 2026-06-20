@@ -52,6 +52,7 @@ interface ProfileUser {
 interface ProfileHeroCardProps {
   user: ProfileUser
   isOwnProfile: boolean
+  onEditClick?: () => void
 }
 
 const roleConfig: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
@@ -72,7 +73,7 @@ const roleConfig: Record<string, { label: string; icon: React.ReactNode; color: 
   },
 }
 
-export function ProfileHeroCard({ user, isOwnProfile }: ProfileHeroCardProps) {
+export function ProfileHeroCard({ user, isOwnProfile, onEditClick }: ProfileHeroCardProps) {
   const initials = user.name ? user.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase() : "U"
   const role = roleConfig[user.role] ?? roleConfig.STUDENT
 
@@ -136,10 +137,8 @@ export function ProfileHeroCard({ user, isOwnProfile }: ProfileHeroCardProps) {
               <Share2 className="h-4 w-4" /> Share
             </Button>
             {isOwnProfile && (
-              <Button asChild size="sm" className="gap-1.5 bg-[#c9f53b] hover:bg-[#c9f53b]/90 text-black font-semibold transition-all">
-                <Link href="/dashboard/profile">
-                  <Pencil className="h-3.5 w-3.5" /> Edit Profile
-                </Link>
+              <Button onClick={onEditClick} size="sm" className="gap-1.5 bg-[#c9f53b] hover:bg-[#c9f53b]/90 text-black font-semibold transition-all">
+                <Pencil className="h-3.5 w-3.5" /> Edit Profile
               </Button>
             )}
           </div>
@@ -201,7 +200,7 @@ export function ProfileHeroCard({ user, isOwnProfile }: ProfileHeroCardProps) {
               </p>
             ) : isOwnProfile && (
               <p className="text-sm text-muted-foreground/50 italic mt-2">
-                No bio yet. <Link href="/dashboard/profile" className="text-[#c9f53b]/70 hover:text-[#c9f53b] underline-offset-4 hover:underline">Add one →</Link>
+                No bio yet. <button onClick={onEditClick} className="text-[#c9f53b]/70 hover:text-[#c9f53b] underline-offset-4 hover:underline cursor-pointer bg-transparent border-none p-0 font-medium">Add one →</button>
               </p>
             )}
 

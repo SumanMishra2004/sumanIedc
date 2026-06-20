@@ -36,28 +36,30 @@ interface ProfileFormProps {
     role: string
     name: string | null
     email: string | null
-    bio: string | null
-    department: string | null
-    phone: string | null
-    image: string | null
-    coverImage: string | null
-    institution: string | null
-    linkedinLink: string | null
+    bio?: string | null
+    department?: string | null
+    phone?: string | null
+    image?: string | null
+    coverImage?: string | null
+    institution?: string | null
+    linkedinLink?: string | null
     skills: string[]
-    enrollmentNo: string | null
-    degree: string | null
-    currentYear: string | null
-    currentSemester: string | null
-    graduationYear: string | null
-    resumeLink: string | null
-    portfolioLink: string | null
-    githubLink: string | null
+    enrollmentNo?: string | null
+    degree?: string | null
+    currentYear?: string | null
+    currentSemester?: string | null
+    graduationYear?: string | null
+    resumeLink?: string | null
+    portfolioLink?: string | null
+    githubLink?: string | null
     researchInterests: string[]
-    designation: string | null
-    yearsOfExperience: string | null
+    designation?: string | null
+    yearsOfExperience?: string | null
     areasOfExpertise: string[]
-    orcidId: string | null
+    orcidId?: string | null
   }
+  onSuccess?: () => void
+  onCancel?: () => void
 }
 
 // ── Reusable section header ──────────────────────────────────────────────────
@@ -147,7 +149,7 @@ function IconInput({
   )
 }
 
-export function ProfileForm({ user }: ProfileFormProps) {
+export function ProfileForm({ user, onSuccess, onCancel }: ProfileFormProps) {
   const { update } = useSession()
   const { toast } = useToast()
   const router = useRouter()
@@ -280,7 +282,11 @@ export function ProfileForm({ user }: ProfileFormProps) {
       } else {
         await update({ name, image: image || undefined, profileCompleted: true })
         toast({ title: "Profile saved successfully" })
-        router.push("/dashboard")
+        if (onSuccess) {
+          onSuccess()
+        } else {
+          router.push("/dashboard")
+        }
       }
     } catch {
       toast({ title: "Something went wrong", variant: "destructive" })
@@ -752,7 +758,7 @@ export function ProfileForm({ user }: ProfileFormProps) {
         <Button
           type="button" variant="outline"
           className="border-white/[0.08] bg-transparent hover:bg-white/[0.04] hover:border-white/15 text-muted-foreground hover:text-white transition-colors"
-          onClick={() => router.push("/dashboard")} disabled={busy}
+          onClick={() => onCancel ? onCancel() : router.push("/dashboard")} disabled={busy}
         >
           Cancel
         </Button>

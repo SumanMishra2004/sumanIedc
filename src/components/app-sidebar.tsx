@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { IconInnerShadowTop } from "@tabler/icons-react"
-import { Award, BookOpen, CircleDollarSign, Settings, User2, UserCog } from "lucide-react"
+import { Award, BookOpen, CircleDollarSign, Settings, User2, UserCog, Sparkles } from "lucide-react"
 import { useSession } from "next-auth/react"
 
 import { NavUser } from "@/components/nav-user"
@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/sidebar"
 import { SidebarNavItem } from "@/types/sidebar"
 import { NavMain } from "./nav-main"
-import { ProfileSearch } from "./profile-search"
 
 interface GrantSidebarItem {
   id: string
@@ -63,8 +62,8 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
       icon: User2,
     },
     {
-      title: "Setup Profile",
-      url: "/dashboard/profile",
+      title: "Settings",
+      url: "/dashboard/settings",
       icon: Settings,
     },
     {
@@ -87,6 +86,11 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
     },
     ...(userRole === "ADMIN"
       ? [
+          {
+            title: "Studio",
+            url: "/studio",
+            icon: Sparkles,
+          },
           {
             title: "Admin",
             url: "#",
@@ -123,26 +127,20 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild className="hover:bg-sidebar-accent/60 transition-colors">
-              <a href="/" className="flex items-center gap-3">
+              <Li href="/" className="flex items-center gap-3">
                 <div className="flex aspect-square size-9 items-center justify-center rounded-xl bg-[#c9f53b] text-black shadow-sm">
                   <IconInnerShadowTop className="size-5" />
                 </div>
                 <div className="grid flex-1 text-left leading-tight">
-                  <span className="truncate text-[15px] font-semibold tracking-tight">IEDC</span>
-                  <span className="truncate text-[11px] text-sidebar-foreground/50 font-medium uppercase tracking-widest">
+                  <span className="truncate text-[14px] font-bold tracking-tight">IEDC</span>
+                  <span className="truncate text-[9.5px] text-sidebar-foreground/50 font-semibold uppercase tracking-wider">
                     Research Portal
                   </span>
                 </div>
-              </a>
+              </Lin>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-
-        <div className="mx-3 my-2 h-px bg-sidebar-border/40" />
-
-        <div className="px-2 pb-3">
-          <ProfileSearch />
-        </div>
       </SidebarHeader>
 
       <SidebarContent className="px-1">

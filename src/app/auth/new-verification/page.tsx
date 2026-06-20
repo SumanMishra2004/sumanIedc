@@ -57,7 +57,6 @@ const [error, setError] = useState<string | undefined>()
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body { background: #080808; }
         .nv-card { width:100%; maxWidth:400px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.07); border-radius:20px; padding:40px 36px; text-align:center; }

@@ -1,6 +1,7 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { CompleteProfileDialog } from "@/components/profile/CompleteProfileDialog";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { unstable_cache } from "next/cache";
@@ -70,6 +71,7 @@ export default async function Layout({
           {children}
         </div>
       </SidebarInset>
+      <CompleteProfileDialog />
     </SidebarProvider>
   );
 }

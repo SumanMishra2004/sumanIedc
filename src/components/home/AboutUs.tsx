@@ -112,7 +112,7 @@ export default function AboutUs({ data }: AboutUsProps) {
 
   return (
     <section
-      className="relative min-h-screen w-full px-4 sm:px-8 lg:px-16 overflow-hidden pb-5 z-[5] bg-background transition-colors duration-300 font-sans"
+      className="relative min-h-fit md:py-30 w-full px-4 sm:px-8 lg:px-16 overflow-hidden pb-5 z-[5] bg-background transition-colors duration-300 font-sans"
     >
       {/* Top gradient that blends from the hero's bottom colour */}
       <div

@@ -67,13 +67,7 @@ export default auth(async function proxy(request: NextRequest) {
 
     const userRole = (session?.user as { role?: string })?.role ?? 'STUDENT'
 
-    // ── 3. Onboarding gate — force incomplete profiles to /setup-profile ──
-    const profileCompleted = (session?.user as { profileCompleted?: boolean })?.profileCompleted
-    if (!profileCompleted && pathname !== ONBOARDING_ROUTE) {
-      return NextResponse.redirect(new URL(ONBOARDING_ROUTE, request.url))
-    }
-
-    // ── 4. Role-based access control ──────────────────────────────────────
+    // ── 3. Role-based access control ──────────────────────────────────────
     if (!allowedRoles.includes(userRole)) {
       if (userRole === 'ADMIN')   return NextResponse.redirect(new URL('/admin',   request.url))
       if (userRole === 'FACULTY') return NextResponse.redirect(new URL('/faculty', request.url))
@@ -81,16 +75,6 @@ export default auth(async function proxy(request: NextRequest) {
     }
   }
 
-  // ── 5. Guard /setup-profile both ways ────────────────────────────────────
-  if (pathname === ONBOARDING_ROUTE) {
-    if (!isLoggedIn) {
-      return NextResponse.redirect(new URL('/auth/signin', request.url))
-    }
-    const profileCompleted = (session?.user as { profileCompleted?: boolean })?.profileCompleted
-    if (profileCompleted) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
-  }
 
   return NextResponse.next()
 })

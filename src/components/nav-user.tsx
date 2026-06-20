@@ -90,19 +90,13 @@ export function NavUser({
               <DropdownMenuItem asChild>
                 <Link href="/dashboard/profile" className="cursor-pointer w-full">
                   <IconUserCircle className="mr-2 h-4 w-4" />
-                  Account
+                  Account Profile
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="#" className="cursor-pointer w-full">
-                  <IconCreditCard className="mr-2 h-4 w-4" />
-                  Billing
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="#" className="cursor-pointer w-full">
+                <Link href="/dashboard/settings" className="cursor-pointer w-full">
                   <IconNotification className="mr-2 h-4 w-4" />
-                  Notifications
+                  Settings
                 </Link>
               </DropdownMenuItem>
             </DropdownMenuGroup>

@@ -52,7 +52,7 @@ export function NavMain({
                   asChild
                   tooltip={item.title}
                   className={`
-                    group h-9 rounded-lg px-3 text-sm font-medium transition-all
+                    group h-9 rounded-lg px-3 text-[13.5px] font-medium transition-all
                     hover:bg-sidebar-accent hover:text-sidebar-accent-foreground
                     ${isActive
                       ? "bg-[#c9f53b]/15 text-[#c9f53b] hover:bg-[#c9f53b]/20 hover:text-[#c9f53b]"
@@ -90,7 +90,7 @@ export function NavMain({
                   <SidebarMenuButton
                     tooltip={item.title}
                     className={`
-                      group h-9 rounded-lg px-3 text-sm font-medium transition-all
+                      group h-9 rounded-lg px-3 text-[13.5px] font-medium transition-all
                       hover:bg-sidebar-accent hover:text-sidebar-accent-foreground
                       ${hasActiveChild
                         ? "text-sidebar-foreground"
@@ -126,13 +126,13 @@ export function NavMain({
                           <SidebarMenuSubButton
                             asChild
                             className={`
-                              relative h-8 rounded-md pl-4 text-[13px] transition-all
-                              before:absolute before:left-0 before:top-1/2 before:h-px before:w-3 before:-translate-y-1/2 before:bg-sidebar-border/40
-                              hover:bg-sidebar-accent hover:text-sidebar-accent-foreground
-                              ${isSubActive
-                                ? "font-medium text-[#c9f53b] before:bg-[#c9f53b]/50"
-                                : "text-sidebar-foreground/55"
-                              }
+                               relative h-8 rounded-md pl-4 text-[12.5px] transition-all
+                               before:absolute before:left-0 before:top-1/2 before:h-px before:w-3 before:-translate-y-1/2 before:bg-sidebar-border/40
+                               hover:bg-sidebar-accent hover:text-sidebar-accent-foreground
+                               ${isSubActive
+                                 ? "font-medium text-[#c9f53b] before:bg-[#c9f53b]/50"
+                                 : "text-sidebar-foreground/55"
+                               }
                             `}
                           >
                             <Link href={subItem.url}>

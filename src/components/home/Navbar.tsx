@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/journal/NotificationBell";
+import Image from "next/image";
 
 const ALL_LINKS = [
   { label: "Home",         href: "/" },
@@ -136,17 +137,6 @@ function ResearchDropdown({ withSep = false }: { withSep?: boolean }) {
   );
 }
 
-// Placeholder logo (swap with <Image> once you have real logos)
-function LogoPlaceholder({ label, size = 56 }: { label: string; size?: number }) {
-  return (
-    <div
-      className="flex items-center justify-center rounded-full border-2 border-primary/60 bg-primary/10 font-bold text-primary select-none shrink-0 font-['Space_Grotesk']"
-      style={{ width: size, height: size, fontSize: size * 0.28 }}
-    >
-      {label}
-    </div>
-  );
-}
 
 // Avatar + dropdown for authenticated users
 function UserMenu({ name, email, image }: { name?: string | null; email?: string | null; image?: string | null }) {
@@ -329,8 +319,8 @@ export default function Navbar() {
         gsap.to(topRow, {
           height: topHeight,
           opacity: 1,
-          paddingTop: "0.75rem",
-          paddingBottom: "0.75rem",
+          paddingTop: "0.2rem",
+          paddingBottom: "0.2rem",
           duration: 0.45,
           ease: "power3.inOut",
         });
@@ -344,8 +334,6 @@ export default function Navbar() {
 
   return (
     <>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');`}</style>
-
       <header
         ref={navbarRef}
         className="fixed top-0 left-0 right-0 z-[100] w-full bg-background/90 dark:bg-background/95 backdrop-blur-md border-b border-border/40 transition-all duration-300"
@@ -353,56 +341,24 @@ export default function Navbar() {
         {/* ── ROW 1 · Logo strip ── */}
         <div
           ref={topRowRef}
-          className="w-full py-3 overflow-hidden"
+          className="w-full  overflow-hidden"
           style={{ willChange: "height, opacity" }}
         >
           <div className=" mx-auto px-4 sm:px-6 lg:px-10 flex items-center justify-between gap-3">
 
             {/* LEFT LOGO – hidden on xs, shown sm+ */}
             <div className="hidden sm:flex shrink-0 items-center gap-2 lg:gap-3">
-              {/* swap LogoPlaceholder with <Image src="/logos/left.png" …> */}
-              <LogoPlaceholder label="L" size={48} />
-              <div className="hidden lg:flex flex-col">
-                <span className="text-[10px] font-semibold text-primary/80 uppercase tracking-widest leading-tight font-['Space_Grotesk']">
-                  Institute
-                </span>
-                <span className="text-[9px] text-muted-foreground leading-tight font-['Space_Grotesk']">
-                  Your University Name
-                </span>
-              </div>
+              <Image src="/iem-logo.png" alt="Institute Logo" width={95} height={95} className=" object-cover dark:invert" />
             </div>
 
             {/* CENTER LOGO + title */}
             <div className="flex items-center gap-3 flex-1 justify-center min-w-0">
-              {/* swap LogoPlaceholder with <Image src="/logos/center.png" …> */}
-              <LogoPlaceholder label="IEDC" size={52} />
-              <div className="flex flex-col items-start min-w-0">
-                <span
-                  className="text-[11px] sm:text-[13px] lg:text-[14.5px] font-bold leading-snug truncate font-['Space_Grotesk'] tracking-[0.03em] bg-gradient-to-r from-primary to-[#a8e63b] bg-clip-text text-transparent"
-                >
-                  Innovation &amp; Entrepreneurship Development Cell
-                </span>
-                <span
-                  className="hidden sm:block text-[9.5px] lg:text-[10.5px] text-muted-foreground leading-snug mt-0.5 font-['Space_Grotesk']"
-                >
-                  Dept. of Computer Science &amp; Engineering
-                  <span className="hidden lg:inline"> · <span className="text-primary/75">IoT, Cyber Security &amp; Blockchain Technology</span></span>
-                </span>
-              </div>
+              <Image src="/iedc-logo.png" alt="IEDC Logo" width={60} height={60} className=" object-cover dark:invert" />
             </div>
 
             {/* RIGHT LOGO – hidden on xs, shown sm+ */}
             <div className="hidden sm:flex shrink-0 items-center gap-2 lg:gap-3">
-              <div className="hidden lg:flex flex-col items-end">
-                <span className="text-[10px] font-semibold text-primary/80 uppercase tracking-widest leading-tight font-['Space_Grotesk']">
-                  Partner
-                </span>
-                <span className="text-[9px] text-muted-foreground leading-tight text-right font-['Space_Grotesk']">
-                  Your Partner Name
-                </span>
-              </div>
-              {/* swap LogoPlaceholder with <Image src="/logos/right.png" …> */}
-              <LogoPlaceholder label="R" size={48} />
+              <Image src="/uem.png" alt="Partner Logo" width={95} height={95} className=" object-cover dark:invert" />
             </div>
 
           </div>

@@ -6,6 +6,8 @@ import { ProfileStatsRow } from "./ProfileStatsRow"
 import { ResearchFeed } from "./ResearchFeed"
 import { ProfileSkeleton } from "./ProfileSkeleton"
 import { AlertCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ProfileForm } from "./ProfileForm"
 
 interface ProfileData {
   user: {
@@ -68,8 +70,9 @@ export function ProfileViewer({ userId }: ProfileViewerProps) {
   const [data, setData] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
-  useEffect(() => {
+  const fetchProfile = () => {
     const url = userId ? `/api/profile?userId=${userId}` : "/api/profile"
     fetch(url)
       .then((r) => {
@@ -82,6 +85,10 @@ export function ProfileViewer({ userId }: ProfileViewerProps) {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    fetchProfile()
   }, [userId])
 
   if (loading) return <ProfileSkeleton />
@@ -102,13 +109,37 @@ export function ProfileViewer({ userId }: ProfileViewerProps) {
 
   return (
     <div className="space-y-6">
-      <ProfileHeroCard user={data.user} isOwnProfile={data.isOwnProfile} />
+      <ProfileHeroCard 
+        user={data.user} 
+        isOwnProfile={data.isOwnProfile} 
+        onEditClick={() => setIsEditDialogOpen(true)} 
+      />
       <ProfileStatsRow stats={data.stats} userRole={data.user.role} />
       <ResearchFeed
         research={data.research}
         isOwnProfile={data.isOwnProfile}
         userRole={data.user.role}
       />
+
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-card border-border shadow-xl p-6">
+          <DialogHeader className="pb-4 border-b border-border/40">
+            <DialogTitle className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              Edit Account Profile
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <ProfileForm 
+              user={data.user} 
+              onSuccess={() => {
+                setIsEditDialogOpen(false);
+                fetchProfile();
+              }}
+              onCancel={() => setIsEditDialogOpen(false)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
