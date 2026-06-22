@@ -38,7 +38,7 @@ export default function HeroSection({ data }: HeroSectionProps) {
   // Build background image URL from Sanity, or fall back to the original Cloudinary URL
   const bgUrl = d.heroBackground
     ? urlFor(d.heroBackground).width(1920).quality(85).url()
-    : "https://res.cloudinary.com/dvky83edw/image/upload/v1774103669/iot/e7aa4373-5920-499d-af38-7d109e14ecef.png";
+    : "";
 
   const { before: headLine1, after: headLine2 } = splitHeading(d.heroHeading);
   const [ ...deptRest] = d.heroDepartment.split(" of ");
@@ -46,7 +46,7 @@ export default function HeroSection({ data }: HeroSectionProps) {
 
   return (
     <div
-      className="relative z-2 min-h-screen w-full select-none overflow-x-clip overflow-y-visible bg-center bg-cover bg-no-repeat bg-background font-sans [perspective:1400px] [perspective-origin:50%_100%] transition-colors duration-300 flex flex-col justify-center"
+      className="relative z-2 min-h-screen w-full select-none overflow-x-clip overflow-y-visible bg-center bg-cover bg-no-repeat bg-background font-sans perspective-[1400px] perspective-origin-[50%_100%] transition-colors duration-300 flex flex-col justify-center"
       style={{ backgroundImage: `url('${bgUrl}')` }}
     >
       {/* ── Left to Right Overlay ── */}
@@ -66,7 +66,7 @@ export default function HeroSection({ data }: HeroSectionProps) {
         <div className="flex-1 flex flex-col justify-center px-[2vw] min-w-0">
           {/* ── PRIMARY GIANT HEADING ── */}
           <h1
-            className="font-['Bebas_Neue'] font-normal leading-[0.95] tracking-[0.01em] text-foreground margin-0 mb-4 text-4xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-9xl"
+            className="font-['Bebas_Neue'] font-normal leading-[0.95] tracking-[0.01em] text-foreground margin-0 mb-4 text-4xl sm:text-6xl md:text-7xl lg:text-8xl xl:text-[7rem]"
           >
             {headLine1}
             <br />
