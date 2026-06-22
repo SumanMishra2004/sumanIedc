@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { IconInnerShadowTop } from "@tabler/icons-react"
+import Link from "next/link"
 import { Award, BookOpen, CircleDollarSign, Settings, User2, UserCog, Sparkles } from "lucide-react"
 import { useSession } from "next-auth/react"
 
@@ -127,7 +128,7 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild className="hover:bg-sidebar-accent/60 transition-colors">
-              <Li href="/" className="flex items-center gap-3">
+              <Link href="/" className="flex items-center gap-3">
                 <div className="flex aspect-square size-9 items-center justify-center rounded-xl bg-[#c9f53b] text-black shadow-sm">
                   <IconInnerShadowTop className="size-5" />
                 </div>
@@ -137,7 +138,7 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
                     Research Portal
                   </span>
                 </div>
-              </Lin>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
