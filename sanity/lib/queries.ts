@@ -13,6 +13,30 @@ export interface SanityImageRef {
 }
 
 // ── Home Page ──────────────────────────────────────────────────────────────────
+export interface StatItem {
+  value: string;
+  suffix?: string;
+  prefix?: string;
+  label: string;
+  sub: string;
+}
+
+export interface MarqueeStatItem {
+  value: string;
+  label: string;
+  icon: string;
+}
+
+export interface SocialLink {
+  platform: string;
+  url: string;
+}
+
+export interface NavLinkData {
+  label: string;
+  href: string;
+}
+
 export interface HomePageData {
   heroBackground: SanityImageRef | null;
   heroHeading: string;
@@ -25,6 +49,18 @@ export interface HomePageData {
   aboutHeading: string;
   aboutBody: string;
   aboutCtaLabel: string;
+  stats?: StatItem[] | null;
+  marqueeSubtitle?: string;
+  marqueeTitle?: string;
+  marqueeStats?: MarqueeStatItem[] | null;
+  footerWordmark?: string[] | null;
+  footerAbout?: string;
+  footerSocials?: SocialLink[] | null;
+  footerLinks?: NavLinkData[] | null;
+  navbarIemLogo?: SanityImageRef | null;
+  navbarIedcLogo?: SanityImageRef | null;
+  navbarUemLogo?: SanityImageRef | null;
+  navbarLinks?: NavLinkData[] | null;
 }
 
 export async function getHomePageData(): Promise<HomePageData | null> {
@@ -40,7 +76,38 @@ export async function getHomePageData(): Promise<HomePageData | null> {
       aboutEyebrow,
       aboutHeading,
       aboutBody,
-      aboutCtaLabel
+      aboutCtaLabel,
+      stats[] {
+        value,
+        suffix,
+        prefix,
+        label,
+        sub
+      },
+      marqueeSubtitle,
+      marqueeTitle,
+      marqueeStats[] {
+        value,
+        label,
+        icon
+      },
+      footerWordmark,
+      footerAbout,
+      footerSocials[] {
+        platform,
+        url
+      },
+      footerLinks[] {
+        label,
+        href
+      },
+      navbarIemLogo,
+      navbarIedcLogo,
+      navbarUemLogo,
+      navbarLinks[] {
+        label,
+        href
+      }
     }`,
     {},
     { next: { revalidate: 60 } }

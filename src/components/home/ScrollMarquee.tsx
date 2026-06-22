@@ -101,10 +101,23 @@ function StatCardItem({ stat }: { stat: StatCard }) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function VelocityMarquee() {
+interface VelocityMarqueeProps {
+  subtitle?: string;
+  title?: string;
+  stats?: any[] | null;
+}
+
+export default function VelocityMarquee({ subtitle, title, stats }: VelocityMarqueeProps) {
   const row1Ref = useRef<HTMLDivElement>(null);
   const row2Ref = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
+
+  const finalSubtitle = subtitle || "◆ Innovation and Entrepreneurship Development Cell ◆";
+  const finalTitle = title || "Numbers That Speak";
+  const statsList = (stats && stats.length > 0) ? stats : STATS;
+
+  const row1Items = [...statsList, ...statsList, ...statsList];
+  const row2Items = [...statsList, ...statsList, ...statsList];
 
   // ── Velocity-based marquee animation ──────────────────────────────────────
   useEffect(() => {
@@ -153,7 +166,7 @@ export default function VelocityMarquee() {
 
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, []);
+  }, [statsList]); // reset if stats change
 
   // ── Scroll-triggered section reveal ───────────────────────────────────────
   useEffect(() => {
@@ -177,6 +190,47 @@ export default function VelocityMarquee() {
     );
   }, []);
 
+  const renderTitle = () => {
+    const words = finalTitle.split(" ");
+    if (words.length <= 1) {
+      return (
+        <h1 className="text-[clamp(4.5rem,13vw,9rem)] leading-[0.86] font-black uppercase text-foreground mb-8 relative font-['Bebas_Neue']">
+          <span className="relative inline-block">
+            {finalTitle}
+            <span className="absolute -bottom-2 left-0 w-full h-[3px] bg-primary/40 rounded-full" />
+          </span>
+        </h1>
+      );
+    }
+    if (words.length === 2) {
+      return (
+        <h1 className="text-[clamp(4.5rem,13vw,9rem)] leading-[0.86] font-black uppercase text-foreground mb-8 relative font-['Bebas_Neue']">
+          {words[0]}
+          <br />
+          <span className="relative inline-block text-primary">
+            {words[1]}
+            <span className="absolute -bottom-2 left-0 w-full h-[3px] bg-primary/40 rounded-full" />
+          </span>
+        </h1>
+      );
+    }
+    // 3 or more words: e.g. "Numbers That Speak"
+    const firstPart = words.slice(0, words.length - 2).join(" ");
+    const highlightWord = words[words.length - 2];
+    const underlineWord = words[words.length - 1];
+    return (
+      <h1 className="text-[clamp(4.5rem,13vw,9rem)] leading-[0.86] font-black uppercase text-foreground mb-8 relative font-['Bebas_Neue']">
+        {firstPart}
+        <br />
+        <span className="text-primary">{highlightWord}</span>{" "}
+        <span className="relative inline-block">
+          {underlineWord}
+          <span className="absolute -bottom-2 left-0 w-full h-[3px] bg-primary/40 rounded-full" />
+        </span>
+      </h1>
+    );
+  };
+
   return (
     <div className="text-foreground overflow-x-hidden w-full bg-background transition-colors duration-300">
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
@@ -194,21 +248,10 @@ export default function VelocityMarquee() {
         {/* Background glow */}
 
         <p className="text-primary text-[10px] tracking-[0.45em] uppercase font-semibold mb-8">
-          ◆ Innovation and Entrepreneurship Development Cell ◆
+          {finalSubtitle}
         </p>
 
-        <h1
-          className="text-[clamp(4.5rem,13vw,9rem)] leading-[0.86] font-black uppercase text-foreground mb-8 relative font-['Bebas_Neue']"
-        >
-          Numbers
-          <br />
-          <span className="text-primary">That</span>{" "}
-          <span className="relative inline-block">
-            Speak
-            {/* underline accent */}
-            <span className="absolute -bottom-2 left-0 w-full h-[3px] bg-primary/40 rounded-full" />
-          </span>
-        </h1>
+        {renderTitle()}
       </section>
 
       {/* ── Stats Marquee ─────────────────────────────────────────────────── */}
@@ -224,7 +267,7 @@ export default function VelocityMarquee() {
         {/* ── Row 1: LEFT ── */}
         <div className="fade-up mb-4 flex overflow-hidden">
           <div ref={row1Ref} className="flex will-change-transform">
-            {ROW1.map((stat, i) => (
+            {row1Items.map((stat, i) => (
               <StatCardItem key={`r1-${i}`} stat={stat} />
             ))}
           </div>
@@ -233,7 +276,7 @@ export default function VelocityMarquee() {
         {/* ── Row 2: RIGHT ── */}
         <div className="fade-up flex overflow-hidden">
           <div ref={row2Ref} className="flex will-change-transform">
-            {ROW2.map((stat, i) => (
+            {row2Items.map((stat, i) => (
               <StatCardItem key={`r2-${i}`} stat={stat} />
             ))}
           </div>

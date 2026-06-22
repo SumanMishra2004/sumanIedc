@@ -11,8 +11,9 @@ import Achievements from "./Achievements";
 import OurJourney from "./OurJourney";
 import UpcomingEvents from "./UpcomingEvents";
 import Footer from "./Footer";
+import StatsStrip from "./StatsStrip";
 
-import type { HomePageData, MilestoneData, GallerySlideData } from "../../../sanity/lib/queries";
+import type { HomePageData, MilestoneData, GallerySlideData, ContactPageData } from "../../../sanity/lib/queries";
 
 const MIN_LOAD_MS = 2200;
 
@@ -20,9 +21,10 @@ interface HomeClientProps {
   homePageData?: HomePageData | null;
   milestones?: MilestoneData[] | null;
   gallerySlides?: GallerySlideData[] | null;
+  contactPageData?: ContactPageData | null;
 }
 
-export default function HomeClient({ homePageData, milestones, gallerySlides }: HomeClientProps) {
+export default function HomeClient({ homePageData, milestones, gallerySlides, contactPageData }: HomeClientProps) {
   const [progress, setProgress]     = useState(0);
   const [isComplete, setIsComplete] = useState(false);
   const [showScreen, setShowScreen] = useState(true);
@@ -95,15 +97,15 @@ export default function HomeClient({ homePageData, milestones, gallerySlides }: 
         }}
       >
         <div className="flex flex-col w-full bg-background text-foreground transition-colors duration-300">
-          <Navbar />
           <HeroSection data={homePageData} />
+          <StatsStrip data={homePageData?.stats} />
           <AboutUs data={homePageData} />
-          <VelocityMarquee />
+          <VelocityMarquee subtitle={homePageData?.marqueeSubtitle} title={homePageData?.marqueeTitle} stats={homePageData?.marqueeStats} />
           <Achievements />
           <OurJourney milestones={milestones} />
           <UpcomingEvents />
           <LabCarousel slides={gallerySlides} />
-          <Footer />
+          <Footer data={homePageData} contactData={contactPageData} />
         </div>
       </div>
     </>

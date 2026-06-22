@@ -8,7 +8,7 @@ import NavbarWrapper from "./NavbarWrapper";
  * - Dashboard pages (/dashboard/*)
  * - Admin pages (/admin/*)
  */
-export default function ConditionalNavbar({ children }: { children: React.ReactNode }) {
+export default function ConditionalNavbar({ children, homePageData }: { children: React.ReactNode; homePageData?: any }) {
   const pathname = usePathname();
 
   // Check if current path should hide the navbar
@@ -26,7 +26,7 @@ export default function ConditionalNavbar({ children }: { children: React.ReactN
   // Show navbar with proper spacing
   return (
     <div className="min-h-screen flex flex-col">
-      <NavbarWrapper>{children}</NavbarWrapper>
+      <NavbarWrapper homePageData={homePageData}>{children}</NavbarWrapper>
     </div>
   );
 }

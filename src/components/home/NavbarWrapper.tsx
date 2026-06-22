@@ -9,7 +9,7 @@ import Navbar from "./Navbar";
  * - Expanded: ~140px (logo strip + nav bar)
  * - Collapsed: ~45px (nav bar only, when scrolled)
  */
-export default function NavbarWrapper({ children }: { children: React.ReactNode }) {
+export default function NavbarWrapper({ children, homePageData }: { children: React.ReactNode; homePageData?: any }) {
   const [navbarHeight, setNavbarHeight] = useState(140); // Initial expanded height
 
   useEffect(() => {
@@ -58,7 +58,7 @@ export default function NavbarWrapper({ children }: { children: React.ReactNode 
 
   return (
     <>
-      <Navbar />
+      <Navbar data={homePageData} />
       {/* Spacer to prevent content from hiding under fixed navbar */}
       <div style={{ height: `${navbarHeight}px` }} className="shrink-0" />
       {/* Main content */}

@@ -206,4 +206,11 @@ body {
   .navbar-transition {
     transition: height 0.45s cubic-bezier(0.65, 0, 0.35, 1);
   }
+
+  /* Hero ticker */
+  @keyframes ticker {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
 }
+

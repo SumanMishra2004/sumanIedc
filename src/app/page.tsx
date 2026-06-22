@@ -3,14 +3,16 @@ import {
   getHomePageData,
   getMilestones,
   getGallerySlides,
+  getContactPageData,
 } from "../../sanity/lib/queries";
 
 export default async function Home() {
   // Fetch all home page content from Sanity in parallel
-  const [homePageData, milestones, gallerySlides] = await Promise.all([
+  const [homePageData, milestones, gallerySlides, contactPageData] = await Promise.all([
     getHomePageData(),
     getMilestones(),
     getGallerySlides(),
+    getContactPageData(),
   ]);
 
   return (
@@ -18,6 +20,7 @@ export default async function Home() {
       homePageData={homePageData}
       milestones={milestones}
       gallerySlides={gallerySlides}
+      contactPageData={contactPageData}
     />
   );
 }

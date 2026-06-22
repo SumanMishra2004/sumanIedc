@@ -13,6 +13,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/journal/NotificationBell";
 import Image from "next/image";
+import { urlFor } from "../../../sanity/lib/image";
 
 const ALL_LINKS = [
   { label: "Home",         href: "/" },
@@ -262,13 +263,34 @@ function MenuIcon({ open }: { open: boolean }) {
   );
 }
 
-export default function Navbar() {
+export default function Navbar({ data }: { data?: any }) {
   const topRowRef   = useRef<HTMLDivElement>(null);
   const navbarRef   = useRef<HTMLElement>(null);
   const isCollapsed = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const { data: session, status } = useSession();
   const isAuthed = status === "authenticated";
+
+  const [localData, setLocalData] = useState<any>(null);
+
+  useEffect(() => {
+    if (!data) {
+      fetch("/api/public/layout-settings")
+        .then((res) => res.json())
+        .then((resData) => {
+          if (resData?.navbar) {
+            setLocalData(resData.navbar);
+          }
+        })
+        .catch((err) => console.error("Error loading navbar layout settings:", err));
+    }
+  }, [data]);
+
+  const navLinks = data?.navbarLinks || localData?.links || ALL_LINKS;
+
+  const iemLogoSrc = data?.navbarIemLogo ? urlFor(data.navbarIemLogo).url() : (localData?.iemLogoUrl || "/iem-logo.png");
+  const iedcLogoSrc = data?.navbarIedcLogo ? urlFor(data.navbarIedcLogo).url() : (localData?.iedcLogoUrl || "/iedc-logo.png");
+  const uemLogoSrc = data?.navbarUemLogo ? urlFor(data.navbarUemLogo).url() : (localData?.uemLogoUrl || "/uem.png");
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
@@ -348,17 +370,17 @@ export default function Navbar() {
 
             {/* LEFT LOGO – hidden on xs, shown sm+ */}
             <div className="hidden sm:flex shrink-0 items-center gap-2 lg:gap-3">
-              <Image src="/iem-logo.png" alt="Institute Logo" width={95} height={95} className=" object-cover dark:invert" />
+              <Image src={iemLogoSrc} alt="Institute Logo" width={95} height={95} className=" object-cover dark:invert" />
             </div>
 
             {/* CENTER LOGO + title */}
             <div className="flex items-center gap-3 flex-1 justify-center min-w-0">
-              <Image src="/iedc-logo.png" alt="IEDC Logo" width={60} height={60} className=" object-cover dark:invert" />
+              <Image src={iedcLogoSrc} alt="IEDC Logo" width={60} height={60} className=" object-cover dark:invert" />
             </div>
 
             {/* RIGHT LOGO – hidden on xs, shown sm+ */}
             <div className="hidden sm:flex shrink-0 items-center gap-2 lg:gap-3">
-              <Image src="/uem.png" alt="Partner Logo" width={95} height={95} className=" object-cover dark:invert" />
+              <Image src={uemLogoSrc} alt="Partner Logo" width={95} height={95} className=" object-cover dark:invert" />
             </div>
 
           </div>
@@ -375,18 +397,18 @@ export default function Navbar() {
             {/* Desktop row: links left, search right */}
             <div className="hidden md:flex flex-1 items-center min-w-0 gap-3">
               <nav className="flex items-center min-w-0 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-                {ALL_LINKS.map((link, i) => (
+                {navLinks.map((link: any, i: number) => (
                   link.label === "Research" ? (
                     <ResearchDropdown
                       key={link.href}
-                      withSep={i < ALL_LINKS.length - 1}
+                      withSep={i < navLinks.length - 1}
                     />
                   ) : (
                     <NavLink
                       key={link.href}
                       href={link.href}
                       label={link.label}
-                      withSep={i < ALL_LINKS.length - 1}
+                      withSep={i < navLinks.length - 1}
                     />
                   )
                 ))}
@@ -479,7 +501,7 @@ export default function Navbar() {
           style={{ maxHeight: menuOpen ? "100vh" : "0" }}
         >
           <nav className="flex flex-col px-4 py-4 gap-1">
-            {ALL_LINKS.map((link) => (
+            {navLinks.map((link: any) => (
               link.label === "Research" ? (
                 <div key={link.href} className="rounded-lg border border-border/40 bg-muted/10">
                   <Link
