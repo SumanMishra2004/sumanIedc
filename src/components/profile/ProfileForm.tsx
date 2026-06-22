@@ -43,7 +43,7 @@ interface ProfileFormProps {
     coverImage?: string | null
     institution?: string | null
     linkedinLink?: string | null
-    skills: string[]
+    skills?: string[]
     enrollmentNo?: string | null
     degree?: string | null
     currentYear?: string | null
@@ -52,10 +52,10 @@ interface ProfileFormProps {
     resumeLink?: string | null
     portfolioLink?: string | null
     githubLink?: string | null
-    researchInterests: string[]
+    researchInterests?: string[]
     designation?: string | null
     yearsOfExperience?: string | null
-    areasOfExpertise: string[]
+    areasOfExpertise?: string[]
     orcidId?: string | null
   }
   onSuccess?: () => void
@@ -172,7 +172,7 @@ export function ProfileForm({ user, onSuccess, onCancel }: ProfileFormProps) {
   const [institution, setInstitution] = useState(user.institution ?? "")
   const [linkedinLink, setLinkedinLink] = useState(user.linkedinLink ?? "")
   const [githubLink, setGithubLink] = useState(user.githubLink ?? "")  // all roles
-  const [skills, setSkills] = useState(user.skills.join(", "))
+  const [skills, setSkills] = useState(user.skills?.join(", ") ?? "")
 
   // Student
   const [enrollmentNo, setEnrollmentNo] = useState(user.enrollmentNo ?? "")
@@ -182,14 +182,14 @@ export function ProfileForm({ user, onSuccess, onCancel }: ProfileFormProps) {
   const [graduationYear, setGraduationYear] = useState(user.graduationYear ?? "")
   const [resumeLink, setResumeLink] = useState(user.resumeLink ?? "")
   const [portfolioLink, setPortfolioLink] = useState(user.portfolioLink ?? "")
-  const [researchInterests, setResearchInterests] = useState(user.researchInterests.join(", "))
+  const [researchInterests, setResearchInterests] = useState(user.researchInterests?.join(", ") ?? "")
 
   // Faculty
   const [designation, setDesignation] = useState(user.designation ?? "")
   const [yearsOfExperience, setYearsOfExperience] = useState(user.yearsOfExperience ?? "")
-  const [areasOfExpertise, setAreasOfExpertise] = useState(user.areasOfExpertise.join(", "))
+  const [areasOfExpertise, setAreasOfExpertise] = useState(user.areasOfExpertise?.join(", ") ?? "")
   const [orcidId, setOrcidId] = useState(user.orcidId ?? "")
-  const [facultyResearchInterests, setFacultyResearchInterests] = useState(user.researchInterests.join(", "))
+  const [facultyResearchInterests, setFacultyResearchInterests] = useState(user.researchInterests?.join(", ") ?? "")
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
