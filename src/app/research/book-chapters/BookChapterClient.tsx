@@ -83,7 +83,7 @@ export default function BookChapterClient({ initialChapters }: { initialChapters
   }, [chapters, search, publisherFilter]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0c0c0c] text-[#f0ede6] overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-background text-foreground overflow-hidden">
       {/* Grid Pattern */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
@@ -124,15 +124,15 @@ export default function BookChapterClient({ initialChapters }: { initialChapters
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-[#0e0e0e]/80 border border-white/5 rounded-2xl p-6 mb-12 backdrop-blur-xl flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="bg-card border border-border/40 rounded-2xl p-6 mb-12 backdrop-blur-xl flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="relative w-full md:max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-white/40" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search chapters, book titles, publishers..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 bg-muted/10 border border-border/40 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors text-foreground"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             />
           </div>
@@ -142,13 +142,13 @@ export default function BookChapterClient({ initialChapters }: { initialChapters
             <select
               value={publisherFilter}
               onChange={(e) => setPublisherFilter(e.target.value)}
-              className="px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-xl text-xs text-white/70 focus:outline-none focus:border-[#c9f53b]/50 transition-colors"
+              className="px-4 py-2.5 bg-muted/10 border border-border/40 rounded-xl text-xs text-foreground focus:outline-none focus:border-[#c9f53b]/50 transition-colors"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
-              <option value="ALL" className="bg-[#0c0c0c]">All Publishers</option>
-              <option value="SPRINGER" className="bg-[#0c0c0c]">Springer</option>
-              <option value="CRC" className="bg-[#0c0c0c]">CRC Press / Taylor &amp; Francis</option>
-              <option value="ELSEVIER" className="bg-[#0c0c0c]">Elsevier</option>
+              <option value="ALL" className="bg-background">All Publishers</option>
+              <option value="SPRINGER" className="bg-background">Springer</option>
+              <option value="CRC" className="bg-background">CRC Press / Taylor &amp; Francis</option>
+              <option value="ELSEVIER" className="bg-background">Elsevier</option>
             </select>
           </div>
         </div>
@@ -163,7 +163,7 @@ export default function BookChapterClient({ initialChapters }: { initialChapters
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: Math.min(idx * 0.05, 0.3) }}
-                className="bg-[#0e0e0e]/50 border border-white/5 hover:border-[#c9f53b]/20 transition-colors duration-300 rounded-2xl p-6 sm:p-8 backdrop-blur-md relative overflow-hidden"
+                className="bg-card border border-border/40 hover:border-[#c9f53b]/20 transition-colors duration-300 rounded-2xl p-6 sm:p-8 backdrop-blur-md relative overflow-hidden"
               >
                 {/* Background glow hover effect */}
                 <div className="absolute inset-0 bg-[#c9f53b]/[0.01] opacity-0 hover:opacity-100 transition-opacity pointer-events-none" />
@@ -177,22 +177,22 @@ export default function BookChapterClient({ initialChapters }: { initialChapters
                 </div>
 
                 {/* Title */}
-                <h3 className="text-xl sm:text-2xl font-bold text-white mb-3 hover:text-[#c9f53b] transition-colors leading-snug" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                <h3 className="text-xl sm:text-2xl font-bold text-foreground mb-3 hover:text-[#c9f53b] transition-colors leading-snug" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                   {item.title}
                 </h3>
 
                 {/* Book Details */}
-                <div className="flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-white/45 mb-4">
+                <div className="flex flex-wrap items-center gap-y-2 gap-x-6 text-xs text-muted-foreground mb-4">
                   {item.publisher && (
                     <div className="flex items-center gap-1.5">
                       <BookOpen className="w-3.5 h-3.5 text-[#c9f53b]/80" />
-                      <span className="font-semibold text-white/70">{item.publisher}</span>
+                      <span className="font-semibold text-foreground">{item.publisher}</span>
                     </div>
                   )}
                   {item.isbnIssn && (
                     <div>
-                      <span className="text-white/30 mr-1.5 uppercase font-medium">ISBN/ISSN:</span>
-                      <span className="font-mono text-white/70">{item.isbnIssn}</span>
+                      <span className="text-muted-foreground mr-1.5 uppercase font-medium">ISBN/ISSN:</span>
+                      <span className="font-mono text-foreground">{item.isbnIssn}</span>
                     </div>
                   )}
                   {item.publicationDate && (
@@ -204,12 +204,12 @@ export default function BookChapterClient({ initialChapters }: { initialChapters
                 </div>
 
                 {/* Authors */}
-                <div className="flex flex-wrap gap-2 items-center mb-5 border-t border-white/5 pt-4">
-                  <span className="text-xs text-white/30 font-medium mr-1 uppercase tracking-wider">Chapter Authors:</span>
+                <div className="flex flex-wrap gap-2 items-center mb-5 border-t border-border/40 pt-4">
+                  <span className="text-xs text-muted-foreground font-medium mr-1 uppercase tracking-wider">Chapter Authors:</span>
                   {item.authors.map((author, aIdx) => (
                     <span
                       key={aIdx}
-                      className="text-xs bg-white/[0.02] border border-white/10 rounded-md px-2 py-0.5 text-white/70"
+                      className="text-xs bg-muted/10 border border-border/40 rounded-md px-2 py-0.5 text-foreground"
                       style={{ fontFamily: "'Space Grotesk', sans-serif" }}
                     >
                       {author.name}
@@ -222,7 +222,7 @@ export default function BookChapterClient({ initialChapters }: { initialChapters
 
                 {/* Abstract snippet */}
                 {item.abstract && (
-                  <p className="text-sm text-white/60 leading-relaxed font-light mb-6">
+                  <p className="text-sm text-muted-foreground leading-relaxed font-light mb-6">
                     {item.abstract}
                   </p>
                 )}
@@ -230,7 +230,7 @@ export default function BookChapterClient({ initialChapters }: { initialChapters
                 {/* Keywords */}
                 <div className="flex flex-wrap gap-1.5 mb-6">
                   {item.keywords.map((word) => (
-                    <span key={word} className="text-[10px] text-white/40 border border-white/5 px-2 py-0.5 rounded bg-white/[0.01]">
+                    <span key={word} className="text-[10px] text-muted-foreground border border-border/40 px-2 py-0.5 rounded bg-muted/10">
                       #{word}
                     </span>
                   ))}
@@ -250,7 +250,7 @@ export default function BookChapterClient({ initialChapters }: { initialChapters
                       </a>
                     )}
                     {item.doi && (
-                      <span className="text-xs font-mono text-white/30">
+                      <span className="text-xs font-mono text-muted-foreground">
                         DOI: {item.doi}
                       </span>
                     )}
@@ -259,8 +259,8 @@ export default function BookChapterClient({ initialChapters }: { initialChapters
               </motion.div>
             ))
           ) : (
-            <div className="text-center py-20 border border-dashed border-white/10 rounded-2xl">
-              <p className="text-white/40">No chapters found matching the filters.</p>
+            <div className="text-center py-20 border border-dashed border-border/40 rounded-2xl">
+              <p className="text-muted-foreground">No chapters found matching the filters.</p>
             </div>
           )}
         </div>

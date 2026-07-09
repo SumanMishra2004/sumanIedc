@@ -120,7 +120,7 @@ export default function TeamClient({ dbFaculty, sanityStudents, pageContent }: T
   }, [sanityStudents]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0c0c0c] text-[#f0ede6] overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-background text-foreground overflow-hidden">
       {/* Grid Pattern */}
       <div
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
@@ -168,7 +168,7 @@ export default function TeamClient({ dbFaculty, sanityStudents, pageContent }: T
             animate={{ scaleX: 1 }}
             className="h-[2px] w-20 bg-[#c9f53b]/60 mx-auto my-5"
           />
-          <p className="max-w-2xl mx-auto text-sm text-white/50 leading-relaxed font-light">
+          <p className="max-w-2xl mx-auto text-sm text-muted-foreground leading-relaxed font-light">
             {content.description}
           </p>
         </div>
@@ -178,12 +178,12 @@ export default function TeamClient({ dbFaculty, sanityStudents, pageContent }: T
           <div className="flex items-center gap-3 mb-10">
             <Shield className="w-5 h-5 text-[#c9f53b]" />
             <h2
-              className="text-2xl font-bold uppercase tracking-wider text-white"
+              className="text-2xl font-bold uppercase tracking-wider text-foreground"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               Faculty Advisors &amp; Mentors
             </h2>
-            <div className="h-px flex-1 bg-white/10" />
+            <div className="h-px flex-1 bg-border/40" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -194,9 +194,9 @@ export default function TeamClient({ dbFaculty, sanityStudents, pageContent }: T
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: idx * 0.1 }}
-                className="bg-[#0e0e0e]/50 border border-white/5 hover:border-[#c9f53b]/30 rounded-2xl p-6 backdrop-blur-xl group relative overflow-hidden transition-all duration-300 flex flex-col items-center text-center"
+                className="bg-card border border-border/40 hover:border-[#c9f53b]/30 rounded-2xl p-6 backdrop-blur-xl group relative overflow-hidden transition-all duration-300 flex flex-col items-center text-center"
               >
-                <div className="w-24 h-24 rounded-full p-1 border-2 border-white/10 group-hover:border-[#c9f53b] transition-all duration-300 mb-6 overflow-hidden relative">
+                <div className="w-24 h-24 rounded-full p-1 border-2 border-border/40 group-hover:border-[#c9f53b] transition-all duration-300 mb-6 overflow-hidden relative">
                   {member.image ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -212,7 +212,7 @@ export default function TeamClient({ dbFaculty, sanityStudents, pageContent }: T
                 </div>
 
                 <h3
-                  className="text-lg font-bold text-white mb-1 group-hover:text-[#c9f53b] transition-colors"
+                  className="text-lg font-bold text-foreground mb-1 group-hover:text-[#c9f53b] transition-colors"
                   style={{ fontFamily: "'Space Grotesk', sans-serif" }}
                 >
                   {member.name}
@@ -220,29 +220,29 @@ export default function TeamClient({ dbFaculty, sanityStudents, pageContent }: T
                 <p className="text-xs text-[#c9f53b] font-medium tracking-wide uppercase mb-1">
                   {member.designation}
                 </p>
-                <p className="text-[11px] text-white/40 mb-4 font-light">{member.department}</p>
+                <p className="text-[11px] text-muted-foreground mb-4 font-light">{member.department}</p>
 
                 <div className="flex flex-wrap gap-1 justify-center mb-6">
                   {member.areasOfExpertise.map((exp) => (
-                    <span key={exp} className="text-[9px] text-white/50 border border-white/5 px-2 py-0.5 rounded bg-white/[0.01]">
+                    <span key={exp} className="text-[9px] text-muted-foreground border border-border/40 px-2 py-0.5 rounded bg-muted/10">
                       {exp}
                     </span>
                   ))}
                 </div>
 
-                <div className="flex items-center gap-3 mt-auto pt-4 border-t border-white/5 w-full justify-center">
+                <div className="flex items-center gap-3 mt-auto pt-4 border-t border-border/40 w-full justify-center">
                   {member.linkedinLink && (
-                    <a href={member.linkedinLink} target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-[#c9f53b] transition-colors">
+                    <a href={member.linkedinLink} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-[#c9f53b] transition-colors">
                       <Linkedin className="w-4 h-4" />
                     </a>
                   )}
                   {member.githubLink && (
-                    <a href={member.githubLink} target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-[#c9f53b] transition-colors">
+                    <a href={member.githubLink} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-[#c9f53b] transition-colors">
                       <Github className="w-4 h-4" />
                     </a>
                   )}
                   {member.email && (
-                    <a href={`mailto:${member.email}`} className="text-white/40 hover:text-[#c9f53b] transition-colors">
+                    <a href={`mailto:${member.email}`} className="text-muted-foreground hover:text-[#c9f53b] transition-colors">
                       <Mail className="w-4 h-4" />
                     </a>
                   )}
@@ -257,12 +257,12 @@ export default function TeamClient({ dbFaculty, sanityStudents, pageContent }: T
           <div className="flex items-center gap-3 mb-10">
             <GraduationCap className="w-5 h-5 text-violet-400" />
             <h2
-              className="text-2xl font-bold uppercase tracking-wider text-white"
+              className="text-2xl font-bold uppercase tracking-wider text-foreground"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
               Student Executive Committee
             </h2>
-            <div className="h-px flex-1 bg-white/10" />
+            <div className="h-px flex-1 bg-border/40" />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -275,9 +275,9 @@ export default function TeamClient({ dbFaculty, sanityStudents, pageContent }: T
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.5, delay: idx * 0.1 }}
-                  className="bg-[#0e0e0e]/50 border border-white/5 hover:border-violet-500/30 rounded-2xl p-6 backdrop-blur-xl group relative overflow-hidden transition-all duration-300 flex flex-col items-center text-center"
+                  className="bg-card border border-border/40 hover:border-violet-500/30 rounded-2xl p-6 backdrop-blur-xl group relative overflow-hidden transition-all duration-300 flex flex-col items-center text-center"
                 >
-                  <div className="w-24 h-24 rounded-full p-1 border-2 border-white/10 group-hover:border-violet-400 transition-all duration-300 mb-6 overflow-hidden relative">
+                  <div className="w-24 h-24 rounded-full p-1 border-2 border-border/40 group-hover:border-violet-400 transition-all duration-300 mb-6 overflow-hidden relative">
                     {photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -293,7 +293,7 @@ export default function TeamClient({ dbFaculty, sanityStudents, pageContent }: T
                   </div>
 
                   <h3
-                    className="text-lg font-bold text-white mb-1 group-hover:text-violet-400 transition-colors"
+                    className="text-lg font-bold text-foreground mb-1 group-hover:text-violet-400 transition-colors"
                     style={{ fontFamily: "'Space Grotesk', sans-serif" }}
                   >
                     {member.name}
@@ -301,29 +301,29 @@ export default function TeamClient({ dbFaculty, sanityStudents, pageContent }: T
                   <p className="text-xs text-violet-400 font-medium tracking-wide uppercase mb-1">
                     {member.designation}
                   </p>
-                  <p className="text-[11px] text-white/40 mb-4 font-light">{member.department}</p>
+                  <p className="text-[11px] text-muted-foreground mb-4 font-light">{member.department}</p>
 
                   <div className="flex flex-wrap gap-1 justify-center mb-6">
                     {member.areasOfExpertise.map((exp) => (
-                      <span key={exp} className="text-[9px] text-white/50 border border-white/5 px-2 py-0.5 rounded bg-white/[0.01]">
+                      <span key={exp} className="text-[9px] text-muted-foreground border border-border/40 px-2 py-0.5 rounded bg-muted/10">
                         {exp}
                       </span>
                     ))}
                   </div>
 
-                  <div className="flex items-center gap-3 mt-auto pt-4 border-t border-white/5 w-full justify-center">
+                  <div className="flex items-center gap-3 mt-auto pt-4 border-t border-border/40 w-full justify-center">
                     {member.linkedinUrl && (
-                      <a href={member.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-violet-400 transition-colors">
+                      <a href={member.linkedinUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-violet-400 transition-colors">
                         <Linkedin className="w-4 h-4" />
                       </a>
                     )}
                     {member.githubUrl && (
-                      <a href={member.githubUrl} target="_blank" rel="noopener noreferrer" className="text-white/40 hover:text-violet-400 transition-colors">
+                      <a href={member.githubUrl} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-violet-400 transition-colors">
                         <Github className="w-4 h-4" />
                       </a>
                     )}
                     {member.email && (
-                      <a href={`mailto:${member.email}`} className="text-white/40 hover:text-violet-400 transition-colors">
+                      <a href={`mailto:${member.email}`} className="text-muted-foreground hover:text-violet-400 transition-colors">
                         <Mail className="w-4 h-4" />
                       </a>
                     )}

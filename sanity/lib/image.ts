@@ -1,8 +1,8 @@
-import imageUrlBuilder, { SanityImageSource } from "@sanity/image-url";
+import { createImageUrlBuilder, SanityImageSource } from "@sanity/image-url";
 
 import { sanityClient } from "./client";
 
-const builder = imageUrlBuilder(sanityClient);
+const builder = createImageUrlBuilder(sanityClient);
 
 /**
  * Returns an image URL builder for a Sanity image source.

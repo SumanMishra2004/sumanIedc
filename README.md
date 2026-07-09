@@ -105,8 +105,7 @@ MIT
 
 
 ## the env are 
-
-DATABASE_URL = "postgresql://Suman:PSCZrDbvlaufGOaDZWbeNA@hiding-piglet-26836.j77.aws-ap-south-1.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full"
+DATABASE_URL = "postgresql://suman:mzH7239_mfVrru3__LjG3Q@iedcuem-28897.j77.aws-ap-south-1.cockroachlabs.cloud:26257/defaultdb?sslmode=verify-full"
 
 
 

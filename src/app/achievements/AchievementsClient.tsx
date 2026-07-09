@@ -108,7 +108,7 @@ export default function AchievementsClient({ initialAchievements }: { initialAch
   }, [achievements, search, categoryFilter, yearFilter]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0c0c0c] text-[#f0ede6] overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-background text-foreground overflow-hidden">
       {/* Grid Pattern */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
@@ -146,21 +146,21 @@ export default function AchievementsClient({ initialAchievements }: { initialAch
             animate={{ scaleX: 1 }}
             className="h-[2px] w-20 bg-[#c9f53b]/60 mx-auto my-5"
           />
-          <p className="max-w-2xl mx-auto text-sm text-white/50 leading-relaxed font-light">
+          <p className="max-w-2xl mx-auto text-sm text-muted-foreground leading-relaxed font-light">
             Celebrating the milestones, hackathon victories, grant sponsorships, and award-winning research designs realized by IEDC innovators.
           </p>
         </div>
 
         {/* Filters and Search */}
-        <div className="bg-[#0e0e0e]/80 border border-white/5 rounded-2xl p-6 mb-12 backdrop-blur-xl flex flex-col md:flex-row gap-4 items-center justify-between">
+        <div className="bg-card border border-border/40 rounded-2xl p-6 mb-12 backdrop-blur-xl flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="relative w-full md:max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-white/40" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search achievements, award details, inventors..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors"
+              className="w-full pl-10 pr-4 py-2.5 bg-muted/10 border border-border/40 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             />
           </div>
@@ -170,12 +170,12 @@ export default function AchievementsClient({ initialAchievements }: { initialAch
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-xl text-xs text-white/70 focus:outline-none focus:border-[#c9f53b]/50 transition-colors"
+              className="px-4 py-2.5 bg-muted/10 border border-border/40 rounded-xl text-xs text-muted-foreground focus:outline-none focus:border-[#c9f53b]/50 transition-colors"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
-              <option value="ALL" className="bg-[#0c0c0c]">All Categories</option>
+              <option value="ALL" className="bg-background">All Categories</option>
               {categories.map(cat => (
-                <option key={cat} value={cat} className="bg-[#0c0c0c]">{cat}</option>
+                <option key={cat} value={cat} className="bg-background">{cat}</option>
               ))}
             </select>
 
@@ -183,12 +183,12 @@ export default function AchievementsClient({ initialAchievements }: { initialAch
             <select
               value={yearFilter}
               onChange={(e) => setYearFilter(e.target.value)}
-              className="px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-xl text-xs text-white/70 focus:outline-none focus:border-[#c9f53b]/50 transition-colors"
+              className="px-4 py-2.5 bg-muted/10 border border-border/40 rounded-xl text-xs text-muted-foreground focus:outline-none focus:border-[#c9f53b]/50 transition-colors"
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
-              <option value="ALL" className="bg-[#0c0c0c]">All Years</option>
+              <option value="ALL" className="bg-background">All Years</option>
               {years.map(yr => (
-                <option key={yr} value={yr} className="bg-[#0c0c0c]">{yr}</option>
+                <option key={yr} value={yr} className="bg-background">{yr}</option>
               ))}
             </select>
           </div>
@@ -204,7 +204,7 @@ export default function AchievementsClient({ initialAchievements }: { initialAch
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: Math.min(idx * 0.05, 0.3) }}
-                className="bg-[#0e0e0e]/50 border border-white/5 hover:border-[#c9f53b]/30 rounded-3xl p-6 sm:p-8 backdrop-blur-xl relative overflow-hidden transition-all duration-300 flex flex-col justify-between"
+                className="bg-card border border-border/40 hover:border-[#c9f53b]/30 rounded-3xl p-6 sm:p-8 backdrop-blur-xl relative overflow-hidden transition-all duration-300 flex flex-col justify-between"
               >
                 <div>
                   {/* Category and Year badges */}
@@ -214,7 +214,7 @@ export default function AchievementsClient({ initialAchievements }: { initialAch
                         {item.category}
                       </span>
                     )}
-                    <span className="text-xs font-bold text-white/45 flex items-center gap-1.5 font-mono">
+                    <span className="text-xs font-bold text-muted-foreground flex items-center gap-1.5 font-mono">
                       <Calendar className="w-3.5 h-3.5" />
                       {item.year}
                     </span>
@@ -224,21 +224,21 @@ export default function AchievementsClient({ initialAchievements }: { initialAch
                     <div className="w-10 h-10 rounded-xl bg-[#c9f53b]/10 flex items-center justify-center text-[#c9f53b] shrink-0">
                       <Trophy className="w-5 h-5 animate-pulse" />
                     </div>
-                    <h3 className="text-lg sm:text-xl font-bold text-white uppercase tracking-tight leading-snug group-hover:text-[#c9f53b]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                    <h3 className="text-lg sm:text-xl font-bold text-foreground uppercase tracking-tight leading-snug group-hover:text-[#c9f53b]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                       {item.title}
                     </h3>
                   </div>
 
-                  <p className="text-sm text-white/55 font-light leading-relaxed mb-6">
+                  <p className="text-sm text-muted-foreground font-light leading-relaxed mb-6">
                     {item.description}
                   </p>
                 </div>
 
-                <div className="border-t border-white/5 pt-4 flex flex-wrap items-center justify-between gap-4 mt-auto">
-                  <div className="flex items-center gap-2 text-xs text-white/60">
+                <div className="border-t border-border/40 pt-4 flex flex-wrap items-center justify-between gap-4 mt-auto">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <User className="w-3.5 h-3.5 text-[#c9f53b]/80" />
                     <span>Recipient:</span>
-                    <span className="font-semibold text-white/80" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                    <span className="font-semibold text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                       {item.earner.name}
                       <span className="text-[9px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded uppercase font-bold ml-2">
                         {item.earner.role}
@@ -258,8 +258,8 @@ export default function AchievementsClient({ initialAchievements }: { initialAch
               </motion.div>
             ))
           ) : (
-            <div className="col-span-2 text-center py-20 border border-dashed border-white/10 rounded-2xl">
-              <p className="text-white/40">No achievements found matching the filters.</p>
+            <div className="col-span-2 text-center py-20 border border-dashed border-border/40 rounded-2xl">
+              <p className="text-muted-foreground">No achievements found matching the filters.</p>
             </div>
           )}
         </div>

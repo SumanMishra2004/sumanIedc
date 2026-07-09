@@ -272,7 +272,7 @@ export default function LabCarousel({ slides: propSlides }: LabCarouselProps) {
                 className="absolute inset-0 w-full h-full object-cover"
                 draggable={false}
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-[#0c0c0c]/95 via-[#0c0c0c]/60 to-[#0c0c0c]/15" />
+              <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/60 to-background/15" />
               <div className="absolute inset-0 opacity-[0.03] bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,1)_2px,rgba(0,0,0,1)_4px)]" />
             </div>
           ))}
@@ -285,7 +285,7 @@ export default function LabCarousel({ slides: propSlides }: LabCarouselProps) {
         <div className="absolute top-0 left-0 right-0 z-30 flex items-center justify-between px-8 py-5">
           <div className="flex items-center gap-3">
             <div className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: accentColor }} />
-            <span className="text-[10px] tracking-[0.3em] uppercase text-white/40 font-mono">
+            <span className="text-[10px] tracking-[0.3em] uppercase text-foreground/40 font-mono">
               IEDC Research Laboratory
             </span>
           </div>
@@ -299,12 +299,12 @@ export default function LabCarousel({ slides: propSlides }: LabCarouselProps) {
 
         {/* Corner hairlines */}
         <div className="absolute top-0 left-0 w-16 h-16 z-30 pointer-events-none">
-          <div className="absolute top-4 left-4 w-8 h-px bg-white/20" />
-          <div className="absolute top-4 left-4 h-8 w-px bg-white/20" />
+          <div className="absolute top-4 left-4 w-8 h-px bg-foreground/20" />
+          <div className="absolute top-4 left-4 h-8 w-px bg-foreground/20" />
         </div>
         <div className="absolute top-0 right-0 w-16 h-16 z-30 pointer-events-none">
-          <div className="absolute top-4 right-4 w-8 h-px bg-white/20" />
-          <div className="absolute top-4 right-4 h-8 w-px bg-white/20" />
+          <div className="absolute top-4 right-4 w-8 h-px bg-foreground/20" />
+          <div className="absolute top-4 right-4 h-8 w-px bg-foreground/20" />
         </div>
 
         {/* Main content */}
@@ -320,11 +320,11 @@ export default function LabCarousel({ slides: propSlides }: LabCarouselProps) {
           </div>
           <h2
             ref={titleRef}
-            className="text-5xl md:text-7xl xl:text-8xl font-bold text-white leading-none mb-5 font-['Bebas_Neue'] tracking-[0.02em]"
+            className="text-5xl md:text-7xl xl:text-8xl font-bold text-foreground leading-none mb-5 font-['Bebas_Neue'] tracking-[0.02em]"
           >
             {slide.label}
           </h2>
-          <p ref={descRef} className="max-w-lg text-sm md:text-base text-white/55 leading-relaxed mb-6">
+          <p ref={descRef} className="max-w-lg text-sm md:text-base text-foreground/55 leading-relaxed mb-6">
             {slide.description}
           </p>
 
@@ -334,18 +334,18 @@ export default function LabCarousel({ slides: propSlides }: LabCarouselProps) {
               <span ref={counterRef} className="text-2xl font-bold tabular-nums" style={{ color: accentColor }}>
                 {String(current + 1).padStart(2, "0")}
               </span>
-              <span className="text-white/25 text-sm mx-1">/</span>
-              <span className="text-white/30 text-sm tabular-nums">{String(total).padStart(2, "0")}</span>
+              <span className="text-foreground/25 text-sm mx-1">/</span>
+              <span className="text-foreground/30 text-sm tabular-nums">{String(total).padStart(2, "0")}</span>
             </div>
             <div className="flex items-center gap-3 pointer-events-auto">
               <button
                 onClick={prev}
-                className="w-9 h-9 border border-white/15 flex items-center justify-center text-white/50 hover:border-primary/60 hover:text-primary transition-all duration-300 rounded-sm cursor-pointer"
+                className="w-9 h-9 border border-foreground/15 flex items-center justify-center text-foreground/50 hover:border-primary/60 hover:text-primary transition-all duration-300 rounded-sm cursor-pointer"
                 aria-label="Previous"
               >←</button>
               <button
                 onClick={next}
-                className="w-9 h-9 border border-white/15 flex items-center justify-center text-white/50 hover:border-primary/60 hover:text-primary transition-all duration-300 rounded-sm cursor-pointer"
+                className="w-9 h-9 border border-foreground/15 flex items-center justify-center text-foreground/50 hover:border-primary/60 hover:text-primary transition-all duration-300 rounded-sm cursor-pointer"
                 aria-label="Next"
               >→</button>
             </div>
@@ -355,12 +355,12 @@ export default function LabCarousel({ slides: propSlides }: LabCarouselProps) {
                   key={i}
                   onClick={() => goTo(i, i > current ? 1 : -1)}
                   aria-label={`Go to slide ${i + 1}`}
-                  className="transition-all duration-300 cursor-pointer"
+                  className={`transition-all duration-300 cursor-pointer ${i === current ? "" : "bg-foreground/20"}`}
                   style={{
                     width: i === current ? 24 : 6,
                     height: 3,
                     borderRadius: 2,
-                    backgroundColor: i === current ? accentColor : "rgba(255,255,255,0.2)",
+                    ...(i === current ? { backgroundColor: accentColor } : {}),
                   }}
                 />
               ))}

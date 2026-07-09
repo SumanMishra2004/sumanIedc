@@ -60,7 +60,7 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0c0c0c] text-[#f0ede6] overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-background text-foreground overflow-hidden">
       {/* Grid Pattern */}
       <div
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
@@ -99,7 +99,7 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
             animate={{ scaleX: 1 }}
             className="h-[2px] w-20 bg-[#c9f53b]/60 mx-auto my-5"
           />
-          <p className="max-w-2xl mx-auto text-sm text-white/50 leading-relaxed font-light">
+          <p className="max-w-2xl mx-auto text-sm text-muted-foreground leading-relaxed font-light">
             {info.pageDescription}
           </p>
         </div>
@@ -111,12 +111,12 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
           <div className="lg:col-span-5 flex flex-col justify-between gap-8">
             <div className="flex flex-col gap-6">
               <h2
-                className="text-2xl font-bold uppercase tracking-wider text-white"
+                className="text-2xl font-bold uppercase tracking-wider text-foreground"
                 style={{ fontFamily: "'Space Grotesk', sans-serif" }}
               >
                 Connect <span className="text-[#c9f53b]">Directly</span>
               </h2>
-              <p className="text-sm text-white/55 font-light leading-relaxed">
+              <p className="text-sm text-muted-foreground font-light leading-relaxed">
                 {info.connectDescription}
               </p>
 
@@ -124,12 +124,12 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
               <div className="flex flex-col gap-5 mt-4">
                 {/* Location */}
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center text-[#c9f53b] shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-muted/10 border border-border/40 flex items-center justify-center text-[#c9f53b] shrink-0">
                     <MapPin className="w-4.5 h-4.5" />
                   </div>
                   <div>
-                    <h4 className="text-[10px] uppercase font-bold tracking-widest text-white/30 mb-0.5">Location</h4>
-                    <p className="text-sm text-white/75 font-light leading-relaxed whitespace-pre-line">
+                    <h4 className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-0.5">Location</h4>
+                    <p className="text-sm text-muted-foreground font-light leading-relaxed whitespace-pre-line">
                       {info.location}
                     </p>
                   </div>
@@ -138,12 +138,12 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
                 {/* Emails */}
                 {info.emails.length > 0 && (
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center text-[#c9f53b] shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-muted/10 border border-border/40 flex items-center justify-center text-[#c9f53b] shrink-0">
                       <Mail className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h4 className="text-[10px] uppercase font-bold tracking-widest text-white/30 mb-0.5">Email Addresses</h4>
-                      <p className="text-sm text-white/75 font-light leading-relaxed font-mono">
+                      <h4 className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-0.5">Email Addresses</h4>
+                      <p className="text-sm text-muted-foreground font-light leading-relaxed font-mono">
                         {info.emails.join("\n").split("\n").map((email, i) => (
                           <span key={i} className="block">{email}</span>
                         ))}
@@ -155,12 +155,12 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
                 {/* Phones */}
                 {info.phones.length > 0 && (
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center text-[#c9f53b] shrink-0">
+                    <div className="w-10 h-10 rounded-xl bg-muted/10 border border-border/40 flex items-center justify-center text-[#c9f53b] shrink-0">
                       <Phone className="w-4.5 h-4.5" />
                     </div>
                     <div>
-                      <h4 className="text-[10px] uppercase font-bold tracking-widest text-white/30 mb-0.5">Phone Channels</h4>
-                      <p className="text-sm text-white/75 font-light leading-relaxed">
+                      <h4 className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-0.5">Phone Channels</h4>
+                      <p className="text-sm text-muted-foreground font-light leading-relaxed">
                         {info.phones.map((p, i) => (
                           <span key={i} className="block">
                             {p.number}{p.label ? ` (${p.label})` : ""}
@@ -173,12 +173,12 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
 
                 {/* Working Hours */}
                 <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/5 flex items-center justify-center text-[#c9f53b] shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-muted/10 border border-border/40 flex items-center justify-center text-[#c9f53b] shrink-0">
                     <Clock className="w-4.5 h-4.5" />
                   </div>
                   <div>
-                    <h4 className="text-[10px] uppercase font-bold tracking-widest text-white/30 mb-0.5">Lab Working Hours</h4>
-                    <p className="text-sm text-white/75 font-light leading-relaxed whitespace-pre-line">
+                    <h4 className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground mb-0.5">Lab Working Hours</h4>
+                    <p className="text-sm text-muted-foreground font-light leading-relaxed whitespace-pre-line">
                       {info.workingHours}
                     </p>
                   </div>
@@ -187,7 +187,7 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
             </div>
 
             {/* Mock Vector Map */}
-            <div className="h-44 w-full rounded-2xl border border-white/5 bg-[#0e0e0e]/40 backdrop-blur-md relative overflow-hidden flex items-center justify-center">
+            <div className="h-44 w-full rounded-2xl border border-border/40 bg-card backdrop-blur-md relative overflow-hidden flex items-center justify-center">
               <div
                 className="absolute inset-0 opacity-[0.05]"
                 style={{
@@ -199,7 +199,7 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
               <div className="absolute top-[60%] left-0 w-full h-px bg-gradient-to-r from-transparent via-violet-500/20 to-transparent" />
               <div className="absolute top-0 left-[45%] w-px h-full bg-gradient-to-b from-transparent via-[#c9f53b]/30 to-transparent" />
               <div className="w-4 h-4 rounded-full bg-[#c9f53b] flex items-center justify-center absolute top-[45%] left-[45%] -translate-x-1/2 -translate-y-1/2 shadow-[0_0_15px_#c9f53b]">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#0c0c0c]" />
+                <div className="w-1.5 h-1.5 rounded-full bg-background" />
                 <div className="absolute inset-0 rounded-full border-2 border-[#c9f53b] animate-ping opacity-60 pointer-events-none" />
               </div>
               <span className="text-[10px] tracking-widest font-extrabold uppercase text-[#c9f53b] absolute top-[52%] left-[48%] select-none">
@@ -209,28 +209,28 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
           </div>
 
           {/* Form Side (Right 7 cols) */}
-          <div className="lg:col-span-7 bg-[#0e0e0e]/80 border border-white/5 rounded-3xl p-8 backdrop-blur-xl relative">
+          <div className="lg:col-span-7 bg-card border border-border/40 rounded-3xl p-8 backdrop-blur-xl relative">
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 {/* Name */}
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="name" className="text-xs text-white/55 font-medium tracking-wide uppercase">
+                  <label htmlFor="name" className="text-xs text-muted-foreground font-medium tracking-wide uppercase">
                     Your Name <span className="text-[#c9f53b]">*</span>
                   </label>
                   <input
                     type="text" id="name" name="name" value={form.name} onChange={handleChange}
-                    className="px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors text-white"
+                    className="px-4 py-2.5 bg-muted/10 border border-border/40 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors text-foreground"
                     placeholder="Enter name" required
                   />
                 </div>
                 {/* Email */}
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="email" className="text-xs text-white/55 font-medium tracking-wide uppercase">
+                  <label htmlFor="email" className="text-xs text-muted-foreground font-medium tracking-wide uppercase">
                     Your Email <span className="text-[#c9f53b]">*</span>
                   </label>
                   <input
                     type="email" id="email" name="email" value={form.email} onChange={handleChange}
-                    className="px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors text-white"
+                    className="px-4 py-2.5 bg-muted/10 border border-border/40 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors text-foreground"
                     placeholder="name@example.com" required
                   />
                 </div>
@@ -239,23 +239,23 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 {/* Role select */}
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="role" className="text-xs text-white/55 font-medium tracking-wide uppercase">Affiliation</label>
+                  <label htmlFor="role" className="text-xs text-muted-foreground font-medium tracking-wide uppercase">Affiliation</label>
                   <select
                     id="role" name="role" value={form.role} onChange={handleChange}
-                    className="px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors text-white/80"
+                    className="px-4 py-2.5 bg-muted/10 border border-border/40 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors text-foreground"
                   >
-                    <option value="student" className="bg-[#0c0c0c] text-white">Student Developer</option>
-                    <option value="faculty" className="bg-[#0c0c0c] text-white">Faculty Mentor</option>
-                    <option value="industry" className="bg-[#0c0c0c] text-white">Industry Partner</option>
-                    <option value="other" className="bg-[#0c0c0c] text-white">Other Affiliation</option>
+                    <option value="student" className="bg-background text-foreground">Student Developer</option>
+                    <option value="faculty" className="bg-background text-foreground">Faculty Mentor</option>
+                    <option value="industry" className="bg-background text-foreground">Industry Partner</option>
+                    <option value="other" className="bg-background text-foreground">Other Affiliation</option>
                   </select>
                 </div>
                 {/* Subject */}
                 <div className="flex flex-col gap-1.5">
-                  <label htmlFor="subject" className="text-xs text-white/55 font-medium tracking-wide uppercase">Subject</label>
+                  <label htmlFor="subject" className="text-xs text-muted-foreground font-medium tracking-wide uppercase">Subject</label>
                   <input
                     type="text" id="subject" name="subject" value={form.subject} onChange={handleChange}
-                    className="px-4 py-2.5 bg-white/[0.02] border border-white/10 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors text-white"
+                    className="px-4 py-2.5 bg-muted/10 border border-border/40 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors text-foreground"
                     placeholder="Enter topic"
                   />
                 </div>
@@ -263,12 +263,12 @@ export default function ContactClient({ contactInfo }: ContactClientProps) {
 
               {/* Message */}
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="message" className="text-xs text-white/55 font-medium tracking-wide uppercase">
+                <label htmlFor="message" className="text-xs text-muted-foreground font-medium tracking-wide uppercase">
                   Message <span className="text-[#c9f53b]">*</span>
                 </label>
                 <textarea
                   id="message" name="message" value={form.message} onChange={handleChange} rows={5}
-                  className="px-4 py-3 bg-white/[0.02] border border-white/10 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors text-white resize-none"
+                  className="px-4 py-3 bg-muted/10 border border-border/40 rounded-xl text-sm focus:outline-none focus:border-[#c9f53b]/50 transition-colors text-foreground resize-none"
                   placeholder="How can we help you?" required
                 />
               </div>

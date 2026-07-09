@@ -63,7 +63,7 @@ const STATS = [
 
 export default function AboutClient() {
   return (
-    <div className="flex flex-col min-h-screen bg-[#0c0c0c] text-[#f0ede6] overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-background text-foreground overflow-hidden">
       {/* Background elements */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
@@ -107,7 +107,7 @@ export default function AboutClient() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="max-w-3xl mx-auto text-lg text-white/60 leading-relaxed font-light"
+            className="max-w-3xl mx-auto text-lg text-muted-foreground leading-relaxed font-light"
           >
             We empower students, faculty, and research enthusiasts to convert state-of-the-art computational research into viable prototypes and commercial startups.
           </motion.p>
@@ -120,14 +120,14 @@ export default function AboutClient() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="p-8 rounded-2xl border border-white/5 bg-white/[0.02] backdrop-blur-xl relative group overflow-hidden"
+            className="p-8 rounded-2xl border border-border bg-card backdrop-blur-xl relative group overflow-hidden"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-[#c9f53b]/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-[#c9f53b]/10 text-[#c9f53b] mb-6">
               <Target className="w-6 h-6" />
             </div>
-            <h3 className="text-2xl font-bold mb-4 uppercase tracking-wide text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Our Vision</h3>
-            <p className="text-white/60 leading-relaxed font-light">
+            <h3 className="text-2xl font-bold mb-4 uppercase tracking-wide text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Our Vision</h3>
+            <p className="text-muted-foreground leading-relaxed font-light">
               To be a premier hub of innovation, research excellence, and technological entrepreneurship. We aspire to build an ecosystem where academic learning meets commercial reality, fostering solutions that address local and global socioeconomic challenges.
             </p>
           </motion.div>
@@ -137,14 +137,14 @@ export default function AboutClient() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="p-8 rounded-2xl border border-white/5 bg-white/[0.02] backdrop-blur-xl relative group overflow-hidden"
+            className="p-8 rounded-2xl border border-border bg-card backdrop-blur-xl relative group overflow-hidden"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-violet-500/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-violet-500/10 text-violet-400 mb-6">
               <Rocket className="w-6 h-6" />
             </div>
-            <h3 className="text-2xl font-bold mb-4 uppercase tracking-wide text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Our Mission</h3>
-            <p className="text-white/60 leading-relaxed font-light">
+            <h3 className="text-2xl font-bold mb-4 uppercase tracking-wide text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>Our Mission</h3>
+            <p className="text-muted-foreground leading-relaxed font-light">
               We dedicatedly provide resources, active mentorship, funding channels, and technical infrastructure. By organizing hackathons, research sprints, and IP clinics, we systematically convert bold ideas into published research, patents, and incubated ventures.
             </p>
           </motion.div>
@@ -153,7 +153,7 @@ export default function AboutClient() {
         {/* Pillars Section */}
         <div className="mb-24">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold uppercase tracking-wide text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <h2 className="text-3xl font-bold uppercase tracking-wide text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               Core <span className="text-[#c9f53b]">Pillars</span>
             </h2>
             <div className="h-0.5 w-16 bg-[#c9f53b]/50 mx-auto mt-3" />
@@ -168,20 +168,20 @@ export default function AboutClient() {
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: idx * 0.1 }}
                 whileHover={{ y: -6, transition: { duration: 0.2 } }}
-                className="p-6 rounded-xl border border-white/5 bg-[#0e0e0e] hover:border-[#c9f53b]/30 transition-all duration-300 relative group"
+                className="p-6 rounded-xl border border-border/40 bg-card hover:border-[#c9f53b]/30 transition-all duration-300 relative group"
               >
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center mb-5 text-[#c9f53b]" style={{ backgroundColor: item.color }}>
                   <item.icon className="w-5 h-5" />
                 </div>
-                <h4 className="text-lg font-bold text-white mb-2 uppercase tracking-wide" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{item.title}</h4>
-                <p className="text-white/50 text-sm leading-relaxed font-light">{item.desc}</p>
+                <h4 className="text-lg font-bold text-foreground mb-2 uppercase tracking-wide" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{item.title}</h4>
+                <p className="text-muted-foreground text-sm leading-relaxed font-light">{item.desc}</p>
               </motion.div>
             ))}
           </div>
         </div>
 
         {/* Stats Section */}
-        <div className="mb-24 relative p-10 rounded-3xl border border-[#c9f53b]/10 bg-white/[0.01] backdrop-blur-md overflow-hidden">
+        <div className="mb-24 relative p-10 rounded-3xl border border-[#c9f53b]/10 bg-muted/10 backdrop-blur-md overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-[#c9f53b]/5 to-transparent pointer-events-none" />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 text-center relative z-10">
             {STATS.map((stat, idx) => (
@@ -195,7 +195,7 @@ export default function AboutClient() {
                 <div className="text-4xl sm:text-5xl font-extrabold text-[#c9f53b] mb-2" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                   {stat.value}
                 </div>
-                <div className="text-xs uppercase tracking-widest text-white/55 font-semibold">
+                <div className="text-xs uppercase tracking-widest text-muted-foreground font-semibold">
                   {stat.label}
                 </div>
               </motion.div>
@@ -206,13 +206,13 @@ export default function AboutClient() {
         {/* Timeline Section */}
         <div className="mb-16">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold uppercase tracking-wide text-white" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <h2 className="text-3xl font-bold uppercase tracking-wide text-foreground" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               Milestones &amp; <span className="text-[#c9f53b]">History</span>
             </h2>
             <div className="h-0.5 w-16 bg-[#c9f53b]/50 mx-auto mt-3" />
           </div>
 
-          <div className="relative border-l border-white/10 ml-4 md:ml-32 py-4">
+          <div className="relative border-l border-border/40 ml-4 md:ml-32 py-4">
             {TIMELINE.map((item, idx) => (
               <motion.div
                 key={item.year}
@@ -223,7 +223,7 @@ export default function AboutClient() {
                 className="mb-12 last:mb-0 pl-8 relative"
               >
                 {/* Bullet node */}
-                <div className="absolute left-0 -translate-x-[9px] top-1.5 w-4.5 h-4.5 rounded-full border-2 border-[#c9f53b] bg-[#0c0c0c] flex items-center justify-center">
+                <div className="absolute left-0 -translate-x-[9px] top-1.5 w-4.5 h-4.5 rounded-full border-2 border-[#c9f53b] bg-background flex items-center justify-center">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#c9f53b]" />
                 </div>
                 
@@ -232,8 +232,8 @@ export default function AboutClient() {
                   {item.year}
                 </div>
                 
-                <h4 className="text-lg font-bold text-white mb-2 uppercase tracking-wide" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{item.title}</h4>
-                <p className="text-white/50 text-sm leading-relaxed max-w-2xl font-light">{item.desc}</p>
+                <h4 className="text-lg font-bold text-foreground mb-2 uppercase tracking-wide" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>{item.title}</h4>
+                <p className="text-muted-foreground text-sm leading-relaxed max-w-2xl font-light">{item.desc}</p>
               </motion.div>
             ))}
           </div>

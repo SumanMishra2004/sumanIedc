@@ -68,7 +68,7 @@ export default function GalleryClient() {
   }, [activeTab]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-[#0c0c0c] text-[#f0ede6] overflow-hidden">
+    <div className="flex flex-col min-h-screen bg-background text-foreground overflow-hidden">
       {/* Grid Pattern */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
@@ -106,7 +106,7 @@ export default function GalleryClient() {
             animate={{ scaleX: 1 }}
             className="h-[2px] w-20 bg-[#c9f53b]/60 mx-auto my-5"
           />
-          <p className="max-w-2xl mx-auto text-sm text-white/50 leading-relaxed font-light">
+          <p className="max-w-2xl mx-auto text-sm text-muted-foreground leading-relaxed font-light">
             Glimpses into our advanced research facility, interactive hackathons, collaborative workshops, and guest lectures.
           </p>
         </div>
@@ -120,7 +120,7 @@ export default function GalleryClient() {
               className={`px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all duration-300 border ${
                 activeTab === tab
                   ? "bg-[#c9f53b] border-[#c9f53b] text-[#0c0c0c]"
-                  : "border-white/10 hover:border-[#c9f53b]/40 text-white/60 hover:text-white"
+                  : "border-border/40 hover:border-[#c9f53b]/40 text-muted-foreground hover:text-foreground"
               }`}
               style={{ fontFamily: "'Space Grotesk', sans-serif" }}
             >
@@ -144,7 +144,7 @@ export default function GalleryClient() {
                 exit={{ opacity: 0, scale: 0.9 }}
                 transition={{ duration: 0.3 }}
                 onClick={() => setSelectedImage(item)}
-                className="group cursor-pointer bg-[#0e0e0e]/50 border border-white/5 hover:border-[#c9f53b]/30 rounded-2xl overflow-hidden backdrop-blur-md relative aspect-4/3 flex flex-col justify-end"
+                className="group cursor-pointer bg-card border border-border/40 hover:border-[#c9f53b]/30 rounded-2xl overflow-hidden backdrop-blur-md relative aspect-4/3 flex flex-col justify-end"
               >
                 {/* Image background with hover zoom */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -155,10 +155,10 @@ export default function GalleryClient() {
                 />
                 
                 {/* Black Overlay Gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0c0c0c] via-black/40 to-transparent opacity-80 z-10" />
+                <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent opacity-80 z-10" />
 
                 {/* Corner Hover Eye Icon */}
-                <div className="absolute top-4 right-4 w-9 h-9 rounded-full bg-[#0c0c0c]/80 backdrop-blur-md flex items-center justify-center text-[#c9f53b] opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
+                <div className="absolute top-4 right-4 w-9 h-9 rounded-full bg-background/80 backdrop-blur-md flex items-center justify-center text-[#c9f53b] opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20">
                   <Eye className="w-4 h-4" />
                 </div>
 
@@ -167,10 +167,10 @@ export default function GalleryClient() {
                   <span className="text-[9px] font-extrabold uppercase tracking-widest text-[#c9f53b] bg-[#c9f53b]/10 px-2 py-0.5 rounded border border-[#c9f53b]/20 inline-block mb-3">
                     {item.category}
                   </span>
-                  <h3 className="text-lg font-bold text-white leading-tight uppercase group-hover:text-[#c9f53b] transition-colors" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                  <h3 className="text-lg font-bold text-foreground leading-tight uppercase group-hover:text-[#c9f53b] transition-colors" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                     {item.title}
                   </h3>
-                  <p className="text-[11px] text-white/50 mt-1 line-clamp-2 font-light">
+                  <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 font-light">
                     {item.description}
                   </p>
                 </div>
@@ -191,7 +191,7 @@ export default function GalleryClient() {
             >
               <button
                 onClick={() => setSelectedImage(null)}
-                className="absolute top-6 right-6 w-12 h-12 rounded-full border border-white/10 hover:border-white/30 bg-[#0e0e0e]/80 flex items-center justify-center text-white/80 hover:text-white transition-all duration-200"
+                className="absolute top-6 right-6 w-12 h-12 rounded-full border border-border/40 hover:border-border/80 bg-card/80 flex items-center justify-center text-muted-foreground hover:text-foreground transition-all duration-200"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -202,7 +202,7 @@ export default function GalleryClient() {
                 exit={{ scale: 0.95, opacity: 0 }}
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
                 onClick={(e) => e.stopPropagation()}
-                className="max-w-4xl w-full bg-[#0c0c0c] border border-white/10 rounded-2xl overflow-hidden relative"
+                className="max-w-4xl w-full bg-background border border-border/40 rounded-2xl overflow-hidden relative"
               >
                 <div className="aspect-16/10 relative">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -212,14 +212,14 @@ export default function GalleryClient() {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <div className="p-6 bg-[#0e0e0e] border-t border-white/5">
+                <div className="p-6 bg-card border-t border-border/40">
                   <span className="text-[9px] font-extrabold uppercase tracking-widest text-[#c9f53b] bg-[#c9f53b]/10 px-2.5 py-0.5 rounded border border-[#c9f53b]/20 inline-block mb-2">
                     {selectedImage.category}
                   </span>
-                  <h3 className="text-xl font-bold text-white mb-2 uppercase" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                  <h3 className="text-xl font-bold text-foreground mb-2 uppercase" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
                     {selectedImage.title}
                   </h3>
-                  <p className="text-sm text-white/60 font-light leading-relaxed">
+                  <p className="text-sm text-muted-foreground font-light leading-relaxed">
                     {selectedImage.description}
                   </p>
                 </div>
