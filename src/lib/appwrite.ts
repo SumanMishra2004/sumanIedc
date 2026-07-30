@@ -14,6 +14,20 @@ const storage = new Storage(client);
 
 export { storage, ID };
 
+/**
+ * Sanitise an Appwrite file URL.
+ * Fixes double-wrapped URLs where a full URL was accidentally used as a file ID,
+ * e.g. "https://cloud.appwrite.io/.../files/https://fra.cloud.appwrite.io/.../files/<id>/view?..."
+ */
+export function sanitizeFileUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  // Detect a second "https://" embedded inside the URL (after the initial protocol)
+  const idx = url.indexOf('https://', 8);
+  if (idx !== -1) {
+    return url.substring(idx);
+  }
+  return url;
+}
 
 export async function uploadFile( file: File) {
   const bucketId = process.env.NEXT_PUBLIC_APPWRITE_BUCKET_ID!;
@@ -24,7 +38,8 @@ export async function uploadFile( file: File) {
       file,
     );
    
-    const fileUrl = await storage.getFileView(bucketId, uploadedFile.$id);
+    // In Appwrite SDK v21, getFileView returns a string (URL) synchronously
+    const fileUrl = storage.getFileView(bucketId, uploadedFile.$id);
 
     return fileUrl.toString(); // Return the file URL as a string
   } catch (error) {

@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import { sanitizeFileUrl } from "@/lib/appwrite"
 import { useState } from "react"
 import {
   ExternalLink,
@@ -186,13 +187,14 @@ export function ResearchPostCard(props: ResearchPostCardProps) {
     doi,
     link,
     documentUrl,
-    imageUrl,
+    imageUrl: rawImageUrl,
     isPublic,
     isOwnProfile,
     studentAuthors,
     facultyAuthors,
   } = props
 
+  const imageUrl = sanitizeFileUrl(rawImageUrl)
   const [dialogOpen, setDialogOpen] = useState(false)
   const cfg = typeConfig[type]
   const statusClass = status ? (statusConfig[status] ?? "bg-muted/30 text-muted-foreground border-border/40") : null
