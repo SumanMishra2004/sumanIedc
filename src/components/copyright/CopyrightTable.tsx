@@ -268,10 +268,10 @@ const CopyrightActions = ({
         copyright.teacherStatus === "UPLOADED"
           ? session?.user.role !== "STUDENT"
           : copyright.teacherStatus === "ACCEPTED"
-          ? session?.user.role === "TEACHER" || session?.user.role === "ADMIN"
+          ? session?.user.role === "FACULTY" || session?.user.role === "ADMIN"
           : copyright.teacherStatus === "PUBLISHED"
           ? session?.user.role === "ADMIN"
-          : session?.user.role === "TEACHER" || session?.user.role === "ADMIN"
+          : session?.user.role === "FACULTY" || session?.user.role === "ADMIN"
       ) && (
         <DropdownMenuItem
           className="text-red-600 focus:text-red-600 focus:bg-red-50"

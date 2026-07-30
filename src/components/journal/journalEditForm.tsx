@@ -45,6 +45,7 @@ import { Journal } from "@/types/journal";
 import type { Session } from "next-auth";
 import { ImageCropModal } from "@/components/ui/ImageCropModal";
 import { useImageCrop } from "@/hooks/useImageCrop";
+import { TeacherStatus } from "@prisma/client";
 
 // Use imported journalSchema from @/lib/validations/journal
 
@@ -141,9 +142,8 @@ export default function EditJournalDialog({
       doi: null,
       paperLink: null,
       keywords: [],
-      registrationFees: null,
-      reimbursement: null,
       journalStatus: "SUBMITTED",
+      teacherStatus: "UPLOADED" as TeacherStatus,
       isPublic: false,
       studentAuthorIds: [],
       facultyAuthorIds: [],
@@ -202,6 +202,7 @@ export default function EditJournalDialog({
         registrationFees: journal.registrationFees || null,
         reimbursement: journal.reimbursement || null,
         journalStatus: journal.journalStatus,
+        teacherStatus: journal.teacherStatus || "UPLOADED",
         isPublic: journal.isPublic,
         facultyAuthorIds: journal.facultyAuthors?.map((a: any) => a.user.id) || [],
         studentAuthorIds: journal.studentAuthors?.map((a: any) => a.user.id) || [],
@@ -314,16 +315,26 @@ export default function EditJournalDialog({
     );
   };
 
+  const onError = (errors: any) => {
+    console.error("Journal Edit Form Validation Errors:", errors);
+    const errorKeys = Object.keys(errors);
+    if (errorKeys.length > 0) {
+      const firstKey = errorKeys[0];
+      const errorMsg = errors[firstKey]?.message || "Invalid input";
+      toast.error(`Validation Error (${firstKey}): ${errorMsg}`);
+    } else {
+      toast.error("Please fill in all required fields correctly.");
+    }
+  };
+
   const onSubmit = async (data: JournalFormValues) => {
     setIsSubmitting(true);
     try {
-      console.log("Updating journal:", data);
       await axios.patch(`/api/research/journal/${journalId}`, data);
       toast.success("Journal updated successfully!");
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
-      console.error("Error updating journal:", error);
       toast.error(
         error.response?.data?.error || error.response?.data?.message || "Failed to update journal",
       );
@@ -336,13 +347,14 @@ export default function EditJournalDialog({
     <>
       {cropState.open && <ImageCropModal src={cropState.src} ratio={cropState.ratio} fileName={cropState.fileName} onCrop={cropState.onCrop} onCancel={closeCrop} />}
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="md:max-w-[96vw] max-h-[90vh] p-0">
-        <DialogHeader className="px-6 pt-6 pb-2">
-          <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-            Edit Journal
+      <DialogContent className="sm:max-w-5xl w-full max-h-[92vh] flex flex-col p-0 border-border bg-card shadow-2xl rounded-2xl overflow-hidden">
+        <DialogHeader className="px-6 pt-5 pb-3 border-b border-border bg-muted/20">
+          <DialogTitle className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+            <div className="w-2.5 h-6 bg-primary rounded-full" />
+            Edit Journal Publication
           </DialogTitle>
-          <DialogDescription className="text-base">
-            Update the details of your journal entry
+          <DialogDescription className="text-sm text-muted-foreground">
+            Update the metadata and details of your journal publication
           </DialogDescription>
         </DialogHeader>
 
@@ -354,10 +366,10 @@ export default function EditJournalDialog({
             </div>
           </div>
         ) : (
-          <ScrollArea className="h-[calc(90vh-120px)] px-6">
+          <ScrollArea className="h-[calc(90vh-120px)] px-6 pt-4">
             <Form {...form}>
               <form
-                onSubmit={form.handleSubmit(onSubmit)}
+                onSubmit={form.handleSubmit(onSubmit, onError)}
                 className="space-y-4 pb-6"
               >
                 {updateComment && (

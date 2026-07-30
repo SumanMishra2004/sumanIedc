@@ -67,13 +67,14 @@ export const journalSchema = z.object({
     .nullable()
     .optional(),
   publisher: z
-    .string({ message: "Publisher is required" })
+    .string()
     .trim()
     .min(2, "Publisher must be at least 2 characters")
     .max(200, "Publisher cannot exceed 200 characters")
     .nullable()
-    .refine((val) => val !== null && val.trim() !== "", {
-      message: "Publisher is required",
+    .optional()
+    .refine((val) => val === null || val === undefined || val.trim() !== "", {
+      message: "Publisher cannot be empty string",
     }),
   publicationMode: z.nativeEnum(JournalPublicationMode, {
     message: "Publication mode is required",

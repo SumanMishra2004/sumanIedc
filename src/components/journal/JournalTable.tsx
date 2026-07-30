@@ -246,7 +246,7 @@ const JournalActions = ({
         <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
         View details
       </DropdownMenuItem>
-      {journal.teacherStatus !== "PUBLISHED" && session?.user.role !== "TEACHER" && (
+      {journal.teacherStatus !== "PUBLISHED" && (
         <>
           <DropdownMenuItem onClick={() => onEdit?.(journal.id)}>
             <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -266,9 +266,9 @@ const JournalActions = ({
           </>
         )}
 
-      {session?.user.role != "STUDENT" && (
+      {session?.user.role !== "STUDENT" && (
         <>
-          <p className="text-xs text-muted-foreground mb-1">Teacher Status</p>
+          <p className="px-2 py-1 text-xs text-muted-foreground font-medium">Teacher Status</p>
 
           <Select
             defaultValue={journal.teacherStatus}
@@ -305,14 +305,14 @@ const JournalActions = ({
       )}
 
     {(
-    journal.teacherStatus === "UPLOADED"
-      ? session?.user.role !== "STUDENT"
-      : journal.teacherStatus === "ACCEPTED"
-      ? session?.user.role === "TEACHER" || session?.user.role === "ADMIN"
-      : journal.teacherStatus === "PUBLISHED"
-      ? session?.user.role === "ADMIN"
-      : session?.user.role === "TEACHER" || session?.user.role === "ADMIN"
-  ) && (
+      journal.teacherStatus === "UPLOADED"
+        ? session?.user.role !== "STUDENT"
+        : journal.teacherStatus === "ACCEPTED"
+        ? session?.user.role === "FACULTY" || session?.user.role === "ADMIN"
+        : journal.teacherStatus === "PUBLISHED"
+        ? session?.user.role === "ADMIN"
+        : session?.user.role === "FACULTY" || session?.user.role === "ADMIN"
+    ) && (
     <DropdownMenuItem
       className="text-red-600 focus:text-red-600 focus:bg-red-50"
       onClick={() => onDelete(journal.id)}

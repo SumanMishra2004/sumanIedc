@@ -27,6 +27,7 @@ interface PosterUploadFieldProps {
   isUploading?: boolean
   label?: string
   hint?: string
+  maxSizeMB?: number
 }
 
 export function PosterUploadField({
@@ -37,6 +38,7 @@ export function PosterUploadField({
   isUploading,
   label = "Cover Image (3:4 poster)",
   hint = "Recommended: portrait orientation, 900×1200 px",
+  maxSizeMB,
 }: PosterUploadFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const { cropState, openCrop, closeCrop } = useImageCrop()
@@ -45,6 +47,10 @@ export function PosterUploadField({
     const file = e.target.files?.[0]
     if (!file) return
     e.target.value = ""
+    if (maxSizeMB && file.size > maxSizeMB * 1024 * 1024) {
+      alert(`File is too large. Maximum size is ${maxSizeMB}MB.`)
+      return
+    }
     openCrop(file, "poster", (cropped) => {
       closeCrop()
       onChange(cropped)

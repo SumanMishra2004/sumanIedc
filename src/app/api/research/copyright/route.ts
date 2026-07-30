@@ -227,6 +227,7 @@ export async function POST(request: Request) {
     // Validate request body with Zod
     const validation = copyrightSchema.safeParse(body)
     if (!validation.success) {
+      console.log("this is validation error", validation.error.issues[0].message)
       return NextResponse.json(
         { error: validation.error.issues[0].message, details: validation.error.issues },
         { status: 400 }

@@ -56,11 +56,17 @@ export function useImageCrop() {
 
   const closeCrop = useCallback(() => {
     // Revoke the object URL to avoid memory leaks
-    if (cropState.src.startsWith("blob:")) {
-      URL.revokeObjectURL(cropState.src)
-    }
-    setCropState(DEFAULT_STATE)
-  }, [cropState.src])
+    setCropState((prev) => {
+      if (prev.src && prev.src.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(prev.src)
+        } catch (e) {
+          console.error("Error revoking crop object URL:", e)
+        }
+      }
+      return DEFAULT_STATE
+    })
+  }, [])
 
   return { cropState, openCrop, closeCrop }
 }

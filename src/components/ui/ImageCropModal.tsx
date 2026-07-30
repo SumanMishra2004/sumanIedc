@@ -174,19 +174,18 @@ export function ImageCropModal({
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onCancel() }}>
       <DialogContent
-        className="max-w-2xl w-full p-0 bg-[#0d0d0d] border border-white/[0.08] overflow-hidden"
-        onInteractOutside={(e) => e.preventDefault()}
+        className="max-w-2xl w-full p-0 bg-card border border-border shadow-2xl overflow-hidden rounded-2xl"
       >
         {/* Header */}
-        <DialogHeader className="px-6 pt-5 pb-3 border-b border-white/[0.06]">
-          <DialogTitle className="text-base font-semibold text-white/90">
+        <DialogHeader className="px-6 pt-5 pb-3 border-b border-border bg-muted/30">
+          <DialogTitle className="text-base font-semibold text-foreground">
             Crop Image — {config.label}
           </DialogTitle>
-          <p className="text-xs text-white/40 mt-0.5">{config.hint}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{config.hint}</p>
         </DialogHeader>
 
         {/* Crop area */}
-        <div className="flex items-center justify-center bg-[#060606] min-h-[300px] max-h-[60vh] overflow-auto p-4">
+        <div className="flex items-center justify-center bg-black/90 min-h-[300px] max-h-[60vh] overflow-auto p-4">
           <ReactCrop
             crop={crop}
             onChange={(c) => setCrop(c)}
@@ -209,21 +208,21 @@ export function ImageCropModal({
         </div>
 
         {/* Tip */}
-        <div className="px-6 py-2 flex items-center gap-2 border-t border-white/[0.04]">
-          <ZoomIn className="h-3.5 w-3.5 text-white/25 shrink-0" />
-          <p className="text-[11px] text-white/30">
+        <div className="px-6 py-2 flex items-center gap-2 border-t border-border bg-muted/10">
+          <ZoomIn className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <p className="text-[11px] text-muted-foreground">
             Drag to reposition · Drag handles to resize · Aspect ratio is locked to {config.label}
           </p>
         </div>
 
         {/* Footer */}
-        <DialogFooter className="px-6 pb-5 pt-2 flex flex-row gap-2 justify-end">
+        <DialogFooter className="px-6 pb-5 pt-3 flex flex-row gap-2 justify-end bg-muted/20 border-t border-border">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={onCancel}
             disabled={isSaving}
-            className="h-9 px-4 text-xs text-white/50 hover:text-white hover:bg-white/8 border border-white/10"
+            className="h-9 px-4 text-xs"
           >
             <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
             Cancel
@@ -232,7 +231,7 @@ export function ImageCropModal({
             size="sm"
             onClick={handleConfirm}
             disabled={!completedCrop || isSaving}
-            className="h-9 px-5 text-xs bg-[#c9f53b] hover:bg-[#d6ff47] text-black font-semibold"
+            className="h-9 px-5 text-xs bg-primary text-primary-foreground font-semibold"
           >
             {isSaving ? (
               <>

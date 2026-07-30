@@ -43,7 +43,7 @@ export const conferenceSchema = z.object({
       message: "Document is required",
     }),
   conferenceStatus: z.nativeEnum(ConferenceStatus),
-  teacherStatus: z.nativeEnum(TeacherStatus),
+  teacherStatus: z.nativeEnum(TeacherStatus).optional().default(TeacherStatus.UPLOADED),
   isPublic: z.boolean(),
   registrationFees: z
     .number()

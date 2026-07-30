@@ -258,7 +258,12 @@ export async function POST(request: Request) {
 
     const body = await request.json()
 
-    // Students have forced default parameters:
+    // Default mandatory system status parameters if missing
+    if (!body.teacherStatus) body.teacherStatus = TeacherStatus.UPLOADED
+    if (!body.journalStatus) body.journalStatus = JournalStatus.SUBMITTED
+    if (body.isPublic === undefined) body.isPublic = false
+
+    // Role specific defaults:
     if (session.user.role === UserRole.STUDENT) {
       body.teacherStatus = TeacherStatus.UPLOADED
       body.journalStatus = JournalStatus.SUBMITTED
@@ -269,6 +274,13 @@ export async function POST(request: Request) {
         body.studentAuthorIds = [session.user.id]
       } else if (!body.studentAuthorIds.includes(session.user.id)) {
         body.studentAuthorIds.push(session.user.id)
+      }
+    } else if (session.user.role === UserRole.FACULTY) {
+      // Auto-assign creating faculty if not present in the payload
+      if (!body.facultyAuthorIds || body.facultyAuthorIds.length === 0) {
+        body.facultyAuthorIds = [session.user.id]
+      } else if (!body.facultyAuthorIds.includes(session.user.id)) {
+        body.facultyAuthorIds.push(session.user.id)
       }
     }
 
