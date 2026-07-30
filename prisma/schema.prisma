@@ -459,9 +459,6 @@ model FDP {
   user          User      @relation("userFDPs", fields: [userId], references: [id], onDelete: Cascade)
 }
 
-enum crdb_internal_region {
-  aws_ap_south_1 @map("aws-ap-south-1")
-}
 
 enum UserRole {
   STUDENT
