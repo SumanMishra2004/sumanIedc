@@ -39,12 +39,8 @@ export interface NavLinkData {
 
 export interface HomePageData {
   heroBackground: SanityImageRef | null;
-  heroHeading: string;
-  heroDepartment: string;
-  heroSpecialisations: string[];
-  heroPrimaryCtaLabel: string;
-  heroSecondaryCtaLabel: string;
   heroTagline: string;
+  heroMissionBlurb?: string;
   aboutEyebrow: string;
   aboutHeading: string;
   aboutBody: string;
@@ -67,12 +63,8 @@ export async function getHomePageData(): Promise<HomePageData | null> {
   return sanityClient.fetch<HomePageData | null>(
     `*[_type == "homePage" && _id == "homePage"][0]{
       heroBackground,
-      heroHeading,
-      heroDepartment,
-      heroSpecialisations,
-      heroPrimaryCtaLabel,
-      heroSecondaryCtaLabel,
       heroTagline,
+      heroMissionBlurb,
       aboutEyebrow,
       aboutHeading,
       aboutBody,

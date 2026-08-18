@@ -13,43 +13,21 @@ export const homePage = defineType({
       options: { hotspot: true },
       description: "Full-screen background image shown behind the hero heading.",
     }),
-    defineField({
-      name: "heroHeading",
-      title: "Hero Heading",
-      type: "string",
-      initialValue: "Innovation & Entrepreneurship Development Cell",
-    }),
-    defineField({
-      name: "heroDepartment",
-      title: "Hero Department Name",
-      type: "string",
-      initialValue: "Computer Science and Engineering",
-    }),
-    defineField({
-      name: "heroSpecialisations",
-      title: "Specialisation Tags",
-      type: "array",
-      of: [{ type: "string" }],
-      description: "Small pill badges shown under the department name.",
-      initialValue: ["Internet of Things", "Cyber Security", "Blockchain Technology"],
-    }),
-    defineField({
-      name: "heroPrimaryCtaLabel",
-      title: "Primary CTA Button Label",
-      type: "string",
-      initialValue: "Explore Programs →",
-    }),
-    defineField({
-      name: "heroSecondaryCtaLabel",
-      title: "Secondary CTA Button Label",
-      type: "string",
-      initialValue: "Meet the Team",
-    }),
+
     defineField({
       name: "heroTagline",
       title: "Tagline (vertical strip & mobile)",
       type: "string",
       initialValue: "Innovate · Build · Disrupt",
+    }),
+    defineField({
+      name: "heroMissionBlurb",
+      title: "Hero Mission Blurb",
+      type: "text",
+      rows: 3,
+      description: "Short paragraph shown below the specialisation tags in the hero section.",
+      initialValue:
+        "A premier research and innovation hub empowering students, faculty, and industry partners to co-create breakthrough technologies — from IoT and AI to quantum computing and space systems.",
     }),
 
     // ── About Us Section ──────────────────────────────────────────
@@ -63,7 +41,7 @@ export const homePage = defineType({
       name: "aboutHeading",
       title: "About — Main Heading",
       type: "string",
-      initialValue: "Crafting stories that resonate.",
+      initialValue: "Where Creativity Meets Innovation",
     }),
     defineField({
       name: "aboutBody",

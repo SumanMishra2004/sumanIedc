@@ -3,15 +3,21 @@
 import type { HomePageData } from "../../../sanity/lib/queries";
 import { urlFor } from "../../../sanity/lib/image";
 
+// ─── Hardcoded hero values ─────────────────────────────────────────────────────
+const HERO_HEADING_LINE1 = "Innovation &";
+const HERO_HEADING_LINE2 = "Entrepreneurship";
+const HERO_HEADING_LINE3 = "Development Cell";
+const HERO_DEPARTMENT = "Computer Science and Engineering";
+const HERO_SPECIALISATIONS = ["Internet of Things", "Cyber Security", "Blockchain Technology"];
+const HERO_PRIMARY_CTA = "Explore Programs →";
+const HERO_SECONDARY_CTA = "Meet the Team";
+
 // ─── Fallback defaults ────────────────────────────────────────────────────────
 const FALLBACK: HomePageData = {
   heroBackground: null,
-  heroHeading: "Innovation & Entrepreneurship Development Cell",
-  heroDepartment: "Computer Science and Engineering",
-  heroSpecialisations: ["Internet of Things", "Cyber Security", "Blockchain Technology"],
-  heroPrimaryCtaLabel: "Explore Programs →",
-  heroSecondaryCtaLabel: "Meet the Team",
   heroTagline: "Innovate · Build · Disrupt",
+  heroMissionBlurb:
+    "A premier research and innovation hub empowering students, faculty, and industry partners to co-create breakthrough technologies — from IoT and AI to quantum computing and space systems.",
   aboutEyebrow: "◆ Who We Are ◆",
   aboutHeading: "Crafting stories that resonate.",
   aboutBody: "",
@@ -27,15 +33,6 @@ const HIGHLIGHTS = [
   { icon: "💡", text: "$10M+ Research Grants" },
 ];
 
-function splitHeading(heading: string): { before: string; after: string } {
-  const idx = heading.indexOf("&");
-  if (idx === -1) return { before: heading, after: "" };
-  return {
-    before: heading.slice(0, idx + 1).trim(),
-    after: heading.slice(idx + 1).trim(),
-  };
-}
-
 interface HeroSectionProps {
   data?: HomePageData | null;
 }
@@ -47,8 +44,7 @@ export default function HeroSection({ data }: HeroSectionProps) {
     ? urlFor(d.heroBackground).width(1920).quality(85).url()
     : "";
 
-  const { before: headLine1, after: headLine2 } = splitHeading(d.heroHeading);
-  const [, ...deptRest] = d.heroDepartment.split(" of ");
+  const [, ...deptRest] = HERO_DEPARTMENT.split(" of ");
   const deptSuffix = deptRest.join(" of ");
 
   return (
@@ -70,17 +66,11 @@ export default function HeroSection({ data }: HeroSectionProps) {
          
           {/* ── PRIMARY HEADING ── */}
           <h1 className="font-['Bebas_Neue'] font-normal leading-[0.92] tracking-[0.01em] text-foreground mb-5 text-[clamp(2.4rem,8vw,7.5rem)]">
-            {headLine1}
+            {HERO_HEADING_LINE1}
             <br />
-            {headLine2 && (
-              <>
-                {headLine2.split(" ").slice(0, -2).join(" ")}
-                <br />
-                <span className="text-primary">
-                  {headLine2.split(" ").slice(-2).join(" ")}
-                </span>
-              </>
-            )}
+            {HERO_HEADING_LINE2}
+            <br />
+            <span className="text-primary">{HERO_HEADING_LINE3}</span>
           </h1>
 
           {/* Acronym + line */}
@@ -99,20 +89,20 @@ export default function HeroSection({ data }: HeroSectionProps) {
                 {deptSuffix}
               </>
             ) : (
-              d.heroDepartment
+              HERO_DEPARTMENT
             )}
           </h2>
 
           {/* Mission blurb */}
-          <p className="text-sm sm:text-base text-foreground/55 leading-relaxed max-w-xl mb-6 font-['Space_Grotesk']">
-            A premier research and innovation hub empowering students, faculty, and industry
-            partners to co-create breakthrough technologies — from IoT and AI to quantum
-            computing and space systems.
-          </p>
+          {d.heroMissionBlurb && (
+            <p className="text-sm sm:text-base text-foreground/55 leading-relaxed max-w-xl mb-6 font-['syne']">
+              {d.heroMissionBlurb}
+            </p>
+          )}
 
           {/* Specialisations */}
           <div className="flex flex-wrap gap-2 mb-7">
-            {d.heroSpecialisations.map((s) => (
+            {HERO_SPECIALISATIONS.map((s) => (
               <span
                 key={s}
                 className="font-mono text-[9px] sm:text-[10px] tracking-[0.06em] uppercase text-primary border border-primary/35 bg-primary/5 px-3 py-1 rounded"
@@ -125,10 +115,10 @@ export default function HeroSection({ data }: HeroSectionProps) {
           {/* CTA buttons */}
           <div className="flex gap-3 flex-wrap mb-10">
             <button className="px-7 py-2.5 rounded text-[11px] font-bold tracking-[0.08em] text-background bg-gradient-to-br from-primary to-[#a8d62a] shadow-lg shadow-primary/30 uppercase cursor-pointer hover:opacity-90 transition-all">
-              {d.heroPrimaryCtaLabel}
+              {HERO_PRIMARY_CTA}
             </button>
             <button className="px-7 py-2.5 rounded text-[11px] font-bold tracking-[0.08em] text-primary border border-primary/45 bg-transparent uppercase cursor-pointer hover:bg-primary/8 transition-all">
-              {d.heroSecondaryCtaLabel}
+              {HERO_SECONDARY_CTA}
             </button>
           </div>
 

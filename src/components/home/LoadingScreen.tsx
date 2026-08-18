@@ -118,7 +118,7 @@ export default function LoadingScreen({
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",
-        fontFamily: "'Sora', 'Inter', sans-serif",
+        fontFamily: " 'Inter', sans-serif",
       }}
     >
       {/* Background grid */}

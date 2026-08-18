@@ -64,7 +64,7 @@ export default function AboutUs({ data }: AboutUsProps) {
   const orbContainerRef = useRef<HTMLDivElement>(null);
 
   const eyebrow = data?.aboutEyebrow ?? "◆ Who We Are ◆";
-  const heading = data?.aboutHeading ?? "Crafting stories that resonate.";
+  const heading = data?.aboutHeading ?? "Where Creativity Meets Innovation";
   const body = data?.aboutBody?.trim() || FALLBACK_BODY;
   const ctaLabel = data?.aboutCtaLabel ?? "Explore More";
 
@@ -136,17 +136,16 @@ export default function AboutUs({ data }: AboutUsProps) {
             ref={headingRef}
             className="text-5xl sm:text-6xl lg:text-7xl font-bold text-foreground leading-[1.05] mb-6 opacity-0 font-['Bebas_Neue'] tracking-[0.02em]"
           >
-            {/* Render last word(s) after the period in primary colour */}
-            {heading.includes("stories") ? (
-              <>
-                Crafting{" "}
-                <em className="text-primary not-italic">stories</em>
-                <br />
-                {heading.split("stories")[1]?.trim() || "that resonate."}
-              </>
-            ) : (
-              heading
-            )}
+            {(() => {
+              const words = heading.trim().split(" ");
+              const last = words.pop();
+              return (
+                <>
+                  {words.join(" ")}{" "}
+                  <em className="text-primary not-italic">{last}</em>
+                </>
+              );
+            })()}
           </h2>
           <div
             ref={decorRef}

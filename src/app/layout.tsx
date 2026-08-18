@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Space_Grotesk, Bebas_Neue, DM_Sans, Syne, Sora } from "next/font/google";
+import { Geist, Geist_Mono, Space_Grotesk, Bebas_Neue, Syne, EB_Garamond } from "next/font/google";
 import "./globals.css";
 import AuthProvider from "@/providers/auth-provider";
 import LenisProvider from "@/providers/lenis-provider";
@@ -35,20 +35,15 @@ const bebasNeue = Bebas_Neue({
   display: "swap",
 });
 
-const dmSans = DM_Sans({
-  variable: "--font-dm-sans",
-  subsets: ["latin"],
-  display: "swap",
-});
-
 const syne = Syne({
   variable: "--font-syne",
   subsets: ["latin"],
   display: "swap",
 });
 
-const sora = Sora({
-  variable: "--font-sora",
+
+const ebGaramond = EB_Garamond({
+  variable: "--font-eb-garamond",
   subsets: ["latin"],
   display: "swap",
 });
@@ -68,7 +63,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${bebasNeue.variable} ${dmSans.variable} ${syne.variable} ${sora.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${spaceGrotesk.variable} ${bebasNeue.variable}  ${syne.variable} ${ebGaramond.variable} antialiased`}
       >
         <ThemeProvider
           attribute="class"
