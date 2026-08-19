@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
+import { isAdminOrHigher } from '@/lib/auth/permissions'
 
 // Helper: admin guard
 async function requireAdmin() {
   const session = await auth()
-  if (!session?.user || session.user.role !== 'ADMIN') {
+  if (!session?.user || !isAdminOrHigher(session.user.role)) {
     return null
   }
   return session
@@ -127,12 +128,12 @@ export async function GET(_req: NextRequest) {
     const departmentMap = new Map<string, number>()
 
     for (const author of studentAuthorDepartments) {
-      const dept = author.user.department || 'Unknown'
+      const dept = author.user?.department || 'Unknown'
       departmentMap.set(dept, (departmentMap.get(dept) || 0) + 1)
     }
 
     for (const author of facultyAuthorDepartments) {
-      const dept = author.user.department || 'Unknown'
+      const dept = author.user?.department || 'Unknown'
       departmentMap.set(dept, (departmentMap.get(dept) || 0) + 1)
     }
 

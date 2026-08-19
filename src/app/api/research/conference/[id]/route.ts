@@ -71,7 +71,7 @@ export async function GET(
         author => author.user.email === session.user.email
       )
       const isFacultyAuthor = conference.facultyAuthors.some(
-        author => author.user.email === session.user.email
+        author => author.user?.email === session.user.email
       )
 
       if (!isAdmin && !isStudentAuthor && !isFacultyAuthor) {
@@ -363,7 +363,7 @@ export async function PATCH(
 
     // 6. Notifications System Dispatch
     const studentUserIds = conference.studentAuthors.map((sa) => sa.userId)
-    const facultyUserIds = conference.facultyAuthors.map((fa) => fa.userId)
+    const facultyUserIds = conference.facultyAuthors.map((fa) => fa.userId).filter((id): id is string => id !== null)
 
     const notifyUser = async (uId: string, title: string, message: string, type: string) => {
       try {
@@ -467,12 +467,12 @@ export async function PATCH(
       } else if (newTeacherStatus === TeacherStatus.UPLOADED) {
         for (const fa of conference.facultyAuthors) {
           await notifyUser(
-            fa.userId,
+            fa.userId ?? '',
             "Conference Resubmitted for Review",
             `A co-authored conference '${conference.conferenceName}' has been resubmitted for review.`,
             "CONFERENCE_SUBMITTED"
           )
-          if (fa.user.email) {
+          if (fa.user?.email) {
             await sendNotificationEmail({
               to: fa.user.email,
               recipientName: fa.user.name || "Faculty",
@@ -510,12 +510,12 @@ export async function PATCH(
         }
         for (const fa of conference.facultyAuthors) {
           await notifyUser(
-            fa.userId,
+            fa.userId ?? '',
             "Conference Published!",
             `The co-authored conference '${conference.conferenceName}' has been successfully published.`,
             "CONFERENCE_PUBLISHED"
           )
-          if (fa.user.email) {
+          if (fa.user?.email) {
             await sendNotificationEmail({
               to: fa.user.email,
               recipientName: fa.user.name || "Faculty",
@@ -531,9 +531,9 @@ export async function PATCH(
         // Broadcast to all users
         if (body.isPublic || existingConference.isPublic) {
           const allAuthorNames = [
-            ...conference.studentAuthors.map(sa => sa.user.name).filter(Boolean),
-            ...conference.facultyAuthors.map(fa => fa.user.name).filter(Boolean),
-          ] as string[]
+            ...conference.studentAuthors.map(sa => sa.user.name).filter((n): n is string => !!n),
+            ...conference.facultyAuthors.map(fa => fa.user?.name).filter((n): n is string => !!n),
+          ]
           const allAuthorIds = [...studentUserIds, ...facultyUserIds]
 
           broadcastPublicationEmail({

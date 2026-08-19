@@ -39,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MultiSelectUsers } from "@/components/ui/multi-select";
+import { ExternalAuthorList, type ExternalAuthor } from "@/components/ui/ExternalAuthorList";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -228,6 +229,8 @@ export default function BookChapterDialog({
   // Authors
   const [selectedFaculty, setSelectedFaculty] = useState<SelectedUser[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<SelectedUser[]>([]);
+  const [externalFaculty, setExternalFaculty] = useState<ExternalAuthor[]>([]);
+  const [externalStudents, setExternalStudents] = useState<ExternalAuthor[]>([]);
 
   // Publisher
   const [showCustomPublisher, setShowCustomPublisher] = useState(false);
@@ -257,6 +260,8 @@ export default function BookChapterDialog({
       publisher: "",
       studentAuthorIds: [],
       facultyAuthorIds: [],
+      externalFacultyAuthors: [],
+      externalStudentAuthors: [],
     },
   });
 
@@ -267,6 +272,8 @@ export default function BookChapterDialog({
     setKeywordInput("");
     setSelectedFaculty([]);
     setSelectedStudents([]);
+    setExternalFaculty([]);
+    setExternalStudents([]);
     setShowCustomPublisher(false);
     setCustomPublisher("");
     // Clear the hidden inputs too
@@ -329,6 +336,16 @@ export default function BookChapterDialog({
       e.target.value = "";
     }
   }, [form]);
+
+  // Sync external author arrays into form values
+  const syncExtFaculty = (authors: ExternalAuthor[]) => {
+    setExternalFaculty(authors);
+    form.setValue("externalFacultyAuthors", authors, { shouldValidate: true });
+  };
+  const syncExtStudents = (authors: ExternalAuthor[]) => {
+    setExternalStudents(authors);
+    form.setValue("externalStudentAuthors", authors, { shouldValidate: true });
+  };
 
   const addKeyword = useCallback(() => {
     const kw = keywordInput.trim();
@@ -727,6 +744,8 @@ export default function BookChapterDialog({
                       title="Authors"
                       accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                     />
+
+                    {/* ── Faculty authors ───────────────────────────── */}
                     <FormField
                       control={form.control}
                       name="facultyAuthorIds"
@@ -736,7 +755,7 @@ export default function BookChapterDialog({
                             Faculty Authors <RequiredDot />
                           </FormLabel>
                           <FormDescription className="text-xs text-muted-foreground">
-                            Search by name or email address
+                            At least one faculty must be selected from the platform — they will verify this submission.
                           </FormDescription>
                           <FormControl>
                             <MultiSelectUsers
@@ -752,6 +771,21 @@ export default function BookChapterDialog({
                         </FormItem>
                       )}
                     />
+
+                    {/* External faculty below the dropdown */}
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-medium text-foreground">
+                        External / Unlisted Faculty
+                      </p>
+                      <ExternalAuthorList
+                        kind="faculty"
+                        value={externalFaculty}
+                        onChange={syncExtFaculty}
+                        hint="Add faculty co-authors who are not on the platform. A verification email will be sent to each."
+                      />
+                    </div>
+
+                    {/* ── Student authors ───────────────────────────── */}
                     <FormField
                       control={form.control}
                       name="studentAuthorIds"
@@ -777,6 +811,19 @@ export default function BookChapterDialog({
                         </FormItem>
                       )}
                     />
+
+                    {/* External students below the dropdown */}
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-medium text-foreground">
+                        External / Unlisted Students
+                      </p>
+                      <ExternalAuthorList
+                        kind="student"
+                        value={externalStudents}
+                        onChange={syncExtStudents}
+                        hint="Add student co-authors who are not on the platform."
+                      />
+                    </div>
                   </div>
 
                   {/* Status & Fees */}

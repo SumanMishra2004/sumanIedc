@@ -335,3 +335,97 @@ export const broadcastPublicationEmail = async (
     );
   }
 };
+
+// ─── Faculty Co-Author Verification Email ────────────────────────────────────
+
+export interface FacultyVerificationEmailParams {
+  to: string;
+  facultyName: string;
+  verifyUrl: string;
+  studentName: string;
+  researchType: string;
+  researchId: string;
+  tokenExpiry: Date;
+}
+
+export const sendFacultyVerificationEmail = async (
+  params: FacultyVerificationEmailParams
+): Promise<void> => {
+  const {
+    to,
+    facultyName,
+    verifyUrl,
+    studentName,
+    researchType,
+    tokenExpiry,
+  } = params;
+
+  const researchLabel = researchType
+    .toLowerCase()
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const expiryStr = tokenExpiry.toLocaleString('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'Asia/Kolkata',
+  });
+
+  try {
+    await resend.emails.send({
+      from: fromEmail,
+      to,
+      subject: `Faculty Co-Author Verification Request — ${researchLabel}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #ffffff;">
+          <div style="background-color: #0c0c0c; padding: 24px; border-radius: 8px 8px 0 0;">
+            <h1 style="color: #c9f53b; margin: 0; font-size: 22px;">Co-Author Verification Request</h1>
+          </div>
+          <div style="padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;">
+            <p style="color: #374151;">Dear <strong>${facultyName}</strong>,</p>
+            <p style="color: #374151;">
+              A student named <strong>${studentName}</strong> has listed you as a co-author
+              on a <strong>${researchLabel}</strong> submission on the IEDC Research Portal.
+            </p>
+            <p style="color: #374151;">
+              Please review the request and confirm or reject your co-authorship by clicking
+              the button below:
+            </p>
+            <div style="margin: 32px 0; text-align: center;">
+              <a
+                href="${verifyUrl}"
+                style="
+                  background-color: #c9f53b;
+                  color: #0c0c0c;
+                  padding: 14px 28px;
+                  text-decoration: none;
+                  border-radius: 6px;
+                  font-weight: bold;
+                  font-size: 15px;
+                  display: inline-block;
+                "
+              >
+                Review Co-Author Request
+              </a>
+            </div>
+            <p style="color: #6b7280; font-size: 13px;">
+              Or copy this link into your browser:<br />
+              <a href="${verifyUrl}" style="color: #3b82f6;">${verifyUrl}</a>
+            </p>
+            <p style="color: #6b7280; font-size: 13px;">
+              This link will expire on <strong>${expiryStr} IST</strong> and can only be used once.
+            </p>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+            <p style="color: #9ca3af; font-size: 12px;">
+              If you did not expect this request, you can safely ignore this email.
+              Do not share this link with anyone.
+            </p>
+          </div>
+        </div>
+      `,
+    });
+  } catch (error) {
+    console.error('[Email] Failed to send faculty verification email to', to, error);
+    throw error;
+  }
+};

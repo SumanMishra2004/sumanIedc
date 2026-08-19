@@ -8,11 +8,12 @@ import {
   JournalIndexing,
   JournalQuartile,
 } from '@prisma/client'
+import { isAdminOrHigher } from '@/lib/auth/permissions'
 
 // Helper: admin guard
 async function requireAdmin() {
   const session = await auth()
-  if (!session?.user || session.user.role !== 'ADMIN') {
+  if (!session?.user || !isAdminOrHigher(session.user.role)) {
     return null
   }
   return session

@@ -6,6 +6,7 @@ import { GrantInPOSTRequestBodyData } from "@/types/grant-in";
 import { revalidateTag } from "next/cache";
 import { storage } from "@/lib/appwrite";
 import { notifyGrantApplied } from "@/lib/research/grantNotifications";
+import { canViewAllResearch, isFacultyOrHigher } from "@/lib/auth/permissions";
 
 /* ----------------------------
    Request Body Interfaces
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
     if (userRole === UserRole.STUDENT) {
   return NextResponse.json({ message: "Students cannot create grants." }, { status: 403 })
 }
+    // EDITOR / ADMIN / SUPERADMIN have no special grant-creation restrictions beyond the PI check below
     /* ----------------------------
        2. Parse Body
     ----------------------------- */
@@ -81,7 +83,7 @@ export async function POST(req: NextRequest) {
        5. FACULTY User Rule:
           Faculty must be PI or CoPI
     ----------------------------- */
-    if (userRole === UserRole.FACULTY) {
+    if (userRole === UserRole.FACULTY || userRole === UserRole.EDITOR) {
       const sessionFacultyEntry = facultyAuthors.find(
         (f) => f.teacherId === userId,
       );
@@ -90,7 +92,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             message:
-              "Faculty creating the grant must be included as PI or Co-PI.",
+              "Faculty/Editor creating the grant must be included as PI or Co-PI.",
           },
           { status: 403 },
         );
@@ -103,7 +105,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             message:
-              "Faculty creator must have role FACULTY_PI or FACULTY_COPI.",
+              "Faculty/Editor creator must have role FACULTY_PI or FACULTY_COPI.",
           },
           { status: 403 },
         );
@@ -111,10 +113,10 @@ export async function POST(req: NextRequest) {
     }
 
     /* ----------------------------
-       6. ADMIN Rule:
-          Admin must assign a faculty PI
+       6. ADMIN / SUPERADMIN Rule:
+          Must assign a faculty PI
     ----------------------------- */
-    if (userRole === UserRole.ADMIN) {
+    if (userRole === UserRole.ADMIN || userRole === UserRole.SUPERADMIN) {
       const piFaculty = facultyAuthors.find(
         (f) => f.role === GrantInRole.FACULTY_PI,
       );
@@ -187,7 +189,7 @@ export async function POST(req: NextRequest) {
     const facultyUsers = await prisma.user.findMany({
       where: {
         id: { in: facultyIds },
-        role: { in: [UserRole.FACULTY, UserRole.ADMIN] },
+        role: { in: [UserRole.FACULTY, UserRole.EDITOR, UserRole.ADMIN, UserRole.SUPERADMIN] },
       },
     });
 
@@ -246,7 +248,7 @@ export async function POST(req: NextRequest) {
     // sidebar updates immediately on next navigation without waiting for the
     // 5-minute revalidation window.
     const involvedUserIds = new Set<string>([userId!])
-    newGrant.facultyAuthors.forEach((fa) => involvedUserIds.add(fa.userId))
+    newGrant.facultyAuthors.forEach((fa) => { if (fa.userId) involvedUserIds.add(fa.userId) })
     newGrant.studentAuthors.forEach((sa) => involvedUserIds.add(sa.userId))
     involvedUserIds.forEach((id) => revalidateTag(`grants-sidebar-${id}`, {}))
     // Revalidate the admin shared cache for all-grants view
@@ -326,10 +328,10 @@ export async function GET(req: NextRequest) {
       usedAmountMax: searchParams.get("usedAmountMax") ?? undefined,
     };
     const whereClause: any = {};
-    if (userRole === UserRole.FACULTY) {
+    if (userRole === UserRole.FACULTY || userRole === UserRole.EDITOR) {
       whereClause.facultyAuthors = {
         some: {
-          userId: userId, // session faculty must be author
+          userId: userId,
         },
       };
     }
@@ -337,13 +339,17 @@ export async function GET(req: NextRequest) {
     if (userRole === UserRole.STUDENT) {
       whereClause.studentAuthors = {
         some: {
-          userId: userId, // session student must be author
+          userId: userId,
         },
       };
     }
 
-    if (userRole === UserRole.ADMIN) {
-      whereClause.hideFromAdmin = false;
+    if (canViewAllResearch(userRole)) {
+      // EDITOR/ADMIN/SUPERADMIN see all (no author filter)
+      // but ADMIN specifically hides hideFromAdmin records
+      if (userRole === UserRole.ADMIN || userRole === UserRole.SUPERADMIN) {
+        whereClause.hideFromAdmin = false;
+      }
     }
 
     if (queryParams.projectCode) {
@@ -462,6 +468,7 @@ export async function DELETE(req: NextRequest) {
         { status: 403 },
       );
     }
+    const userRole = session.user.role;
     const { searchParams } = new URL(req.url);
     const grantIds = searchParams.get("grantIds");
     if (!grantIds) {
@@ -475,7 +482,7 @@ export async function DELETE(req: NextRequest) {
     const grantsToDelete = await prisma.grantIn.findMany({
       where: {
         id: { in: grantIdArray },
-        ...(session.user.role === UserRole.ADMIN ? {} : {
+        ...(canViewAllResearch(session.user.role) ? {} : {
           OR: [
             { facultyAuthors: { some: { userId: session.user.id } } },
             { studentAuthors: { some: { userId: session.user.id } } },
@@ -493,7 +500,7 @@ export async function DELETE(req: NextRequest) {
         { status: 404 },
       );
     }
-    if (session.user.role === UserRole.FACULTY) {
+    if (userRole === UserRole.FACULTY || userRole === UserRole.EDITOR) {
       const allAllowed = grantsToDelete.every((grant) => {
         const facultyEntry = grant.facultyAuthors.find(
           (fa) => fa.userId === session.user.id,
@@ -548,7 +555,7 @@ export async function DELETE(req: NextRequest) {
     // Invalidate sidebar grants cache for all authors of the deleted grants
     const affectedUserIds = new Set<string>([session.user.id!])
     grantsToDelete.forEach((grant) =>
-      grant.facultyAuthors.forEach((fa) => affectedUserIds.add(fa.userId))
+      grant.facultyAuthors.forEach((fa) => { if (fa.userId) affectedUserIds.add(fa.userId) })
     )
     affectedUserIds.forEach((id) => revalidateTag(`grants-sidebar-${id}`, {}))
     revalidateTag(`grants-sidebar-all`, {})

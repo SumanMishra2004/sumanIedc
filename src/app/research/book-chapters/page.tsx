@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import BookChapterClient from "./BookChapterClient";
 import { Metadata } from "next";
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: "Book Chapters | IEDC Research Lab",
   description: "Browse the published book chapters, research compilation contributions, and textbooks co-authored by student and faculty writers at IEDC CSE.",
@@ -20,7 +21,7 @@ export default async function BookChaptersPage() {
   const formattedChapters = dbChapters.map((c) => {
     const authors = [
       ...c.facultyAuthors.map((fa) => ({
-        name: fa.user.name || fa.user.email || "Faculty Author",
+        name: fa.user?.name || fa.user?.email || "Faculty Author",
         role: "Faculty",
       })),
       ...c.studentAuthors.map((sa) => ({

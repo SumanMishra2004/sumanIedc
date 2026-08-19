@@ -45,7 +45,7 @@ export default function AllUsersPage() {
     )
   }
 
-  if (session?.user?.role !== "ADMIN") {
+  if (session?.user?.role !== "ADMIN" && session?.user?.role !== "SUPERADMIN") {
     return (
       <div className="container mx-auto max-w-7xl p-6">
         <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-8 text-center">

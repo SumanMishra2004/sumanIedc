@@ -1,11 +1,8 @@
 {
   "servers": {
-    "cockroachdb-cloud": {
+    "aiven": {
       "type": "http",
-      "url": "https://cockroachlabs.cloud/mcp",
-      "headers": {
-        "mcp-cluster-id": "2750794c-9b56-4c72-825c-37823b364ee8"
-      }
+      "url": "https://mcp.aiven.live/mcp?services_scope=pg"
     }
   }
 }

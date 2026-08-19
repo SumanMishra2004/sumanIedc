@@ -55,7 +55,7 @@ export function NavMain({
                     group h-9 rounded-lg px-3 text-[13.5px] font-medium transition-all
                     hover:bg-sidebar-accent hover:text-sidebar-accent-foreground
                     ${isActive
-                      ? "bg-[#c9f53b]/15 text-[#c9f53b] hover:bg-[#c9f53b]/20 hover:text-[#c9f53b]"
+                      ? "bg-[#c9f53b]/75 text-[#171a0d]"
                       : "text-sidebar-foreground/70"
                     }
                   `}
@@ -102,7 +102,7 @@ export function NavMain({
                       <item.icon
                         className={`size-4 shrink-0 transition-colors ${
                           hasActiveChild
-                            ? "text-[#c9f53b]"
+                            ? "text-[#88a233]"
                             : "text-sidebar-foreground/50 group-hover:text-sidebar-foreground"
                         }`}
                       />
@@ -130,7 +130,7 @@ export function NavMain({
                                before:absolute before:left-0 before:top-1/2 before:h-px before:w-3 before:-translate-y-1/2 before:bg-sidebar-border/40
                                hover:bg-sidebar-accent hover:text-sidebar-accent-foreground
                                ${isSubActive
-                                 ? "font-medium text-[#c9f53b] before:bg-[#c9f53b]/50"
+                                 ? "font-medium dark:text-[#bcf308] text-[#0f1202] before:bg-[#c9f53b]/50"
                                  : "text-sidebar-foreground/55"
                                }
                             `}
@@ -138,7 +138,7 @@ export function NavMain({
                             <Link href={subItem.url}>
                               <span>{subItem.title}</span>
                               {isSubActive && (
-                                <span className="ml-auto h-1 w-1 rounded-full bg-[#c9f53b]" />
+                                <span className="ml-auto h-1 w-1 rounded-full bg-[#586138]" />
                               )}
                             </Link>
                           </SidebarMenuSubButton>

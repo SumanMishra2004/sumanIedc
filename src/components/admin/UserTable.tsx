@@ -79,7 +79,9 @@ export type UserRow = {
 const roleBadgeVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
   STUDENT: "default",
   FACULTY: "secondary",
+  EDITOR: "outline",
   ADMIN: "destructive",
+  SUPERADMIN: "destructive",
 }
 
 export function UserTable({
@@ -312,7 +314,9 @@ export function UserTable({
               <SelectItem value="all">All Roles</SelectItem>
               <SelectItem value="STUDENT">Student</SelectItem>
               <SelectItem value="FACULTY">Faculty</SelectItem>
+              <SelectItem value="EDITOR">Editor</SelectItem>
               <SelectItem value="ADMIN">Admin</SelectItem>
+              <SelectItem value="SUPERADMIN">SuperAdmin</SelectItem>
             </SelectContent>
           </Select>
           <Select value={departmentFilter} onValueChange={setDepartmentFilter}>

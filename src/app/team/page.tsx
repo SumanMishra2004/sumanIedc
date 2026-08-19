@@ -1,10 +1,11 @@
 import prisma from "@/lib/prisma";
 import TeamClient from "./TeamClient";
 import { Metadata } from "next";
-import {
-  getSanityTeamMembers,
+import {  getSanityTeamMembers,
   getTeamPageContent,
 } from "../../../sanity/lib/queries";
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: "Our Team | IEDC Research Lab",

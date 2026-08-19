@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { isAdminOrHigher } from "@/lib/auth/permissions"
 
 // Admin verification helper
 async function requireAdmin() {
   const session = await auth()
-  if (!session?.user || session.user.role !== "ADMIN") {
+  if (!session?.user || !isAdminOrHigher(session.user.role)) {
     return null
   }
   return session

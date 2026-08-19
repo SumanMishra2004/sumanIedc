@@ -87,7 +87,7 @@ export function ProfileStatsRow({ stats, userRole }: ProfileStatsRowProps) {
       accent: "#ef4444",
       bg: "from-red-500/10 to-transparent",
     },
-    ...(userRole === "FACULTY" || userRole === "ADMIN"
+    ...(userRole === "FACULTY" || userRole === "ADMIN" || userRole === "EDITOR" || userRole === "SUPERADMIN"
       ? [
           {
             label: "FDPs",

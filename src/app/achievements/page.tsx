@@ -2,6 +2,8 @@ import prisma from "@/lib/prisma";
 import AchievementsClient from "./AchievementsClient";
 import { Metadata } from "next";
 
+export const dynamic = 'force-dynamic'
+
 export const metadata: Metadata = {
   title: "Cell Achievements | IEDC Research Lab",
   description: "Browse the national hackathon wins, research grants, start-up launch milestones and awards won by IEDC Computer Science & Engineering developers.",

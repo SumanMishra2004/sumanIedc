@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import JournalClient from "./JournalClient";
 import { Metadata } from "next";
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: "Journal Publications | IEDC Research Lab",
   description: "Explore the international peer-reviewed journal articles, impact factors, indexing and research studies published by the faculty and student innovators of IEDC Cell.",
@@ -20,7 +21,7 @@ export default async function JournalPage() {
   const formattedJournals = dbJournals.map((j) => {
     const authors = [
       ...j.facultyAuthors.map((fa) => ({
-        name: fa.user.name || fa.user.email || "Faculty Author",
+        name: fa.user?.name || fa.user?.email || "Faculty Author",
         role: "Faculty",
       })),
       ...j.studentAuthors.map((sa) => ({

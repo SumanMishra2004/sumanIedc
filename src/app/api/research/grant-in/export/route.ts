@@ -170,7 +170,7 @@ export async function GET(req: NextRequest) {
           .join('; ')
         
         const facultyAuthors = grant.facultyAuthors
-          .map(fa => `${fa.user.name} (${fa.user.email})`)
+          .map(fa => `${fa.user?.name ?? 'Unknown'} (${fa.user?.email ?? 'N/A'})`)
           .join('; ')
 
         return [

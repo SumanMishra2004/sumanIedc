@@ -17,10 +17,10 @@ const AUTH_ROUTES      = ['/auth/signin', '/auth/signup']
 const ONBOARDING_ROUTE = '/setup-profile'
 
 const PROTECTED_PREFIXES: Record<string, string[]> = {
-  '/dashboard': ['STUDENT', 'FACULTY', 'ADMIN'],
-  '/student':   ['STUDENT', 'ADMIN'],
-  '/faculty':   ['FACULTY', 'ADMIN'],
-  '/admin':     ['ADMIN'],
+  '/dashboard': ['STUDENT', 'FACULTY', 'EDITOR', 'ADMIN', 'SUPERADMIN'],
+  '/student':   ['STUDENT', 'ADMIN', 'SUPERADMIN'],
+  '/faculty':   ['FACULTY', 'EDITOR', 'ADMIN', 'SUPERADMIN'],
+  '/admin':     ['ADMIN', 'SUPERADMIN'],
 }
 
 function isAuthRoute(pathname: string): boolean {
@@ -69,8 +69,10 @@ export default auth(async function proxy(request: NextRequest) {
 
     // ── 3. Role-based access control ──────────────────────────────────────
     if (!allowedRoles.includes(userRole)) {
-      if (userRole === 'ADMIN')   return NextResponse.redirect(new URL('/admin',   request.url))
-      if (userRole === 'FACULTY') return NextResponse.redirect(new URL('/faculty', request.url))
+      if (userRole === 'SUPERADMIN') return NextResponse.redirect(new URL('/dashboard', request.url))
+      if (userRole === 'ADMIN')   return NextResponse.redirect(new URL('/dashboard', request.url))
+      if (userRole === 'EDITOR')  return NextResponse.redirect(new URL('/dashboard', request.url))
+      if (userRole === 'FACULTY') return NextResponse.redirect(new URL('/dashboard', request.url))
       return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }

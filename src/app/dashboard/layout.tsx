@@ -13,19 +13,20 @@ import { unstable_cache } from "next/cache";
    consistent without constantly hitting the database.
 ----------------------------------------------------------------- */
 function getCachedGrants(userId: string, userRole: string) {
-  // Admins see ALL grants — use a shared tag so any grant mutation revalidates
+  // Admins and SuperAdmins see ALL grants — use a shared tag so any grant mutation revalidates
   // the admin's sidebar. Regular users get a per-user tag.
-  const cacheKey = userRole === "ADMIN" ? "grants-sidebar-all" : `grants-sidebar-${userId}`
+  const isPrivileged = userRole === "ADMIN" || userRole === "SUPERADMIN"
+  const cacheKey = isPrivileged ? "grants-sidebar-all" : `grants-sidebar-${userId}`
 
   return unstable_cache(
     async () => {
       const whereClause: Record<string, unknown> = {};
-      if (userRole === "FACULTY") {
+      if (userRole === "FACULTY" || userRole === "EDITOR") {
         whereClause.facultyAuthors = { some: { userId } };
       } else if (userRole === "STUDENT") {
         whereClause.studentAuthors = { some: { userId } };
       }
-      // ADMIN — no filter, sees all grants
+      // ADMIN / SUPERADMIN — no filter, sees all grants
 
       return prisma.grantIn.findMany({
         where: whereClause,

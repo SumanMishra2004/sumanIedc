@@ -224,7 +224,7 @@ function SignInContent() {
 
             <div className="si-row" style={{ marginTop: 28, paddingTop: 24, borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'center' }}>
               <span style={{ fontSize: 13, color: 'rgba(240,237,230,0.3)' }}>No account?&nbsp;</span>
-              <Link href="/auth/signup" style={{ fontSize: 13, color: '#c9f53b', textDecoration: 'none', fontWeight: 600 }}>Create one</Link>
+              <a href="/auth/signup" style={{ fontSize: 13, color: '#c9f53b', textDecoration: 'none', fontWeight: 600 }}>Create one</a>
             </div>
           </div>
         </div>

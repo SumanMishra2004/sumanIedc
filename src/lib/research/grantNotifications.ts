@@ -100,6 +100,7 @@ export async function notifyGrantApplied(grantId: string) {
     );
 
     for (const entry of piCoPiEntries) {
+      if (!entry.userId || !entry.user) continue
       await sendNotification({
         userId: entry.userId,
         email: entry.user.email,
@@ -131,6 +132,7 @@ export async function notifyGrantApplied(grantId: string) {
     ];
 
     for (const author of allOtherAuthors) {
+      if (!author.id || !author.user) continue
       await sendNotification({
         userId: author.id,
         email: author.user.email,
@@ -218,8 +220,8 @@ export async function notifyGrantStatusUpdated(
     }
 
     const allAuthors = [
-      ...grant.facultyAuthors.map(fa => fa.user),
-      ...grant.studentAuthors.map(sa => sa.user),
+      ...grant.facultyAuthors.map(fa => fa.user).filter((u): u is NonNullable<typeof u> => u !== null),
+      ...grant.studentAuthors.map(sa => sa.user).filter((u): u is NonNullable<typeof u> => u !== null),
     ];
 
     for (const author of allAuthors) {
@@ -273,6 +275,7 @@ export async function notifyBillUploaded(grantId: string, billId: string) {
     );
 
     for (const entry of piCoPiEntries) {
+      if (!entry.userId || !entry.user) continue
       await sendNotification({
         userId: entry.userId,
         email: entry.user.email,

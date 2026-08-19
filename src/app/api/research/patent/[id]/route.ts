@@ -69,7 +69,7 @@ export async function GET(
         author => author.user.email === session.user.email
       )
       const isFacultyAuthor = patent.facultyAuthors.some(
-        author => author.user.email === session.user.email
+        author => author.user?.email === session.user.email
       )
 
       if (!isAdmin && !isStudentAuthor && !isFacultyAuthor) {
@@ -411,7 +411,7 @@ export async function PATCH(
 
     // Create notifications based on status transitions
     const studentUserIds = patent.studentAuthors.map((sa) => sa.userId)
-    const facultyUserIds = patent.facultyAuthors.map((fa) => fa.userId)
+    const facultyUserIds = patent.facultyAuthors.map((fa) => fa.userId).filter((id): id is string => id !== null)
 
     const notifyUser = async (uId: string, title: string, message: string, type: string) => {
       try {
@@ -516,12 +516,12 @@ export async function PATCH(
       } else if (newTeacherStatus === TeacherStatus.UPLOADED) {
         for (const fa of patent.facultyAuthors) {
           await notifyUser(
-            fa.userId,
+            fa.userId ?? '',
             "Patent Resubmitted for Review",
             `A co-authored patent '${patent.title}' has been resubmitted for review.`,
             "PATENT_SUBMITTED"
           )
-          if (fa.user.email) {
+          if (fa.user?.email) {
             await sendNotificationEmail({
               to: fa.user.email,
               recipientName: fa.user.name || "Faculty",
@@ -559,12 +559,12 @@ export async function PATCH(
         }
         for (const fa of patent.facultyAuthors) {
           await notifyUser(
-            fa.userId,
+            fa.userId ?? '',
             "Patent Granted!",
             `The co-authored patent '${patent.title}' has been marked as GRANTED.`,
             "PATENT_PUBLISHED"
           )
-          if (fa.user.email) {
+          if (fa.user?.email) {
             await sendNotificationEmail({
               to: fa.user.email,
               recipientName: fa.user.name || "Faculty",
@@ -580,9 +580,9 @@ export async function PATCH(
         // Broadcast to all users
         if (body.isPublic || existingPatent.isPublic) {
           const allAuthorNames = [
-            ...patent.studentAuthors.map(sa => sa.user.name).filter(Boolean),
-            ...patent.facultyAuthors.map(fa => fa.user.name).filter(Boolean),
-          ] as string[]
+            ...patent.studentAuthors.map(sa => sa.user.name).filter((n): n is string => !!n),
+            ...patent.facultyAuthors.map(fa => fa.user?.name).filter((n): n is string => !!n),
+          ]
           const allAuthorIds = [...studentUserIds, ...facultyUserIds]
 
           broadcastPublicationEmail({

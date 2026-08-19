@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { TeacherStatus, UserRole, JournalStatus } from "@prisma/client"
 import { journalSchema } from "@/lib/validations/journal"
 import { sendNotificationEmail, broadcastPublicationEmail } from "@/lib/mail"
+import { canViewAllResearch, isAdminOrHigher, isFacultyOrHigher } from "@/lib/auth/permissions"
 // GET - Get single journal by ID with permission checks
 export async function GET(
   req: NextRequest,
@@ -53,7 +54,6 @@ export async function GET(
     }
 
     if (!journal.isPublic) {
-      // Private journal - check authorization
       if (!session) {
         return NextResponse.json(
           { error: "Unauthorized - Please sign in to view this journal" },
@@ -61,18 +61,17 @@ export async function GET(
         )
       }
 
-      // Allow admins
-      const isAdmin = session.user.role === UserRole.ADMIN
+      // Allow admin or higher
+      const isPrivileged = canViewAllResearch(session.user.role)
 
-      // Check if user is one of the authors
       const isStudentAuthor = journal.studentAuthors.some(
-        (author) => author.user.email === session.user.email
+        (author) => author.user?.email === session.user.email
       )
       const isFacultyAuthor = journal.facultyAuthors.some(
-        (author) => author.user.email === session.user.email
+        (author) => author.user?.email === session.user.email
       )
 
-      if (!isAdmin && !isStudentAuthor && !isFacultyAuthor) {
+      if (!isPrivileged && !isStudentAuthor && !isFacultyAuthor) {
         return NextResponse.json(
           { error: "Unauthorized to view this journal" },
           { status: 403 }
@@ -157,25 +156,27 @@ export async function PATCH(
       delete body.journalStatus
       delete body.teacherStatus
       delete body.isPublic
-    } else if (userRole === UserRole.FACULTY) {
+    } else if (userRole === UserRole.FACULTY || userRole === UserRole.EDITOR) {
+      // FACULTY and EDITOR act as reviewers — must be in facultyAuthors
       const isAssignedReviewer = existingJournal.facultyAuthors.some(
         (fa) => fa.userId === userId
       )
-      if (!isAssignedReviewer) {
+      // Editors with full oversight can also edit (they're not per-record restricted)
+      if (!isAssignedReviewer && userRole === UserRole.FACULTY) {
         return NextResponse.json(
           { error: "Unauthorized - You are not assigned to review this journal" },
           { status: 403 }
         )
       }
 
-      // Faculty cannot make journal publicly visible
+      // Faculty/Editor cannot make journal publicly visible
       if (body.isPublic === true) {
         return NextResponse.json(
-          { error: "Unauthorized - Faculty cannot make journals public" },
+          { error: "Unauthorized - Only administrators can make journals public" },
           { status: 403 }
         )
       }
-    } else if (userRole !== UserRole.ADMIN) {
+    } else if (!isAdminOrHigher(userRole)) {
       return NextResponse.json(
         { error: "Unauthorized - Invalid user role" },
         { status: 403 }
@@ -191,8 +192,8 @@ export async function PATCH(
 
     // Validation rules for Journal Status
     if (newJournalStatus && newJournalStatus !== currentJournalStatus) {
-      // Only admins can change publication status to PUBLISHED
-      if (newJournalStatus === JournalStatus.PUBLISHED && userRole !== UserRole.ADMIN) {
+      // Only admins (and higher) can change publication status to PUBLISHED
+      if (newJournalStatus === JournalStatus.PUBLISHED && !isAdminOrHigher(userRole)) {
         return NextResponse.json(
           { error: "Only administrators can publish journals" },
           { status: 403 }
@@ -287,7 +288,10 @@ export async function PATCH(
       teacherStatus: body.teacherStatus !== undefined ? body.teacherStatus : existingJournal.teacherStatus,
       isPublic: body.isPublic !== undefined ? body.isPublic : existingJournal.isPublic,
       studentAuthorIds: body.studentAuthorIds !== undefined ? body.studentAuthorIds : existingJournal.studentAuthors.map((sa) => sa.userId),
-      facultyAuthorIds: body.facultyAuthorIds !== undefined ? body.facultyAuthorIds : existingJournal.facultyAuthors.map((fa) => fa.userId),
+      facultyAuthorIds: body.facultyAuthorIds !== undefined ? body.facultyAuthorIds : existingJournal.facultyAuthors.map((fa) => fa.userId).filter(Boolean),
+      // external authors are only accepted on create; on edit we pass empty arrays so schema validates
+      externalFacultyAuthors: [],
+      externalStudentAuthors: [],
     }
 
     const validationResult = journalSchema.safeParse(mergedData)
@@ -454,7 +458,7 @@ export async function PATCH(
 
     // Create notifications based on status transitions
     const studentUserIds = journal.studentAuthors.map((sa) => sa.userId)
-    const facultyUserIds = journal.facultyAuthors.map((fa) => fa.userId)
+    const facultyUserIds = journal.facultyAuthors.map((fa) => fa.userId).filter((id): id is string => id !== null)
 
     const notifyUser = async (uId: string, title: string, message: string, type: string) => {
       try {
@@ -563,12 +567,12 @@ export async function PATCH(
         // Notify faculty co-authors
         for (const fa of journal.facultyAuthors) {
           await notifyUser(
-            fa.userId,
+            fa.userId ?? "",
             "Journal Resubmitted for Review",
             `A co-authored publication '${journal.title}' has been resubmitted for review.`,
             "JOURNAL_SUBMITTED"
           )
-          if (fa.user.email) {
+          if (fa.user?.email) {
             await sendNotificationEmail({
               to: fa.user.email,
               recipientName: fa.user.name || "Faculty",
@@ -608,12 +612,12 @@ export async function PATCH(
         // Notify faculty co-authors
         for (const fa of journal.facultyAuthors) {
           await notifyUser(
-            fa.userId,
+            fa.userId ?? '',
             "Journal Published!",
             `The co-authored publication '${journal.title}' has been successfully published.`,
             "JOURNAL_PUBLISHED"
           )
-          if (fa.user.email) {
+          if (fa.user?.email) {
             await sendNotificationEmail({
               to: fa.user.email,
               recipientName: fa.user.name || "Faculty",
@@ -629,9 +633,9 @@ export async function PATCH(
         // Broadcast to all users
         if (body.isPublic || existingJournal.isPublic) {
           const allAuthorNames = [
-            ...journal.studentAuthors.map(sa => sa.user.name).filter(Boolean),
-            ...journal.facultyAuthors.map(fa => fa.user.name).filter(Boolean),
-          ] as string[]
+            ...journal.studentAuthors.map(sa => sa.user.name).filter((n): n is string => !!n),
+            ...journal.facultyAuthors.map(fa => fa.user?.name).filter((n): n is string => !!n),
+          ]
           const allAuthorIds = [...studentUserIds, ...facultyUserIds]
 
           broadcastPublicationEmail({

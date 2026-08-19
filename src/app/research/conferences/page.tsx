@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import ConferenceClient from "./ConferenceClient";
 import { Metadata } from "next";
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: "Conference Proceedings | IEDC Research Lab",
   description: "Browse the national and international academic conference papers, abstracts, and tech proceedings published by student and faculty developers at IEDC CSE.",
@@ -20,7 +21,7 @@ export default async function ConferencePage() {
   const formattedConferences = dbConferences.map((c) => {
     const authors = [
       ...c.facultyAuthors.map((fa) => ({
-        name: fa.user.name || fa.user.email || "Faculty Author",
+        name: fa.user?.name || fa.user?.email || "Faculty Author",
         role: "Faculty",
       })),
       ...c.studentAuthors.map((sa) => ({

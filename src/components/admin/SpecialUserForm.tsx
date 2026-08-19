@@ -16,12 +16,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { UserPlus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { clearFacultyCache } from "@/lib/faculty-cache"
+import { useSession } from "next-auth/react"
+import { canAssignRole, type UserRoleString } from "@/lib/auth/permissions"
 
 export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
+  const { data: session } = useSession()
+  const actorRole = session?.user?.role ?? 'STUDENT'
+
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<string>("")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
+
+  // Only show roles that the current actor can assign
+  const allRoles: { value: UserRoleString; label: string }[] = [
+    { value: 'STUDENT', label: 'Student' },
+    { value: 'FACULTY', label: 'Faculty' },
+    { value: 'EDITOR', label: 'Editor' },
+    { value: 'ADMIN', label: 'Admin' },
+    { value: 'SUPERADMIN', label: 'SuperAdmin' },
+  ]
+  const assignableRoles = allRoles.filter(r => canAssignRole(actorRole, r.value))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,7 +94,7 @@ export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
           Add Special User
         </CardTitle>
         <CardDescription>
-          Grant Faculty or Admin privileges by email address. Students have these privileges removed automatically.
+          Pre-assign a role to an email address. When the user registers, they will receive this role automatically.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -104,8 +119,9 @@ export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="FACULTY">Faculty</SelectItem>
-                <SelectItem value="ADMIN">Admin</SelectItem>
+                {assignableRoles.map(r => (
+                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -118,8 +134,13 @@ export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
         <div className="mt-6 space-y-2">
           <h3 className="text-sm font-semibold">Role Descriptions:</h3>
           <div className="space-y-2 text-sm text-muted-foreground">
-            <p><span className="font-medium">Faculty:</span> Can manage publications, view admin panels and advanced features</p>
+            <p><span className="font-medium">Student:</span> Default role — can submit research and manage own profile</p>
+            <p><span className="font-medium">Faculty:</span> Can review submissions, participate as co-author, verify co-authorship requests</p>
+            <p><span className="font-medium">Editor:</span> Can review and approve/reject research submissions</p>
             <p><span className="font-medium">Admin:</span> Full system access — user management, access control, statistics</p>
+            {canAssignRole(actorRole, 'SUPERADMIN') && (
+              <p><span className="font-medium">SuperAdmin:</span> Highest authority — can manage admins and all system settings</p>
+            )}
           </div>
         </div>
       </CardContent>

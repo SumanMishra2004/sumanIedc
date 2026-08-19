@@ -71,7 +71,7 @@ export async function GET(
         author => author.user.email === session.user.email
       )
       const isFacultyAuthor = bookChapter.facultyAuthors.some(
-        author => author.user.email === session.user.email
+        author => author.user?.email === session.user.email
       )
 
       if (!isAdmin && !isStudentAuthor && !isFacultyAuthor) {
@@ -274,7 +274,10 @@ export async function PATCH(
       publicationDate: body.publicationDate !== undefined ? body.publicationDate : existingChapter.publicationDate,
       publisher: body.publisher !== undefined ? body.publisher : existingChapter.publisher,
       studentAuthorIds: body.studentAuthorIds !== undefined ? body.studentAuthorIds : existingChapter.studentAuthors.map((sa) => sa.userId),
-      facultyAuthorIds: body.facultyAuthorIds !== undefined ? body.facultyAuthorIds : existingChapter.facultyAuthors.map((fa) => fa.userId),
+      facultyAuthorIds: body.facultyAuthorIds !== undefined ? body.facultyAuthorIds : existingChapter.facultyAuthors.map((fa) => fa.userId).filter(Boolean),
+      // external authors only accepted on create; pass empty so schema validates
+      externalFacultyAuthors: [],
+      externalStudentAuthors: [],
       updateComment: body.updateComment !== undefined ? body.updateComment : existingChapter.updateComment,
     }
 
@@ -409,7 +412,7 @@ export async function PATCH(
 
     // Create notifications based on status transitions
     const studentUserIds = bookChapter.studentAuthors.map((sa) => sa.userId)
-    const facultyUserIds = bookChapter.facultyAuthors.map((fa) => fa.userId)
+    const facultyUserIds = bookChapter.facultyAuthors.map((fa) => fa.userId).filter((id): id is string => id !== null)
 
     const notifyUser = async (uId: string, title: string, message: string, type: string) => {
       try {
@@ -514,12 +517,12 @@ export async function PATCH(
       } else if (newTeacherStatus === TeacherStatus.UPLOADED) {
         for (const fa of bookChapter.facultyAuthors) {
           await notifyUser(
-            fa.userId,
+            fa.userId ?? '',
             "Book Chapter Resubmitted for Review",
             `A co-authored book chapter '${bookChapter.title}' has been resubmitted for review.`,
             "BOOK_CHAPTER_SUBMITTED"
           )
-          if (fa.user.email) {
+          if (fa.user?.email) {
             await sendNotificationEmail({
               to: fa.user.email,
               recipientName: fa.user.name || "Faculty",
@@ -557,12 +560,12 @@ export async function PATCH(
         }
         for (const fa of bookChapter.facultyAuthors) {
           await notifyUser(
-            fa.userId,
+            fa.userId ?? '',
             "Book Chapter Published!",
             `The co-authored book chapter '${bookChapter.title}' has been successfully published.`,
             "BOOK_CHAPTER_PUBLISHED"
           )
-          if (fa.user.email) {
+          if (fa.user?.email) {
             await sendNotificationEmail({
               to: fa.user.email,
               recipientName: fa.user.name || "Faculty",
@@ -578,9 +581,9 @@ export async function PATCH(
         // Broadcast to all users
         if (body.isPublic || existingChapter.isPublic) {
           const allAuthorNames = [
-            ...bookChapter.studentAuthors.map(sa => sa.user.name).filter(Boolean),
-            ...bookChapter.facultyAuthors.map(fa => fa.user.name).filter(Boolean),
-          ] as string[]
+            ...bookChapter.studentAuthors.map(sa => sa.user.name).filter((n): n is string => !!n),
+            ...bookChapter.facultyAuthors.map(fa => fa.user?.name).filter((n): n is string => !!n),
+          ]
           const allAuthorIds = [...studentUserIds, ...facultyUserIds]
 
           broadcastPublicationEmail({

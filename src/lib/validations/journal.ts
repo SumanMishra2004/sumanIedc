@@ -9,7 +9,9 @@ import {
   JournalStatus,
   TeacherStatus
 } from "@prisma/client"
+import { externalAuthorSchema } from "@/lib/validations/book-chapter"
 
+export { externalAuthorSchema }
 export const doiRegex = /^10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+$/
 
 export const journalSchema = z.object({
@@ -133,8 +135,12 @@ export const journalSchema = z.object({
   journalStatus: z.nativeEnum(JournalStatus),
   teacherStatus: z.nativeEnum(TeacherStatus),
   isPublic: z.boolean(),
-  studentAuthorIds: z.array(z.string()).min(1, "At least one student author is required"),
-  facultyAuthorIds: z.array(z.string()).min(1, "At least one faculty author is required"),
+  studentAuthorIds: z.array(z.string()).default([]),
+  facultyAuthorIds: z.array(z.string()).min(1, "At least one faculty author must be selected from the platform"),
+  /** External (unlisted) faculty co-authors */
+  externalFacultyAuthors: z.array(externalAuthorSchema).default([]),
+  /** External (unlisted) student co-authors */
+  externalStudentAuthors: z.array(externalAuthorSchema).default([]),
   updateComment: z.string().trim().nullable().optional(),
 })
 .superRefine((data, ctx) => {
@@ -217,5 +223,41 @@ export const journalSchema = z.object({
       message: "An update comment explaining the required corrections is required",
       path: ["updateComment"],
     })
+  }
+
+  // 8. At least one student author (platform OR external)
+  const hasStudentAuthor =
+    (data.studentAuthorIds && data.studentAuthorIds.length > 0) ||
+    (data.externalStudentAuthors && data.externalStudentAuthors.length > 0)
+  if (!hasStudentAuthor) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "At least one student author is required",
+      path: ["studentAuthorIds"],
+    })
+  }
+
+  // 9. No duplicate external faculty emails
+  if (data.externalFacultyAuthors && data.externalFacultyAuthors.length > 0) {
+    const emails = data.externalFacultyAuthors.map((a) => a.email.toLowerCase())
+    if (new Set(emails).size !== emails.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "External faculty author emails must be unique",
+        path: ["externalFacultyAuthors"],
+      })
+    }
+  }
+
+  // 10. No duplicate external student emails
+  if (data.externalStudentAuthors && data.externalStudentAuthors.length > 0) {
+    const emails = data.externalStudentAuthors.map((a) => a.email.toLowerCase())
+    if (new Set(emails).size !== emails.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "External student author emails must be unique",
+        path: ["externalStudentAuthors"],
+      })
+    }
   }
 })

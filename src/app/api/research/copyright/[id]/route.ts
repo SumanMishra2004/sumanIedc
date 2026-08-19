@@ -67,7 +67,7 @@ export async function GET(
            author => author.user.email === session.user.email
          )
          const isFacultyAuthor = copyright.facultyAuthors.some(
-           author => author.user.email === session.user.email
+           author => author.user?.email === session.user.email
          )
    
          if (!isAdmin && !isStudentAuthor && !isFacultyAuthor) {
@@ -413,7 +413,7 @@ export async function PATCH(
 
     // Create notifications based on status transitions
     const studentUserIds = copyright.studentAuthors.map((sa) => sa.userId)
-    const facultyUserIds = copyright.facultyAuthors.map((fa) => fa.userId)
+    const facultyUserIds = copyright.facultyAuthors.map((fa) => fa.userId).filter((id): id is string => id !== null)
 
     const notifyUser = async (uId: string, title: string, message: string, type: string) => {
       try {
@@ -522,12 +522,12 @@ export async function PATCH(
         // Notify faculty co-authors
         for (const fa of copyright.facultyAuthors) {
           await notifyUser(
-            fa.userId,
+            fa.userId ?? '',
             "Copyright Resubmitted for Review",
             `A co-authored copyright '${copyright.title}' has been resubmitted for review.`,
             "COPYRIGHT_SUBMITTED"
           )
-          if (fa.user.email) {
+          if (fa.user?.email) {
             await sendNotificationEmail({
               to: fa.user.email,
               recipientName: fa.user.name || "Faculty",
@@ -567,12 +567,12 @@ export async function PATCH(
         // Notify faculty co-authors
         for (const fa of copyright.facultyAuthors) {
           await notifyUser(
-            fa.userId,
+            fa.userId ?? '',
             "Copyright Published!",
             `The co-authored copyright '${copyright.title}' has been successfully published.`,
             "COPYRIGHT_PUBLISHED"
           )
-          if (fa.user.email) {
+          if (fa.user?.email) {
             await sendNotificationEmail({
               to: fa.user.email,
               recipientName: fa.user.name || "Faculty",
@@ -588,9 +588,9 @@ export async function PATCH(
         // Broadcast to all users
         if (body.isPublic || existingCopyright.isPublic) {
           const allAuthorNames = [
-            ...copyright.studentAuthors.map(sa => sa.user.name).filter(Boolean),
-            ...copyright.facultyAuthors.map(fa => fa.user.name).filter(Boolean),
-          ] as string[]
+            ...copyright.studentAuthors.map(sa => sa.user.name).filter((n): n is string => !!n),
+            ...copyright.facultyAuthors.map(fa => fa.user?.name).filter((n): n is string => !!n),
+          ]
           const allAuthorIds = [...studentUserIds, ...facultyUserIds]
 
           broadcastPublicationEmail({

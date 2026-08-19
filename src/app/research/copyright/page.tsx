@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import CopyrightClient from "./CopyrightClient";
 import { Metadata } from "next";
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: "Software Copyrights | IEDC Research Lab",
   description: "Browse the registered software codebases, utility algorithms, and database designs copyrighted by student developers and faculty of IEDC CSE.",
@@ -20,7 +21,7 @@ export default async function CopyrightPage() {
   const formattedCopyrights = dbCopyrights.map((c) => {
     const authors = [
       ...c.facultyAuthors.map((fa) => ({
-        name: fa.user.name || fa.user.email || "Faculty Creator",
+        name: fa.user?.name || fa.user?.email || "Faculty Creator",
         role: "Faculty",
       })),
       ...c.studentAuthors.map((sa) => ({

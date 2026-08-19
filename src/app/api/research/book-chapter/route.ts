@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { BookchapterStatus, TeacherStatus, UserRole } from '@prisma/client'
 import { bookChapterSchema } from '@/lib/validations/book-chapter'
 import { sendNotificationEmail } from '@/lib/mail'
+import { canViewAllResearch, isFacultyAuthorRole } from '@/lib/auth/permissions'
 // GET - List all book chapters with filtering, pagination, and search
 export async function GET(req: NextRequest) {
   try {
@@ -46,20 +47,18 @@ export async function GET(req: NextRequest) {
     if (!session) {
       // Not logged in - only public chapters
       where.isPublic = true
-    } else if (session.user.role === UserRole.STUDENT) {
-      // Students see: public chapters OR chapters where they are authors
-      where.OR = [
-        
-        { studentAuthors: { some: { userId: session.user.id } } }
-      ]
+    } else if (canViewAllResearch(session.user.role)) {
+      // EDITOR / ADMIN / SUPERADMIN — no filter, sees everything
     } else if (session.user.role === UserRole.FACULTY) {
-      // Faculty see: public chapters OR chapters where they are authors
       where.OR = [
-
         { facultyAuthors: { some: { userId: session.user.id } } }
       ]
+    } else {
+      // STUDENT
+      where.OR = [
+        { studentAuthors: { some: { userId: session.user.id } } }
+      ]
     }
-    // ADMIN sees everything - no filter needed
 
     // Apply filters
     if (bookChapterStatus) {
@@ -222,14 +221,16 @@ export async function POST(request: Request) {
       publicationDate,
       publisher,
       studentAuthorIds,
-      facultyAuthorIds
+      facultyAuthorIds,
+      externalFacultyAuthors = [],
+      externalStudentAuthors = [],
     } = validation.data
 
     /* -------------------- Validate faculty authors -------------------- */
     const facultyAuthors = await prisma.user.findMany({
       where: {
         id: { in: facultyAuthorIds },
-        role: UserRole.FACULTY
+        role: { in: ['FACULTY', 'EDITOR', 'ADMIN', 'SUPERADMIN'] as UserRole[] },
       }
     })
 
@@ -244,7 +245,7 @@ export async function POST(request: Request) {
     const studentAuthors = await prisma.user.findMany({
       where: {
         id: { in: studentAuthorIds },
-        role: UserRole.STUDENT
+        role: UserRole.STUDENT,
       }
     })
 
@@ -278,7 +279,8 @@ export async function POST(request: Request) {
         },
         facultyAuthors: {
           create: facultyAuthorIds.map((userId: string) => ({
-            userId
+            userId,
+            verificationStatus: 'ACCEPTED',
           }))
         }
       },
@@ -292,7 +294,79 @@ export async function POST(request: Request) {
       }
     })
 
-    // Trigger Notifications for faculty co-authors
+    /* -------------------- External faculty: create verification requests -------------------- */
+    for (const ext of externalFacultyAuthors) {
+      try {
+        const normEmail = ext.email.toLowerCase().trim()
+
+        // Check if this external faculty already has an account
+        const existingUser = await prisma.user.findUnique({
+          where: { email: normEmail },
+          select: { id: true, role: true },
+        })
+        const autoAccept = existingUser &&
+          ['FACULTY', 'EDITOR', 'ADMIN', 'SUPERADMIN'].includes(existingUser.role)
+
+        const crypto = await import('crypto')
+        const verificationToken = crypto.randomBytes(48).toString('hex')
+        const tokenExpiry = new Date(Date.now() + 72 * 60 * 60 * 1000)
+
+        const verificationRequest = await prisma.facultyVerificationRequest.create({
+          data: {
+            researchType: 'BOOK_CHAPTER',
+            researchId: bookChapter.id,
+            facultyName: ext.name,
+            facultyEmail: normEmail,
+            affiliation: ext.affiliation ?? null,
+            department: ext.department ?? null,
+            verificationToken,
+            tokenExpiry,
+            status: autoAccept ? 'ACCEPTED' : 'PENDING',
+            tokenUsed: autoAccept ? true : false,
+            verifiedAt: autoAccept ? new Date() : null,
+            requestedById: session.user.id,
+            linkedFacultyId: autoAccept && existingUser ? existingUser.id : null,
+          },
+        })
+
+        // Add unlisted faculty author row linked to the verification request
+        await prisma.bookChapterTeacherAuthor.create({
+          data: {
+            bookChapterId: bookChapter.id,
+            userId: autoAccept && existingUser ? existingUser.id : null,
+            verificationStatus: autoAccept ? 'ACCEPTED' : 'PENDING',
+            verificationRequestId: verificationRequest.id,
+          },
+        })
+
+        if (!autoAccept) {
+          // Send verification email
+          const { sendFacultyVerificationEmail } = await import('@/lib/mail')
+          const domain = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+          const verifyUrl = `${domain}/faculty-verification?token=${verificationToken}`
+          await sendFacultyVerificationEmail({
+            to: normEmail,
+            facultyName: ext.name,
+            verifyUrl,
+            studentName: session.user.name || 'A student',
+            researchType: 'BOOK_CHAPTER',
+            researchId: bookChapter.id,
+            tokenExpiry,
+          }).catch(err => console.error('[BookChapter] Failed to send verification email:', err))
+        }
+      } catch (err) {
+        console.error('[BookChapter] Failed to process external faculty author:', err)
+      }
+    }
+
+    /* -------------------- External students: store as unlisted student rows -------------------- */
+    // External students are stored for display purposes; they are not platform users.
+    // We store them in the verification request table so admin can see them, but they
+    // do not get a StudentAuthor row (which requires a userId).
+    // Instead we send them a simple notification email if desired.
+    // For now we just log; a future migration can add an externalStudentAuthors JSON column.
+
+    /* -------------------- Notify platform faculty co-authors -------------------- */
     for (const faculty of facultyAuthors) {
       try {
         await prisma.notification.create({
@@ -342,7 +416,7 @@ export async function DELETE(request: Request) {
 
     if (!session?.user || session.user.role === UserRole.STUDENT) {
       return NextResponse.json(
-        { error: 'Unauthorized - Admin or Faculty access required' },
+        { error: 'Unauthorized - Editor or Faculty access required' },
         { status: 403 }
       )
     }

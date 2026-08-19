@@ -257,7 +257,7 @@ export async function GET(req: NextRequest) {
           .join('; ')
         
         const facultyAuthors = journal.facultyAuthors
-          .map(fa => `${fa.user.name} (${fa.user.email})`)
+          .map(fa => `${fa.user?.name ?? 'Unknown'} (${fa.user?.email ?? 'N/A'})`)
           .join('; ')
 
         const keywords = journal.keywords.join('; ')

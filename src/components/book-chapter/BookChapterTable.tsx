@@ -707,7 +707,7 @@ export default function BookChapterTable({
                   <Button
                     variant="secondary"
                     size="sm"
-                    className="shadow-lg bg-white/20 hover:bg-white/30 text-white border-white/30"
+                    className="shadow-lg dark:bg-white/20 bg-[#eff5eb] hover:bg-white/30 dark:text-white text-black border-white/30"
                   >
                     <FileDown className="mr-2 h-4 w-4" />
                     Export

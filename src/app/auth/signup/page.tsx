@@ -291,7 +291,7 @@ export default function SignUpPage() {
 
             <div className="su-row" style={{ marginTop:28,paddingTop:24,borderTop:'1px solid rgba(255,255,255,0.05)',display:'flex',justifyContent:'center' }}>
               <span style={{ fontSize:13,color:'rgba(240,237,230,0.3)' }}>Already have an account?&nbsp;</span>
-              <Link href="/auth/signin" style={{ fontSize:13,color:'#c9f53b',textDecoration:'none',fontWeight:600 }}>Sign in</Link>
+              <a href="/auth/signin" style={{ fontSize:13,color:'#c9f53b',textDecoration:'none',fontWeight:600 }}>Sign in</a>
             </div>
           </div>
         </div>

@@ -4,6 +4,7 @@ import prisma from '@/lib/prisma'
 import { CopyrightStatus, TeacherStatus, UserRole } from '@prisma/client'
 import { copyrightSchema } from '@/lib/validations/copyright'
 import { sendNotificationEmail } from '@/lib/mail'
+import { canViewAllResearch } from '@/lib/auth/permissions'
 // GET - List all copyrights with filtering, pagination, and search
 export async function GET(req: NextRequest) {
   try {
@@ -49,22 +50,21 @@ export async function GET(req: NextRequest) {
 
     // Access control based on role
     if (!session) {
-      // Not logged in - only public copyrights
       where.isPublic = true
-    } else if (session.user.role === UserRole.STUDENT) {
-      // Students see: public copyrights OR copyrights where they are authors
-      where.OR = [
-        { isPublic: true },
-        { studentAuthors: { some: { userId: session.user.id } } }
-      ]
+    } else if (canViewAllResearch(session.user.role)) {
+      // EDITOR / ADMIN / SUPERADMIN — no filter
     } else if (session.user.role === UserRole.FACULTY) {
-      // Faculty see: public copyrights OR copyrights where they are authors
       where.OR = [
         { isPublic: true },
         { facultyAuthors: { some: { userId: session.user.id } } }
       ]
+    } else {
+      // STUDENT
+      where.OR = [
+        { isPublic: true },
+        { studentAuthors: { some: { userId: session.user.id } } }
+      ]
     }
-    // ADMIN sees everything - no filter needed
 
     // Apply filters
     if (copyrightStatus) {
@@ -240,7 +240,7 @@ export async function POST(request: Request) {
     const facultyAuthors = await prisma.user.findMany({
       where: {
         id: { in: data.facultyAuthorIds },
-        role: UserRole.FACULTY
+        role: { in: ['FACULTY', 'EDITOR', 'ADMIN', 'SUPERADMIN'] as UserRole[] },
       }
     })
 
@@ -255,7 +255,7 @@ export async function POST(request: Request) {
     const studentAuthors = await prisma.user.findMany({
       where: {
         id: { in: data.studentAuthorIds },
-        role: UserRole.STUDENT
+        role: UserRole.STUDENT,
       }
     })
 
@@ -309,6 +309,7 @@ export async function POST(request: Request) {
 
     // Notify faculty authors (co-authors / reviewers)
     for (const fa of copyright.facultyAuthors) {
+      if (!fa.userId) continue // skip unlisted faculty with no platform account
       try {
         await prisma.notification.create({
           data: {
@@ -320,7 +321,7 @@ export async function POST(request: Request) {
           },
         })
 
-        if (fa.user.email) {
+        if (fa.user?.email) {
           await sendNotificationEmail({
             to: fa.user.email,
             recipientName: fa.user.name || "Faculty",
@@ -357,7 +358,7 @@ export async function DELETE(request: Request) {
 
     if (!session?.user || session.user.role === UserRole.STUDENT) {
       return NextResponse.json(
-        { error: 'Unauthorized - Admin or Faculty access required' },
+        { error: 'Unauthorized - Editor or Faculty access required' },
         { status: 403 }
       )
     }

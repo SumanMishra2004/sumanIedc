@@ -24,8 +24,8 @@ export async function GET(req: NextRequest) {
     // Build where clause
     const andClauses: object[] = [];
 
-    if (role && ["STUDENT", "FACULTY", "ADMIN"].includes(role.toUpperCase())) {
-      andClauses.push({ role: role.toUpperCase() as "STUDENT" | "FACULTY" | "ADMIN" });
+    if (role && ["STUDENT", "FACULTY", "EDITOR", "ADMIN", "SUPERADMIN"].includes(role.toUpperCase())) {
+      andClauses.push({ role: role.toUpperCase() as "STUDENT" | "FACULTY" | "EDITOR" | "ADMIN" | "SUPERADMIN" });
     }
 
     if (department) {

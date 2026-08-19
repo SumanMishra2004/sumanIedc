@@ -3,7 +3,7 @@
 import * as React from "react"
 import { IconInnerShadowTop } from "@tabler/icons-react"
 import Link from "next/link"
-import { Award, BookOpen, CircleDollarSign, Settings, User2, UserCog, Sparkles } from "lucide-react"
+import { Award, BookOpen, CircleDollarSign, Settings, User2, UserCog, Sparkles, ClipboardCheck } from "lucide-react"
 import { useSession } from "next-auth/react"
 
 import { NavUser } from "@/components/nav-user"
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 import { SidebarNavItem } from "@/types/sidebar"
 import { NavMain } from "./nav-main"
+import { showAdminNav, showFacultyNav, isEditorOrHigher } from "@/lib/auth/permissions"
 
 interface GrantSidebarItem {
   id: string
@@ -30,7 +31,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
   const { data: session } = useSession()
-  const userRole = session?.user?.role
+  const userRole = session?.user?.role ?? 'STUDENT'
 
   const researchItems = [
     { title: "Book Chapters", url: "/dashboard/book-chapters" },
@@ -38,7 +39,7 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
     { title: "Journal", url: "/dashboard/journal" },
     { title: "Conferences", url: "/dashboard/conferences" },
     { title: "Patent", url: "/dashboard/patent" },
-    ...(userRole === "FACULTY" || userRole === "ADMIN"
+    ...(showFacultyNav(userRole)
       ? [{ title: "FDP", url: "/dashboard/fdp" }]
       : []),
   ]
@@ -85,7 +86,17 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
       icon: CircleDollarSign,
       items: grantSubItems,
     },
-    ...(userRole === "ADMIN"
+    // Faculty / Editor: show Co-Author Verification Requests
+    ...(showFacultyNav(userRole)
+      ? [
+          {
+            title: "Co-Author Requests",
+            url: "/dashboard/faculty/verification-requests",
+            icon: ClipboardCheck,
+          },
+        ]
+      : []),
+    ...(showAdminNav(userRole)
       ? [
           {
             title: "Studio",
@@ -99,6 +110,7 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
             items: [
               { title: "All Users", url: "/dashboard/admin/users" },
               { title: "Access Management", url: "/dashboard/admin/special-user" },
+              { title: "Role Management", url: "/dashboard/admin/role-management" },
               { title: "Book Chapter Management", url: "/dashboard/admin/book-chapters" },
               { title: "Journal Management", url: "/dashboard/admin/journals" },
               { title: "Conference Management", url: "/dashboard/admin/conferences" },
@@ -108,6 +120,7 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
               { title: "FDP Management", url: "/dashboard/admin/fdps" },
               { title: "Event Management", url: "/dashboard/admin/events" },
               { title: "Achievement Verification", url: "/dashboard/admin/achievements" },
+              { title: "Verification Records", url: "/dashboard/admin/faculty-verification" },
             ],
           },
         ]

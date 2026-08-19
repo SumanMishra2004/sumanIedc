@@ -14,6 +14,7 @@ import {
 } from "@prisma/client"
 import { journalSchema } from "@/lib/validations/journal"
 import { sendNotificationEmail } from "@/lib/mail"
+import { canViewAllResearch, isAdminOrHigher } from "@/lib/auth/permissions"
 // GET - List all journals with filtering, pagination, and search
 export async function GET(req: NextRequest) {
   try {
@@ -64,22 +65,21 @@ export async function GET(req: NextRequest) {
 
     // Access control based on role
     if (!session) {
-      // Not logged in - only public journals
       where.isPublic = true
-    } else if (session.user.role === UserRole.STUDENT) {
-      // Students see: public journals OR journals where they are authors
-      where.OR = [
-        { isPublic: true },
-        { studentAuthors: { some: { userId: session.user.id } } }
-      ]
+    } else if (canViewAllResearch(session.user.role)) {
+      // EDITOR / ADMIN / SUPERADMIN — no filter, sees all journals
     } else if (session.user.role === UserRole.FACULTY) {
-      // Faculty see: public journals OR journals where they are reviewers/authors
       where.OR = [
         { isPublic: true },
         { facultyAuthors: { some: { userId: session.user.id } } }
       ]
+    } else {
+      // STUDENT
+      where.OR = [
+        { isPublic: true },
+        { studentAuthors: { some: { userId: session.user.id } } }
+      ]
     }
-    // ADMIN sees everything - no filter needed
 
     // Apply filters
     if (journalStatus) {
@@ -307,11 +307,11 @@ export async function POST(request: Request) {
       )
     }
 
-    // Validate faculty authors exist
+    // Validate faculty authors exist and have an appropriate role
     const facultyAuthors = await prisma.user.findMany({
       where: {
         id: { in: data.facultyAuthorIds },
-        role: UserRole.FACULTY
+        role: { in: ['FACULTY', 'EDITOR', 'ADMIN', 'SUPERADMIN'] as UserRole[] },
       }
     })
 
@@ -326,7 +326,7 @@ export async function POST(request: Request) {
     const studentAuthors = await prisma.user.findMany({
       where: {
         id: { in: data.studentAuthorIds },
-        role: UserRole.STUDENT
+        role: UserRole.STUDENT,
       }
     })
 
@@ -373,7 +373,8 @@ export async function POST(request: Request) {
 
         facultyAuthors: {
           create: data.facultyAuthorIds.map((userId: string) => ({
-            userId
+            userId,
+            verificationStatus: 'ACCEPTED',
           }))
         }
       },
@@ -387,8 +388,74 @@ export async function POST(request: Request) {
       }
     })
 
-    // Notify faculty authors (co-authors / reviewers)
+    /* -------------------- External faculty: create verification requests -------------------- */
+    const externalFacultyAuthors = data.externalFacultyAuthors ?? []
+    for (const ext of externalFacultyAuthors) {
+      try {
+        const normEmail = ext.email.toLowerCase().trim()
+
+        // Check if this external faculty already has an account
+        const existingUser = await prisma.user.findUnique({
+          where: { email: normEmail },
+          select: { id: true, role: true },
+        })
+        const autoAccept = existingUser &&
+          ['FACULTY', 'EDITOR', 'ADMIN', 'SUPERADMIN'].includes(existingUser.role)
+
+        const crypto = await import('crypto')
+        const verificationToken = crypto.randomBytes(48).toString('hex')
+        const tokenExpiry = new Date(Date.now() + 72 * 60 * 60 * 1000)
+
+        const verificationRequest = await prisma.facultyVerificationRequest.create({
+          data: {
+            researchType: 'JOURNAL',
+            researchId: journal.id,
+            facultyName: ext.name,
+            facultyEmail: normEmail,
+            affiliation: ext.affiliation ?? null,
+            department: ext.department ?? null,
+            verificationToken,
+            tokenExpiry,
+            status: autoAccept ? 'ACCEPTED' : 'PENDING',
+            tokenUsed: autoAccept ? true : false,
+            verifiedAt: autoAccept ? new Date() : null,
+            requestedById: session.user.id,
+            linkedFacultyId: autoAccept && existingUser ? existingUser.id : null,
+          },
+        })
+
+        // Add unlisted faculty author row linked to the verification request
+        await prisma.journalTeacherAuthor.create({
+          data: {
+            journalId: journal.id,
+            userId: autoAccept && existingUser ? existingUser.id : null,
+            verificationStatus: autoAccept ? 'ACCEPTED' : 'PENDING',
+            verificationRequestId: verificationRequest.id,
+          },
+        })
+
+        if (!autoAccept) {
+          const { sendFacultyVerificationEmail } = await import('@/lib/mail')
+          const domain = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+          const verifyUrl = `${domain}/faculty-verification?token=${verificationToken}`
+          await sendFacultyVerificationEmail({
+            to: normEmail,
+            facultyName: ext.name,
+            verifyUrl,
+            studentName: session.user.name || 'A student',
+            researchType: 'JOURNAL',
+            researchId: journal.id,
+            tokenExpiry,
+          }).catch(err => console.error('[Journal] Failed to send verification email:', err))
+        }
+      } catch (err) {
+        console.error('[Journal] Failed to process external faculty author:', err)
+      }
+    }
+
+    // Notify platform faculty authors (co-authors / reviewers)
     for (const fa of journal.facultyAuthors) {
+      if (!fa.userId) continue // skip unlisted faculty who have no platform account
       try {
         await prisma.notification.create({
           data: {
@@ -400,7 +467,7 @@ export async function POST(request: Request) {
           },
         })
 
-        if (fa.user.email) {
+        if (fa.user?.email) {
           await sendNotificationEmail({
             to: fa.user.email,
             recipientName: fa.user.name || "Faculty",
@@ -462,8 +529,8 @@ export async function DELETE(request: Request) {
       )
     }
 
-    // Faculty role can only delete journals they are reviewing/assigned to
-    if (userRole === UserRole.FACULTY) {
+    // Faculty/Editor can only delete journals they are assigned to
+    if (userRole === UserRole.FACULTY || userRole === UserRole.EDITOR) {
       const journals = await prisma.journal.findMany({
         where: { id: { in: ids } },
         include: { facultyAuthors: true }
@@ -481,7 +548,7 @@ export async function DELETE(request: Request) {
       }
     }
 
-    // Delete journals (cascade will delete authors)
+    // ADMIN / SUPERADMIN can delete any
     const result = await prisma.journal.deleteMany({
       where: {
         id: {

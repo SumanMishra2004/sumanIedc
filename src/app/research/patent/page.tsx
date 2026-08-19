@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import PatentClient from "./PatentClient";
 import { Metadata } from "next";
 
+export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: "Patents & IP | IEDC Research Lab",
   description: "Browse the utility and design patents, technology disclosures, and industrial designs registered by student and faculty inventors at the IEDC.",
@@ -20,7 +21,7 @@ export default async function PatentPage() {
   const formattedPatents = dbPatents.map((p) => {
     const inventors = [
       ...p.facultyAuthors.map((fa) => ({
-        name: fa.user.name || fa.user.email || "Faculty Inventor",
+        name: fa.user?.name || fa.user?.email || "Faculty Inventor",
         role: "Faculty",
       })),
       ...p.studentAuthors.map((sa) => ({
