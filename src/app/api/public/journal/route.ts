@@ -50,19 +50,12 @@ export async function GET(req: NextRequest) {
     // Build where clause
     const where: any = {}
 
-   where.isPublic = true // Only show public journals by default
-    // Apply filters
-    if (journalStatus) {
-      where.journalStatus = journalStatus as JournalStatus
-    }
+    // HARD LOCK: public API ALWAYS filters to isPublic=true and PUBLISHED status.
+    // Client cannot override these via query params — doing so would leak private records.
+    where.isPublic      = true
+    where.journalStatus = 'PUBLISHED'
 
-    if (teacherStatus) {
-      where.teacherStatus = teacherStatus as TeacherStatus
-    }
-
-    if (isPublic !== null && isPublic !== undefined) {
-      where.isPublic = isPublic === 'true'
-    }
+    // Apply safe filters (client cannot override isPublic or journalStatus)
 
     if (scope) {
       where.scope = scope as JournalScope

@@ -1,674 +1,254 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
-import prisma from '@/lib/prisma'
-import { UserRole, TeacherStatus, BookchapterStatus } from '@prisma/client'
-import { bookChapterSchema } from '@/lib/validations/book-chapter'
-import { sendNotificationEmail, broadcastPublicationEmail } from '@/lib/mail'
+/**
+ * GET  /api/research/book-chapter/[id]
+ * PATCH /api/research/book-chapter/[id]
+ * DELETE /api/research/book-chapter/[id]
+ *
+ * Security: IDOR-safe (userId comparison), workflow engine, field allowlists,
+ * EDITOR+ publish authority, audit logging, 401/403/404 semantics.
+ */
 
-// GET - Get single book chapter by ID with permission checks
+import { NextRequest, NextResponse } from 'next/server'
+import prisma from '@/lib/prisma'
+import { requireAuth, getClientIp } from '@/lib/auth/guard'
+import { canViewAllResearch, canPublishContent } from '@/lib/auth/permissions'
+import { pickAllowedFields, getResearchUpdateAllowlist } from '@/lib/auth/field-allowlists'
+import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+import {
+  canReadResearch,
+  canWriteResearch,
+  isLockedForStudent,
+  validateResearchStatusChange,
+  dispatchResearchStatusNotifications,
+  auditResearchChange,
+  allAuthorUserIds,
+} from '@/lib/research/researchRouteHelpers'
+import { TeacherStatus, BookchapterStatus, UserRole } from '@prisma/client'
+import { broadcastPublicationEmail } from '@/lib/mail'
+
+// ─── GET ──────────────────────────────────────────────────────────────────────
+
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth()
     const { id } = await params
 
-    const bookChapter = await prisma.bookChapter.findUnique({
+    const chapter = await prisma.bookChapter.findUnique({
       where: { id },
       include: {
         studentAuthors: {
           include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-                department: true,
-              }
-            }
-          }
+            user: { select: { id: true, name: true, email: true, image: true, department: true } },
+          },
         },
         facultyAuthors: {
           include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-                department: true,
-              }
-            }
-          }
-        }
-      }
+            user: { select: { id: true, name: true, email: true, image: true, department: true } },
+          },
+        },
+      },
     })
 
-    if (!bookChapter) {
-      return NextResponse.json(
-        { error: 'Book chapter not found' },
-        { status: 404 }
-      )
+    if (!chapter) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    if (chapter.isPublic && chapter.bookChapterStatus === BookchapterStatus.PUBLISHED) {
+      return NextResponse.json({ bookChapter: chapter })
     }
 
-    // Access control - check if user can view
-    if (!bookChapter.isPublic) {
-      // Private chapter - check authorization
-      if (!session) {
-        return NextResponse.json(
-          { error: 'Unauthorized - Please sign in to view this book chapter' },
-          { status: 401 }
-        )
-      }
+    const guard = await requireAuth(req)
+    if (!guard.ok) return guard.response
+    const { session } = guard
 
-      // Allow admins
-      const isAdmin = session.user.role === UserRole.ADMIN
-
-      // Check if user is one of the authors
-      const isStudentAuthor = bookChapter.studentAuthors.some(
-        author => author.user.email === session.user.email
-      )
-      const isFacultyAuthor = bookChapter.facultyAuthors.some(
-        author => author.user?.email === session.user.email
-      )
-
-      if (!isAdmin && !isStudentAuthor && !isFacultyAuthor) {
-        return NextResponse.json(
-          { error: 'Unauthorized to view this book chapter' },
-          { status: 403 }
-        )
+    if (!canViewAllResearch(session.user.role)) {
+      if (!canReadResearch(session.user, { studentAuthors: chapter.studentAuthors, facultyAuthors: chapter.facultyAuthors })) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 })
       }
     }
 
-    return NextResponse.json({ bookChapter })
+    return NextResponse.json({ bookChapter: chapter })
   } catch (error) {
-    console.error('Error fetching book chapter:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('[BookChapter GET]', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// PATCH - Update book chapter with role, transition validation and Zod schema
+// ─── PATCH ────────────────────────────────────────────────────────────────────
+
 export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth()
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
+    const guard = await requireAuth(req)
+    if (!guard.ok) return guard.response
+    const { session } = guard
     const { id } = await params
-    const body = await request.json()
+    const body = await req.json()
+    const { role, id: userId } = session.user
+    const ip = await getClientIp(req)
 
-    // 1. Fetch current book chapter status & author mapping
-    const existingChapter = await prisma.bookChapter.findUnique({
+    const existing = await prisma.bookChapter.findUnique({
       where: { id },
-      include: {
-        studentAuthors: true,
-        facultyAuthors: true,
-      }
+      include: { studentAuthors: true, facultyAuthors: true },
     })
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    if (!existingChapter) {
-      return NextResponse.json(
-        { error: 'Book chapter not found' },
-        { status: 404 }
-      )
+    if (!canWriteResearch(session.user, existing)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    const userRole = session.user.role
-    const userId = session.user.id
-
-    // 2. Validate user role permissions to modify this specific chapter
-    if (userRole === UserRole.STUDENT) {
-      const isAuthor = existingChapter.studentAuthors.some(
-        (sa) => sa.userId === userId
-      )
-      if (!isAuthor) {
-        return NextResponse.json(
-          { error: "Unauthorized - You can only edit your own book chapters" },
-          { status: 403 }
-        )
-      }
-
-      // Students can only edit before publication and when requested update or newly uploaded
-      const isLocked =
-        existingChapter.bookChapterStatus === BookchapterStatus.PUBLISHED ||
-        existingChapter.teacherStatus === TeacherStatus.ACCEPTED ||
-        existingChapter.teacherStatus === TeacherStatus.REJECTED ||
-        existingChapter.teacherStatus === TeacherStatus.PUBLISHED
-
-      if (isLocked) {
-        return NextResponse.json(
-          { error: "This book chapter is locked and cannot be edited by students" },
-          { status: 403 }
-        )
-      }
-
-      // Prevent student from updating status fields directly
-      delete body.bookChapterStatus
-      delete body.teacherStatus
-      delete body.isPublic
-    } else if (userRole === UserRole.FACULTY) {
-      const isAssigned = existingChapter.facultyAuthors.some(
-        (fa) => fa.userId === userId
-      )
-      if (!isAssigned) {
-        return NextResponse.json(
-          { error: "Unauthorized - You are not assigned to review this book chapter" },
-          { status: 403 }
-        )
-      }
-
-      // Faculty cannot make chapter public directly
-      if (body.isPublic === true) {
-        return NextResponse.json(
-          { error: "Unauthorized - Faculty cannot make book chapters public" },
-          { status: 403 }
-        )
-      }
-    } else if (userRole !== UserRole.ADMIN) {
-      return NextResponse.json(
-        { error: "Unauthorized - Invalid user role" },
-        { status: 403 }
-      )
-    }
-
-    // 3. Enforce and automate Status transitions
-    const currentChapterStatus = existingChapter.bookChapterStatus
-    const currentTeacherStatus = existingChapter.teacherStatus
-
-    const newChapterStatus = body.bookChapterStatus as BookchapterStatus | undefined
-    const newTeacherStatus = body.teacherStatus as TeacherStatus | undefined
-
-    // Validation rules for Chapter Status
-    if (newChapterStatus && newChapterStatus !== currentChapterStatus) {
-      // Only admins can change status to PUBLISHED
-      if (newChapterStatus === BookchapterStatus.PUBLISHED && userRole !== UserRole.ADMIN) {
-        return NextResponse.json(
-          { error: "Only administrators can publish book chapters" },
-          { status: 403 }
-        )
-      }
-
-      // Disallow transitions out of PUBLISHED
-      if (currentChapterStatus === BookchapterStatus.PUBLISHED) {
-        return NextResponse.json(
-          { error: "Cannot modify status of a published book chapter" },
-          { status: 400 }
-        )
+    if (role === UserRole.STUDENT) {
+      if (isLockedForStudent(existing.teacherStatus, existing.bookChapterStatus === BookchapterStatus.PUBLISHED)) {
+        return NextResponse.json({ error: 'This book chapter is locked and cannot be edited at this stage' }, { status: 403 })
       }
     }
 
-    // Validation rules for Teacher Status
-    if (newTeacherStatus && newTeacherStatus !== currentTeacherStatus) {
-      // Disallow: REJECTED -> ACCEPTED
-      if (currentTeacherStatus === TeacherStatus.REJECTED && newTeacherStatus === TeacherStatus.ACCEPTED) {
-        return NextResponse.json(
-          { error: "Cannot transition status from REJECTED to ACCEPTED" },
-          { status: 400 }
-        )
+    const allowlist = getResearchUpdateAllowlist('book-chapter', role)
+    const safeBody  = pickAllowedFields(body, allowlist) as Record<string, unknown>
+
+    const wantsStudentUpdate  = Array.isArray(body.studentAuthorIds)
+    const wantsFacultyUpdate  = Array.isArray(body.facultyAuthorIds)
+
+    const newTeacherStatus  = safeBody.teacherStatus as TeacherStatus | undefined
+    const newChapterStatus  = safeBody.bookChapterStatus as BookchapterStatus | undefined
+
+    const statusResult = validateResearchStatusChange(
+      role, 'book-chapter',
+      existing.teacherStatus, existing.bookChapterStatus,
+      newTeacherStatus, newChapterStatus,
+    )
+    if (statusResult.error) return statusResult.error
+
+    // Automated side-effects
+    if (role === UserRole.STUDENT && existing.teacherStatus === TeacherStatus.UPDATE) {
+      safeBody.teacherStatus = TeacherStatus.UPLOADED
+      safeBody.updateComment = null
+    }
+    if (statusResult.impliedMainStatus) safeBody.bookChapterStatus = statusResult.impliedMainStatus
+
+    const resolvedStatus = (safeBody.bookChapterStatus ?? existing.bookChapterStatus) as BookchapterStatus
+    if (resolvedStatus === BookchapterStatus.PUBLISHED) {
+      if (!canPublishContent(role)) {
+        return NextResponse.json({ error: 'Forbidden — only EDITOR or higher can publish' }, { status: 403 })
       }
+      safeBody.isPublic      = true
+      safeBody.teacherStatus = TeacherStatus.PUBLISHED
+    }
 
-      // Disallow: PUBLISHED -> ACCEPTED/UPDATE
-      if (currentTeacherStatus === TeacherStatus.PUBLISHED) {
-        if (newTeacherStatus === TeacherStatus.UPDATE || newTeacherStatus === TeacherStatus.ACCEPTED) {
-          return NextResponse.json(
-            { error: `Cannot transition from PUBLISHED to ${newTeacherStatus}` },
-            { status: 400 }
-          )
-        }
-      }
-
-      // Lock rejected
-      if (currentTeacherStatus === TeacherStatus.REJECTED) {
-        return NextResponse.json(
-          { error: "This book chapter is rejected and locked" },
-          { status: 400 }
-        )
+    // Author validation
+    if (wantsStudentUpdate) {
+      const sIds: string[] = body.studentAuthorIds
+      if (new Set(sIds).size !== sIds.length) return NextResponse.json({ error: 'Duplicate student authors' }, { status: 400 })
+      const valid = await prisma.user.findMany({ where: { id: { in: sIds }, role: UserRole.STUDENT } })
+      if (valid.length !== sIds.length) return NextResponse.json({ error: 'One or more student authors are invalid' }, { status: 400 })
+      if (role === UserRole.STUDENT && !sIds.includes(userId)) {
+        return NextResponse.json({ error: 'You must remain listed as an author' }, { status: 400 })
       }
     }
-
-    // Automated transitions
-    // Student edits own chapter under UPDATE -> teacherStatus changes back to UPLOADED, clear updateComment
-    if (userRole === UserRole.STUDENT && currentTeacherStatus === TeacherStatus.UPDATE) {
-      body.teacherStatus = TeacherStatus.UPLOADED
-      body.updateComment = null
-    }
-
-    // Accept: teacherStatus = ACCEPTED -> bookChapterStatus becomes UNDER_REVIEW (ready for admin)
-    if (newTeacherStatus === TeacherStatus.ACCEPTED) {
-      body.bookChapterStatus = BookchapterStatus.UNDER_REVIEW
-    }
-
-    // Admin publication approval: bookChapterStatus = PUBLISHED -> isPublic becomes true
-    if (newChapterStatus === BookchapterStatus.PUBLISHED) {
-      body.isPublic = true
-      body.teacherStatus = TeacherStatus.PUBLISHED
-    }
-
-    // 4. Validate final merged record against Zod Schema
-    const mergedData = {
-      title: body.title !== undefined ? body.title : existingChapter.title,
-      abstract: body.abstract !== undefined ? body.abstract : existingChapter.abstract,
-      imageUrl: body.imageUrl !== undefined ? body.imageUrl : existingChapter.imageUrl,
-      documentUrl: body.documentUrl !== undefined ? body.documentUrl : existingChapter.documentUrl,
-      bookChapterStatus: body.bookChapterStatus !== undefined ? body.bookChapterStatus : existingChapter.bookChapterStatus,
-      teacherStatus: body.teacherStatus !== undefined ? body.teacherStatus : existingChapter.teacherStatus,
-      isbnIssn: body.isbnIssn !== undefined ? body.isbnIssn : existingChapter.isbnIssn,
-      registrationFees: body.registrationFees !== undefined ? (body.registrationFees ? parseFloat(body.registrationFees) : null) : existingChapter.registrationFees,
-      reimbursement: body.reimbursement !== undefined ? (body.reimbursement ? parseFloat(body.reimbursement) : null) : existingChapter.reimbursement,
-      isPublic: body.isPublic !== undefined ? body.isPublic : existingChapter.isPublic,
-      keywords: body.keywords !== undefined ? body.keywords : existingChapter.keywords,
-      doi: body.doi !== undefined ? body.doi : existingChapter.doi,
-      publicationDate: body.publicationDate !== undefined ? body.publicationDate : existingChapter.publicationDate,
-      publisher: body.publisher !== undefined ? body.publisher : existingChapter.publisher,
-      studentAuthorIds: body.studentAuthorIds !== undefined ? body.studentAuthorIds : existingChapter.studentAuthors.map((sa) => sa.userId),
-      facultyAuthorIds: body.facultyAuthorIds !== undefined ? body.facultyAuthorIds : existingChapter.facultyAuthors.map((fa) => fa.userId).filter(Boolean),
-      // external authors only accepted on create; pass empty so schema validates
-      externalFacultyAuthors: [],
-      externalStudentAuthors: [],
-      updateComment: body.updateComment !== undefined ? body.updateComment : existingChapter.updateComment,
-    }
-
-    const validationResult = bookChapterSchema.safeParse(mergedData)
-    if (!validationResult.success) {
-      return NextResponse.json(
-        { error: validationResult.error.issues[0].message, details: validationResult.error.issues },
-        { status: 400 }
-      )
-    }
-
-    // 5. Check database author ids validity (if modified)
-    if (body.studentAuthorIds) {
-      const validStudents = await prisma.user.findMany({
-        where: {
-          id: { in: body.studentAuthorIds },
-          role: UserRole.STUDENT,
-        }
+    if (wantsFacultyUpdate) {
+      const fIds: string[] = body.facultyAuthorIds
+      if (new Set(fIds).size !== fIds.length) return NextResponse.json({ error: 'Duplicate faculty authors' }, { status: 400 })
+      const valid = await prisma.user.findMany({
+        where: { id: { in: fIds }, role: { in: ['FACULTY','EDITOR','ADMIN','SUPERADMIN'] as UserRole[] } },
       })
-      if (validStudents.length !== body.studentAuthorIds.length) {
-        return NextResponse.json(
-          { error: "One or more student authors are invalid" },
-          { status: 400 }
-        )
-      }
-      if (userRole === UserRole.STUDENT && !body.studentAuthorIds.includes(userId)) {
-        return NextResponse.json(
-          { error: "You must remain listed as an author on your own publication" },
-          { status: 400 }
-        )
-      }
+      if (valid.length !== fIds.length) return NextResponse.json({ error: 'One or more faculty authors are invalid' }, { status: 400 })
     }
 
-    if (body.facultyAuthorIds) {
-      const validFaculty = await prisma.user.findMany({
-        where: {
-          id: { in: body.facultyAuthorIds },
-          role: UserRole.FACULTY,
-        }
-      })
-      if (validFaculty.length !== body.facultyAuthorIds.length) {
-        return NextResponse.json(
-          { error: "One or more faculty authors are invalid" },
-          { status: 400 }
-        )
-      }
-    }
+    const updateData: Record<string, unknown> = { ...safeBody }
+    if (safeBody.publicationDate !== undefined) updateData.publicationDate = safeBody.publicationDate ? new Date(safeBody.publicationDate as string) : null
+    if (safeBody.registrationFees !== undefined) updateData.registrationFees = safeBody.registrationFees ? parseFloat(safeBody.registrationFees as string) : null
+    if (safeBody.reimbursement !== undefined) updateData.reimbursement = safeBody.reimbursement ? parseFloat(safeBody.reimbursement as string) : null
 
-    // 6. Perform update
-    const updateData: any = {}
-    const directFields = [
-      "title",
-      "abstract",
-      "imageUrl",
-      "documentUrl",
-      "bookChapterStatus",
-      "teacherStatus",
-      "isbnIssn",
-      "isPublic",
-      "keywords",
-      "doi",
-      "publisher",
-      "updateComment",
-    ]
-
-    for (const field of directFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field]
-      }
+    if (wantsStudentUpdate) {
+      await prisma.bookChapterStudentAuthor.deleteMany({ where: { bookChapterId: id } })
+      updateData.studentAuthors = { create: (body.studentAuthorIds as string[]).map((uId) => ({ userId: uId })) }
     }
-
-    if (body.publicationDate !== undefined) {
-      updateData.publicationDate = body.publicationDate ? new Date(body.publicationDate) : null
-    }
-    if (body.registrationFees !== undefined) {
-      updateData.registrationFees = body.registrationFees ? parseFloat(body.registrationFees) : null
-    }
-    if (body.reimbursement !== undefined) {
-      updateData.reimbursement = body.reimbursement ? parseFloat(body.reimbursement) : null
-    }
-
-    if (body.studentAuthorIds !== undefined) {
-      await prisma.bookChapterStudentAuthor.deleteMany({
-        where: { bookChapterId: id }
-      })
-      updateData.studentAuthors = {
-        create: body.studentAuthorIds.map((uId: string) => ({
-          userId: uId,
-        }))
-      }
-    }
-
-    if (body.facultyAuthorIds !== undefined) {
-      await prisma.bookChapterTeacherAuthor.deleteMany({
-        where: { bookChapterId: id }
-      })
+    if (wantsFacultyUpdate) {
+      await prisma.bookChapterTeacherAuthor.deleteMany({ where: { bookChapterId: id } })
       updateData.facultyAuthors = {
-        create: body.facultyAuthorIds.map((uId: string) => ({
-          userId: uId,
-        }))
+        create: (body.facultyAuthorIds as string[]).map((uId) => ({ userId: uId, verificationStatus: 'ACCEPTED' })),
       }
     }
 
-    const bookChapter = await prisma.bookChapter.update({
+    const chapter = await prisma.bookChapter.update({
       where: { id },
       data: updateData,
       include: {
-        studentAuthors: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
-          }
-        },
-        facultyAuthors: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true
-              }
-            }
-          }
-        }
-      }
+        studentAuthors: { include: { user: { select: { id: true, name: true, email: true } } } },
+        facultyAuthors: { include: { user: { select: { id: true, name: true, email: true } } } },
+      },
     })
 
-    // Create notifications based on status transitions
-    const studentUserIds = bookChapter.studentAuthors.map((sa) => sa.userId)
-    const facultyUserIds = bookChapter.facultyAuthors.map((fa) => fa.userId).filter((id): id is string => id !== null)
-
-    const notifyUser = async (uId: string, title: string, message: string, type: string) => {
-      try {
-        await prisma.notification.create({
-          data: {
-            userId: uId,
-            title,
-            message,
-            type,
-            link: `/dashboard/book-chapters?id=${id}`,
-          }
-        })
-      } catch (err) {
-        console.error("Failed to create notification for user", uId, err)
-      }
+    const resolvedTeacher = (updateData.teacherStatus ?? existing.teacherStatus) as TeacherStatus
+    const resolvedMain    = (updateData.bookChapterStatus ?? existing.bookChapterStatus) as BookchapterStatus
+    if (resolvedTeacher !== existing.teacherStatus || resolvedMain !== existing.bookChapterStatus) {
+      await auditResearchChange({
+        session: session as { user: { id: string; email: string; role: string } },
+        resourceType: 'BookChapter', resourceId: id,
+        oldStatus: `${existing.teacherStatus}/${existing.bookChapterStatus}`,
+        newStatus: `${resolvedTeacher}/${resolvedMain}`,
+        action: resolvedMain === BookchapterStatus.PUBLISHED ? AuditActions.RESEARCH_PUBLISHED : AuditActions.RESEARCH_APPROVED,
+        ipAddress: ip,
+      })
     }
 
-    // Trigger status transition notifications
-    if (newTeacherStatus && newTeacherStatus !== currentTeacherStatus) {
-      if (newTeacherStatus === TeacherStatus.ACCEPTED) {
-        for (const sa of bookChapter.studentAuthors) {
-          await notifyUser(
-            sa.userId,
-            "Book Chapter Approved by Faculty",
-            `Your book chapter '${bookChapter.title}' has been accepted by the faculty reviewer.`,
-            "BOOK_CHAPTER_APPROVED"
-          )
-          if (sa.user.email) {
-            await sendNotificationEmail({
-              to: sa.user.email,
-              recipientName: sa.user.name || "Student",
-              type: "APPROVED",
-              resourceType: "book-chapter",
-              resourceTitle: bookChapter.title,
-              dashboardLink: `/dashboard/book-chapters?id=${id}`,
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-        // Notify Admins
-        const admins = await prisma.user.findMany({
-          where: { role: UserRole.ADMIN },
-          select: { id: true, email: true, name: true }
-        })
-        for (const admin of admins) {
-          await notifyUser(
-            admin.id,
-            "Book Chapter Ready for Publication",
-            `The book chapter '${bookChapter.title}' has been approved by the reviewer and is ready for final publication.`,
-            "BOOK_CHAPTER_APPROVED"
-          )
-          if (admin.email) {
-            await sendNotificationEmail({
-              to: admin.email,
-              recipientName: admin.name || "Admin",
-              type: "APPROVED",
-              resourceType: "book-chapter",
-              resourceTitle: bookChapter.title,
-              dashboardLink: `/dashboard/book-chapters?id=${id}`,
-              isAdminNotification: true,
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-      } else if (newTeacherStatus === TeacherStatus.UPDATE) {
-        for (const sa of bookChapter.studentAuthors) {
-          await notifyUser(
-            sa.userId,
-            "Revision Requested for Book Chapter",
-            `The reviewer requested corrections for '${bookChapter.title}'. Reason: ${body.updateComment || "Please view details."}`,
-            "BOOK_CHAPTER_UPDATE_REQUESTED"
-          )
-          if (sa.user.email) {
-            await sendNotificationEmail({
-              to: sa.user.email,
-              recipientName: sa.user.name || "Student",
-              type: "REVISION",
-              resourceType: "book-chapter",
-              resourceTitle: bookChapter.title,
-              dashboardLink: `/dashboard/book-chapters?id=${id}`,
-              message: body.updateComment || "Please view details.",
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-      } else if (newTeacherStatus === TeacherStatus.REJECTED) {
-        for (const sa of bookChapter.studentAuthors) {
-          await notifyUser(
-            sa.userId,
-            "Book Chapter Rejected",
-            `Your book chapter '${bookChapter.title}' was rejected by the reviewer.`,
-            "BOOK_CHAPTER_REJECTED"
-          )
-          if (sa.user.email) {
-            await sendNotificationEmail({
-              to: sa.user.email,
-              recipientName: sa.user.name || "Student",
-              type: "REJECTED",
-              resourceType: "book-chapter",
-              resourceTitle: bookChapter.title,
-              dashboardLink: `/dashboard/book-chapters?id=${id}`,
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-      } else if (newTeacherStatus === TeacherStatus.UPLOADED) {
-        for (const fa of bookChapter.facultyAuthors) {
-          await notifyUser(
-            fa.userId ?? '',
-            "Book Chapter Resubmitted for Review",
-            `A co-authored book chapter '${bookChapter.title}' has been resubmitted for review.`,
-            "BOOK_CHAPTER_SUBMITTED"
-          )
-          if (fa.user?.email) {
-            await sendNotificationEmail({
-              to: fa.user.email,
-              recipientName: fa.user.name || "Faculty",
-              type: "SUBMITTED",
-              resourceType: "book-chapter",
-              resourceTitle: bookChapter.title,
-              dashboardLink: `/dashboard/book-chapters?id=${id}`,
-              submittedBy: session.user.name || "A team member",
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-      }
+    const authorIds = allAuthorUserIds(chapter.studentAuthors, chapter.facultyAuthors)
+    await dispatchResearchStatusNotifications({
+      resourceType: 'book-chapter', resourceId: id, title: chapter.title,
+      oldTeacherStatus: existing.teacherStatus, newTeacherStatus: updateData.teacherStatus as TeacherStatus | undefined,
+      oldMainStatus: existing.bookChapterStatus, newMainStatus: updateData.bookChapterStatus as string | undefined,
+      updateComment: updateData.updateComment as string | null | undefined,
+      allAuthorIds: authorIds, sessionUserId: userId, sessionRole: role,
+    })
+
+    if (resolvedMain === BookchapterStatus.PUBLISHED) {
+      broadcastPublicationEmail({
+        resourceType: 'book-chapter', resourceTitle: chapter.title, resourceId: id,
+        authors: [...chapter.studentAuthors.map(sa => sa.user.name), ...chapter.facultyAuthors.map(fa => fa.user?.name)].filter(Boolean) as string[],
+        excludeUserIds: authorIds,
+      }).catch(() => {})
     }
 
-    if (newChapterStatus && newChapterStatus !== currentChapterStatus) {
-      if (newChapterStatus === BookchapterStatus.PUBLISHED) {
-        for (const sa of bookChapter.studentAuthors) {
-          await notifyUser(
-            sa.userId,
-            "Book Chapter Published!",
-            `Your book chapter '${bookChapter.title}' has been successfully verified and published by the administrator.`,
-            "BOOK_CHAPTER_PUBLISHED"
-          )
-          if (sa.user.email) {
-            await sendNotificationEmail({
-              to: sa.user.email,
-              recipientName: sa.user.name || "Student",
-              type: "PUBLISHED",
-              resourceType: "book-chapter",
-              resourceTitle: bookChapter.title,
-              dashboardLink: `/dashboard/book-chapters?id=${id}`,
-              publicLink: `/publications/book-chapters?id=${id}`,
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-        for (const fa of bookChapter.facultyAuthors) {
-          await notifyUser(
-            fa.userId ?? '',
-            "Book Chapter Published!",
-            `The co-authored book chapter '${bookChapter.title}' has been successfully published.`,
-            "BOOK_CHAPTER_PUBLISHED"
-          )
-          if (fa.user?.email) {
-            await sendNotificationEmail({
-              to: fa.user.email,
-              recipientName: fa.user.name || "Faculty",
-              type: "PUBLISHED",
-              resourceType: "book-chapter",
-              resourceTitle: bookChapter.title,
-              dashboardLink: `/dashboard/book-chapters?id=${id}`,
-              publicLink: `/publications/book-chapters?id=${id}`,
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-        
-        // Broadcast to all users
-        if (body.isPublic || existingChapter.isPublic) {
-          const allAuthorNames = [
-            ...bookChapter.studentAuthors.map(sa => sa.user.name).filter((n): n is string => !!n),
-            ...bookChapter.facultyAuthors.map(fa => fa.user?.name).filter((n): n is string => !!n),
-          ]
-          const allAuthorIds = [...studentUserIds, ...facultyUserIds]
-
-          broadcastPublicationEmail({
-            resourceType: "book-chapter",
-            resourceTitle: bookChapter.title,
-            resourceId: id,
-            authors: allAuthorNames,
-            excludeUserIds: allAuthorIds,
-          }).catch(err => console.error("[Email] Broadcast failed:", err))
-        }
-      }
-    }
-
-    return NextResponse.json({ bookChapter })
+    return NextResponse.json({ bookChapter: chapter })
   } catch (error) {
-    console.error('Error updating book chapter:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('[BookChapter PATCH]', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// DELETE - Delete single book chapter with permission verification
+// ─── DELETE ───────────────────────────────────────────────────────────────────
+
 export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth()
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
+    const guard = await requireAuth(req)
+    if (!guard.ok) return guard.response
+    const { session } = guard
+    const { role, id: userId } = session.user
     const { id } = await params
 
-    const bookChapter = await prisma.bookChapter.findUnique({
-      where: { id },
-      include: { facultyAuthors: true }
+    if (role === UserRole.STUDENT) {
+      return NextResponse.json({ error: 'Forbidden — students cannot delete book chapters' }, { status: 403 })
+    }
+
+    const chapter = await prisma.bookChapter.findUnique({
+      where: { id }, include: { facultyAuthors: true },
     })
+    if (!chapter) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    if (!bookChapter) {
-      return NextResponse.json(
-        { error: 'Book chapter not found' },
-        { status: 404 }
-      )
-    }
-
-    const userRole = session.user.role
-    const userId = session.user.id
-
-    // Secure checking: Only admins can delete anything, faculty can delete chapters they review/co-author, students cannot delete
-    if (userRole === UserRole.STUDENT) {
-      return NextResponse.json(
-        { error: 'Unauthorized - Students cannot delete book chapters' },
-        { status: 403 }
-      )
-    }
-
-    if (userRole === UserRole.FACULTY) {
-      const isAssigned = bookChapter.facultyAuthors.some((fa) => fa.userId === userId)
-      if (!isAssigned) {
-        return NextResponse.json(
-          { error: 'Unauthorized - You can only delete book chapters you are assigned to' },
-          { status: 403 }
-        )
+    if (role === UserRole.FACULTY) {
+      if (!chapter.facultyAuthors.some((fa) => fa.userId === userId)) {
+        return NextResponse.json({ error: 'Forbidden — you can only delete book chapters you author' }, { status: 403 })
       }
     }
 
-    await prisma.bookChapter.delete({
-      where: { id }
-    })
-
-    return NextResponse.json({
-      message: 'Book chapter deleted successfully'
-    })
+    await prisma.bookChapter.delete({ where: { id } })
+    return NextResponse.json({ message: 'Book chapter deleted successfully' })
   } catch (error) {
-    console.error('Error deleting book chapter:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('[BookChapter DELETE]', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

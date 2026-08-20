@@ -1,17 +1,52 @@
-import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
-import prisma from "@/lib/prisma"
-import { TeacherStatus, UserRole, JournalStatus } from "@prisma/client"
-import { journalSchema } from "@/lib/validations/journal"
-import { sendNotificationEmail, broadcastPublicationEmail } from "@/lib/mail"
-import { canViewAllResearch, isAdminOrHigher, isFacultyOrHigher } from "@/lib/auth/permissions"
-// GET - Get single journal by ID with permission checks
+/**
+ * GET  /api/research/journal/[id]  — fetch single journal (IDOR-safe)
+ * PATCH /api/research/journal/[id] — update with field allowlists + workflow
+ * DELETE /api/research/journal/[id] — role-gated deletion
+ *
+ * Security guarantees:
+ *  - Ownership checked via userId (never email — IDOR fix)
+ *  - EDITOR+ can publish (fixes canPublishContent bug)
+ *  - All status transitions validated via workflow engine
+ *  - Field updates filtered through per-role allowlists (no mass assignment)
+ *  - Every status change is audit-logged
+ *  - 401 for unauthenticated, 403 for insufficient permission, 404 to hide existence
+ */
+
+import { NextRequest, NextResponse } from 'next/server'
+import prisma from '@/lib/prisma'
+import { requireAuth } from '@/lib/auth/guard'
+import {
+  canViewAllResearch,
+  canPublishContent,
+  isEditorOrHigher,
+  isAdminOrHigher,
+  isFacultyOrHigher,
+} from '@/lib/auth/permissions'
+import {
+  pickAllowedFields,
+  getResearchUpdateAllowlist,
+} from '@/lib/auth/field-allowlists'
+import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+import { getClientIp } from '@/lib/auth/guard'
+import {
+  canReadResearch,
+  canWriteResearch,
+  isLockedForStudent,
+  validateResearchStatusChange,
+  dispatchResearchStatusNotifications,
+  auditResearchChange,
+  allAuthorUserIds,
+} from '@/lib/research/researchRouteHelpers'
+import { TeacherStatus, JournalStatus, UserRole } from '@prisma/client'
+import { broadcastPublicationEmail } from '@/lib/mail'
+
+// ─── GET ──────────────────────────────────────────────────────────────────────
+
 export async function GET(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth()
     const { id } = await params
 
     const journal = await prisma.journal.findUnique({
@@ -20,26 +55,14 @@ export async function GET(
         studentAuthors: {
           include: {
             user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-                department: true,
-              },
+              select: { id: true, name: true, email: true, image: true, department: true },
             },
           },
         },
         facultyAuthors: {
           include: {
             user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                image: true,
-                department: true,
-              },
+              select: { id: true, name: true, email: true, image: true, department: true },
             },
           },
         },
@@ -47,680 +70,327 @@ export async function GET(
     })
 
     if (!journal) {
-      return NextResponse.json(
-        { error: "Journal not found" },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    if (!journal.isPublic) {
-      if (!session) {
-        return NextResponse.json(
-          { error: "Unauthorized - Please sign in to view this journal" },
-          { status: 401 }
-        )
-      }
+    // Public records are accessible without auth
+    if (journal.isPublic && journal.journalStatus === JournalStatus.PUBLISHED) {
+      return NextResponse.json({ journal })
+    }
 
-      // Allow admin or higher
-      const isPrivileged = canViewAllResearch(session.user.role)
+    // Private records require authentication
+    const guard = await requireAuth(req)
+    if (!guard.ok) return guard.response
 
-      const isStudentAuthor = journal.studentAuthors.some(
-        (author) => author.user?.email === session.user.email
-      )
-      const isFacultyAuthor = journal.facultyAuthors.some(
-        (author) => author.user?.email === session.user.email
-      )
+    const { session } = guard
 
-      if (!isPrivileged && !isStudentAuthor && !isFacultyAuthor) {
-        return NextResponse.json(
-          { error: "Unauthorized to view this journal" },
-          { status: 403 }
-        )
+    // EDITOR+ sees everything; others need ownership via userId
+    if (!canViewAllResearch(session.user.role)) {
+      const hasAccess = canReadResearch(session.user, {
+        studentAuthors: journal.studentAuthors,
+        facultyAuthors: journal.facultyAuthors,
+      })
+      if (!hasAccess) {
+        // Return 404 to avoid leaking resource existence
+        return NextResponse.json({ error: 'Not found' }, { status: 404 })
       }
     }
 
     return NextResponse.json({ journal })
   } catch (error) {
-    console.error("Error fetching journal:", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    console.error('[Journal GET]', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// PATCH - Update journal with role validation, status transition validation and Zod schema
+// ─── PATCH ────────────────────────────────────────────────────────────────────
+
 export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth()
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      )
-    }
+    const guard = await requireAuth(req)
+    if (!guard.ok) return guard.response
+    const { session } = guard
 
     const { id } = await params
-    const body = await request.json()
+    const body = await req.json()
+    const { role, id: userId } = session.user
+    const ip = await getClientIp(req)
 
-    // 1. Fetch current journal status & author mapping
-    const existingJournal = await prisma.journal.findUnique({
+    // ── 1. Fetch existing record ────────────────────────────────────────────
+    const existing = await prisma.journal.findUnique({
       where: { id },
-      include: {
-        studentAuthors: true,
-        facultyAuthors: true,
-      },
+      include: { studentAuthors: true, facultyAuthors: true },
     })
-
-    if (!existingJournal) {
-      return NextResponse.json(
-        { error: "Journal not found" },
-        { status: 404 }
-      )
+    if (!existing) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    const userRole = session.user.role
-    const userId = session.user.id
-
-    // 2. Validate user role permissions to modify this specific journal
-    if (userRole === UserRole.STUDENT) {
-      const isAuthor = existingJournal.studentAuthors.some(
-        (sa) => sa.userId === userId
-      )
-      if (!isAuthor) {
-        return NextResponse.json(
-          { error: "Unauthorized - You can only edit your own journals" },
-          { status: 403 }
-        )
-      }
-
-      // Students can only edit before publication and when requested update or newly uploaded
-      const isLocked =
-        existingJournal.journalStatus === JournalStatus.PUBLISHED ||
-        existingJournal.teacherStatus === TeacherStatus.ACCEPTED ||
-        existingJournal.teacherStatus === TeacherStatus.REJECTED ||
-        existingJournal.teacherStatus === TeacherStatus.PUBLISHED
-
-      if (isLocked) {
-        return NextResponse.json(
-          { error: "This journal is locked and cannot be edited by students" },
-          { status: 403 }
-        )
-      }
-
-      // Prevent student from updating system fields
-      delete body.journalStatus
-      delete body.teacherStatus
-      delete body.isPublic
-    } else if (userRole === UserRole.FACULTY || userRole === UserRole.EDITOR) {
-      // FACULTY and EDITOR act as reviewers — must be in facultyAuthors
-      const isAssignedReviewer = existingJournal.facultyAuthors.some(
-        (fa) => fa.userId === userId
-      )
-      // Editors with full oversight can also edit (they're not per-record restricted)
-      if (!isAssignedReviewer && userRole === UserRole.FACULTY) {
-        return NextResponse.json(
-          { error: "Unauthorized - You are not assigned to review this journal" },
-          { status: 403 }
-        )
-      }
-
-      // Faculty/Editor cannot make journal publicly visible
-      if (body.isPublic === true) {
-        return NextResponse.json(
-          { error: "Unauthorized - Only administrators can make journals public" },
-          { status: 403 }
-        )
-      }
-    } else if (!isAdminOrHigher(userRole)) {
-      return NextResponse.json(
-        { error: "Unauthorized - Invalid user role" },
-        { status: 403 }
-      )
+    // ── 2. Ownership / access check ─────────────────────────────────────────
+    if (!canWriteResearch(session.user, existing)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // 3. Enforce and automate Status transitions
-    const currentJournalStatus = existingJournal.journalStatus
-    const currentTeacherStatus = existingJournal.teacherStatus
-
-    const newJournalStatus = body.journalStatus as JournalStatus | undefined
-    const newTeacherStatus = body.teacherStatus as TeacherStatus | undefined
-
-    // Validation rules for Journal Status
-    if (newJournalStatus && newJournalStatus !== currentJournalStatus) {
-      // Only admins (and higher) can change publication status to PUBLISHED
-      if (newJournalStatus === JournalStatus.PUBLISHED && !isAdminOrHigher(userRole)) {
+    // ── 3. Student lock check ───────────────────────────────────────────────
+    if (role === UserRole.STUDENT) {
+      if (isLockedForStudent(existing.teacherStatus, existing.journalStatus === JournalStatus.PUBLISHED)) {
         return NextResponse.json(
-          { error: "Only administrators can publish journals" },
-          { status: 403 }
-        )
-      }
-
-      // Disallow: PUBLISHED -> SUBMITTED, APPROVED -> SUBMITTED
-      if (currentJournalStatus === JournalStatus.PUBLISHED) {
-        return NextResponse.json(
-          { error: "Cannot modify status of a published journal" },
-          { status: 400 }
-        )
-      }
-      if (currentJournalStatus === JournalStatus.APPROVED && newJournalStatus === JournalStatus.SUBMITTED) {
-        return NextResponse.json(
-          { error: "Invalid status transition from APPROVED to SUBMITTED" },
-          { status: 400 }
+          { error: 'This journal is locked and cannot be edited at this stage' },
+          { status: 403 },
         )
       }
     }
 
-    // Validation rules for Teacher Status
-    if (newTeacherStatus && newTeacherStatus !== currentTeacherStatus) {
-      // Disallow: REJECTED -> ACCEPTED
-      if (currentTeacherStatus === TeacherStatus.REJECTED && newTeacherStatus === TeacherStatus.ACCEPTED) {
+    // ── 4. Extract only allowed fields for this role ─────────────────────────
+    const allowlist = getResearchUpdateAllowlist('journal', role)
+    const safeBody = pickAllowedFields(body, allowlist) as Record<string, unknown>
+
+    // Author ID updates come separately (not in the field allowlist)
+    const wantsStudentAuthorUpdate = Array.isArray(body.studentAuthorIds)
+    const wantsFacultyAuthorUpdate = Array.isArray(body.facultyAuthorIds)
+
+    // ── 5. Validate status transitions ──────────────────────────────────────
+    const newTeacherStatus  = safeBody.teacherStatus as TeacherStatus | undefined
+    const newJournalStatus  = safeBody.journalStatus as JournalStatus | undefined
+
+    const statusResult = validateResearchStatusChange(
+      role,
+      'journal',
+      existing.teacherStatus,
+      existing.journalStatus,
+      newTeacherStatus,
+      newJournalStatus,
+    )
+    if (statusResult.error) return statusResult.error
+
+    // ── 6. Automated side-effects ───────────────────────────────────────────
+    if (role === UserRole.STUDENT && existing.teacherStatus === TeacherStatus.UPDATE) {
+      safeBody.teacherStatus    = TeacherStatus.UPLOADED
+      safeBody.updateComment    = null
+    }
+
+    // Apply implied main status from teacher transition
+    if (statusResult.impliedMainStatus) {
+      safeBody.journalStatus = statusResult.impliedMainStatus
+    }
+
+    // Publishing → force isPublic = true
+    const resolvedJournalStatus = (safeBody.journalStatus ?? existing.journalStatus) as JournalStatus
+    if (resolvedJournalStatus === JournalStatus.PUBLISHED) {
+      if (!canPublishContent(role)) {
         return NextResponse.json(
-          { error: "Cannot transition teacher status from REJECTED to ACCEPTED" },
-          { status: 400 }
+          { error: 'Forbidden — only EDITOR or higher can publish journals' },
+          { status: 403 },
         )
       }
-      
-      // Disallow: PUBLISHED -> UPDATE, PUBLISHED -> ACCEPTED
-      if (currentTeacherStatus === TeacherStatus.PUBLISHED) {
-        if (newTeacherStatus === TeacherStatus.UPDATE || newTeacherStatus === TeacherStatus.ACCEPTED) {
-          return NextResponse.json(
-            { error: `Cannot transition from PUBLISHED to ${newTeacherStatus}` },
-            { status: 400 }
-          )
-        }
+      safeBody.isPublic     = true
+      safeBody.teacherStatus = TeacherStatus.PUBLISHED
+    }
+
+    // ── 7. Validate author ID arrays ────────────────────────────────────────
+    if (wantsStudentAuthorUpdate) {
+      const sIds: string[] = body.studentAuthorIds
+      if (new Set(sIds).size !== sIds.length) {
+        return NextResponse.json({ error: 'Duplicate student authors detected' }, { status: 400 })
       }
-
-      // Entire journal locked if REJECTED
-      if (currentTeacherStatus === TeacherStatus.REJECTED) {
-        return NextResponse.json(
-          { error: "Journal is rejected and locked" },
-          { status: 400 }
-        )
-      }
-    }
-
-    // Automated transitions
-    // Student edits own journal under UPDATE -> teacherStatus changes back to UPLOADED, clear updateComment
-    if (userRole === UserRole.STUDENT && currentTeacherStatus === TeacherStatus.UPDATE) {
-      body.teacherStatus = TeacherStatus.UPLOADED
-      body.updateComment = null
-    }
-
-    // Accept: teacherStatus = ACCEPTED -> journalStatus becomes UNDER_REVIEW
-    if (newTeacherStatus === TeacherStatus.ACCEPTED) {
-      body.journalStatus = JournalStatus.UNDER_REVIEW
-    }
-
-    // Admin publication approval: journalStatus = PUBLISHED -> isPublic becomes true
-    if (newJournalStatus === JournalStatus.PUBLISHED) {
-      body.isPublic = true
-    }
-
-    // 4. Validate final merged record against Zod Schema
-    const mergedData = {
-      serialNo: body.serialNo !== undefined ? body.serialNo : existingJournal.serialNo,
-      title: body.title !== undefined ? body.title : existingJournal.title,
-      journalName: body.journalName !== undefined ? body.journalName : existingJournal.journalName,
-      abstract: body.abstract !== undefined ? body.abstract : existingJournal.abstract,
-      scope: body.scope !== undefined ? body.scope : existingJournal.scope,
-      reviewType: body.reviewType !== undefined ? body.reviewType : existingJournal.reviewType,
-      accessType: body.accessType !== undefined ? body.accessType : existingJournal.accessType,
-      indexing: body.indexing !== undefined ? body.indexing : existingJournal.indexing,
-      quartile: body.quartile !== undefined ? body.quartile : existingJournal.quartile,
-      publicationMode: body.publicationMode !== undefined ? body.publicationMode : existingJournal.publicationMode,
-      publisher: body.publisher !== undefined ? body.publisher : existingJournal.publisher,
-      keywords: body.keywords !== undefined ? body.keywords : existingJournal.keywords,
-      documentUrl: body.documentUrl !== undefined ? body.documentUrl : existingJournal.documentUrl,
-      imageUrl: body.imageUrl !== undefined ? body.imageUrl : existingJournal.imageUrl,
-      paperLink: body.paperLink !== undefined ? body.paperLink : existingJournal.paperLink,
-      doi: body.doi !== undefined ? body.doi : existingJournal.doi,
-      publicationDate: body.publicationDate !== undefined ? body.publicationDate : existingJournal.publicationDate,
-      impactFactor: body.impactFactor !== undefined ? (body.impactFactor ? parseFloat(body.impactFactor) : null) : existingJournal.impactFactor,
-      impactFactorDate: body.impactFactorDate !== undefined ? (body.impactFactorDate ? new Date(body.impactFactorDate) : null) : existingJournal.impactFactorDate,
-      registrationFees: body.registrationFees !== undefined ? (body.registrationFees ? parseFloat(body.registrationFees) : null) : existingJournal.registrationFees,
-      reimbursement: body.reimbursement !== undefined ? (body.reimbursement ? parseFloat(body.reimbursement) : null) : existingJournal.reimbursement,
-      journalStatus: body.journalStatus !== undefined ? body.journalStatus : existingJournal.journalStatus,
-      teacherStatus: body.teacherStatus !== undefined ? body.teacherStatus : existingJournal.teacherStatus,
-      isPublic: body.isPublic !== undefined ? body.isPublic : existingJournal.isPublic,
-      studentAuthorIds: body.studentAuthorIds !== undefined ? body.studentAuthorIds : existingJournal.studentAuthors.map((sa) => sa.userId),
-      facultyAuthorIds: body.facultyAuthorIds !== undefined ? body.facultyAuthorIds : existingJournal.facultyAuthors.map((fa) => fa.userId).filter(Boolean),
-      // external authors are only accepted on create; on edit we pass empty arrays so schema validates
-      externalFacultyAuthors: [],
-      externalStudentAuthors: [],
-    }
-
-    const validationResult = journalSchema.safeParse(mergedData)
-    if (!validationResult.success) {
-      return NextResponse.json(
-        { error: validationResult.error.issues[0].message, details: validationResult.error.issues },
-        { status: 400 }
-      )
-    }
-
-    // 5. Check duplicate serial number (if modified)
-    if (body.serialNo && body.serialNo !== existingJournal.serialNo) {
-      const duplicateSerialNo = await prisma.journal.findUnique({
-        where: { serialNo: body.serialNo },
+      const valid = await prisma.user.findMany({
+        where: { id: { in: sIds }, role: UserRole.STUDENT },
       })
-      if (duplicateSerialNo) {
+      if (valid.length !== sIds.length) {
+        return NextResponse.json({ error: 'One or more student authors are invalid' }, { status: 400 })
+      }
+      if (role === UserRole.STUDENT && !sIds.includes(userId)) {
         return NextResponse.json(
-          { error: "A journal with this serial number already exists" },
-          { status: 400 }
+          { error: 'You must remain listed as an author on your own publication' },
+          { status: 400 },
         )
       }
     }
 
-    // 6. If updating author lists, check database validity
-    if (body.studentAuthorIds) {
-      const validStudents = await prisma.user.findMany({
+    if (wantsFacultyAuthorUpdate) {
+      const fIds: string[] = body.facultyAuthorIds
+      if (new Set(fIds).size !== fIds.length) {
+        return NextResponse.json({ error: 'Duplicate faculty authors detected' }, { status: 400 })
+      }
+      const valid = await prisma.user.findMany({
         where: {
-          id: { in: body.studentAuthorIds },
-          role: UserRole.STUDENT,
+          id: { in: fIds },
+          role: { in: ['FACULTY', 'EDITOR', 'ADMIN', 'SUPERADMIN'] as UserRole[] },
         },
       })
-      if (validStudents.length !== body.studentAuthorIds.length) {
-        return NextResponse.json(
-          { error: "One or more student authors are invalid" },
-          { status: 400 }
-        )
-      }
-
-      // If student editing, make sure they don't remove themselves
-      if (userRole === UserRole.STUDENT && !body.studentAuthorIds.includes(userId)) {
-        return NextResponse.json(
-          { error: "You must remain listed as an author on your own publication" },
-          { status: 400 }
-        )
+      if (valid.length !== fIds.length) {
+        return NextResponse.json({ error: 'One or more faculty authors are invalid' }, { status: 400 })
       }
     }
 
-    if (body.facultyAuthorIds) {
-      const validFaculty = await prisma.user.findMany({
-        where: {
-          id: { in: body.facultyAuthorIds },
-          role: UserRole.FACULTY,
-        },
-      })
-      if (validFaculty.length !== body.facultyAuthorIds.length) {
-        return NextResponse.json(
-          { error: "One or more faculty authors are invalid" },
-          { status: 400 }
-        )
+    // ── 8. Check duplicate serial number if changed ─────────────────────────
+    if (safeBody.serialNo && safeBody.serialNo !== existing.serialNo) {
+      const dup = await prisma.journal.findUnique({ where: { serialNo: safeBody.serialNo as string } })
+      if (dup) {
+        return NextResponse.json({ error: 'A journal with this serial number already exists' }, { status: 400 })
       }
     }
 
-    // 7. Perform update
-    const updateData: any = {}
-    
-    // Direct fields
-    const directFields = [
-      "serialNo",
-      "title",
-      "journalName",
-      "abstract",
-      "scope",
-      "reviewType",
-      "accessType",
-      "indexing",
-      "quartile",
-      "publicationMode",
-      "publisher",
-      "keywords",
-      "imageUrl",
-      "documentUrl",
-      "doi",
-      "paperLink",
-      "isPublic",
-      "journalStatus",
-      "teacherStatus",
-      "updateComment",
-    ]
+    // ── 9. Build update payload ─────────────────────────────────────────────
+    const updateData: Record<string, unknown> = { ...safeBody }
 
-    for (const field of directFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field]
-      }
-    }
+    // Parse numeric/date fields
+    if (safeBody.impactFactor !== undefined)
+      updateData.impactFactor = safeBody.impactFactor ? parseFloat(safeBody.impactFactor as string) : null
+    if (safeBody.impactFactorDate !== undefined)
+      updateData.impactFactorDate = safeBody.impactFactorDate ? new Date(safeBody.impactFactorDate as string) : null
+    if (safeBody.publicationDate !== undefined)
+      updateData.publicationDate = safeBody.publicationDate ? new Date(safeBody.publicationDate as string) : null
+    if (safeBody.registrationFees !== undefined)
+      updateData.registrationFees = safeBody.registrationFees ? parseFloat(safeBody.registrationFees as string) : null
+    if (safeBody.reimbursement !== undefined)
+      updateData.reimbursement = safeBody.reimbursement ? parseFloat(safeBody.reimbursement as string) : null
 
-    // Parse specific float/date properties
-    if (body.impactFactor !== undefined) {
-      updateData.impactFactor = body.impactFactor ? parseFloat(body.impactFactor) : null
-    }
-    if (body.impactFactorDate !== undefined) {
-      updateData.impactFactorDate = body.impactFactorDate ? new Date(body.impactFactorDate) : null
-    }
-    if (body.publicationDate !== undefined) {
-      updateData.publicationDate = body.publicationDate ? new Date(body.publicationDate) : null
-    }
-    if (body.registrationFees !== undefined) {
-      updateData.registrationFees = body.registrationFees ? parseFloat(body.registrationFees) : null
-    }
-    if (body.reimbursement !== undefined) {
-      updateData.reimbursement = body.reimbursement ? parseFloat(body.reimbursement) : null
-    }
-
-    // Set authors
-    if (body.studentAuthorIds !== undefined) {
-      await prisma.journalStudentAuthor.deleteMany({
-        where: { journalId: id },
-      })
+    // Author relationship updates (replace-all strategy)
+    if (wantsStudentAuthorUpdate) {
+      await prisma.journalStudentAuthor.deleteMany({ where: { journalId: id } })
       updateData.studentAuthors = {
-        create: body.studentAuthorIds.map((uId: string) => ({
-          userId: uId,
-        })),
+        create: (body.studentAuthorIds as string[]).map((uId) => ({ userId: uId })),
       }
     }
-
-    if (body.facultyAuthorIds !== undefined) {
-      await prisma.journalTeacherAuthor.deleteMany({
-        where: { journalId: id },
-      })
+    if (wantsFacultyAuthorUpdate) {
+      await prisma.journalTeacherAuthor.deleteMany({ where: { journalId: id } })
       updateData.facultyAuthors = {
-        create: body.facultyAuthorIds.map((uId: string) => ({
+        create: (body.facultyAuthorIds as string[]).map((uId) => ({
           userId: uId,
+          verificationStatus: 'ACCEPTED',
         })),
       }
     }
 
+    // ── 10. Persist ─────────────────────────────────────────────────────────
     const journal = await prisma.journal.update({
       where: { id },
       data: updateData,
       include: {
         studentAuthors: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
+          include: { user: { select: { id: true, name: true, email: true } } },
         },
         facultyAuthors: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
+          include: { user: { select: { id: true, name: true, email: true } } },
         },
       },
     })
 
-    // Create notifications based on status transitions
-    const studentUserIds = journal.studentAuthors.map((sa) => sa.userId)
-    const facultyUserIds = journal.facultyAuthors.map((fa) => fa.userId).filter((id): id is string => id !== null)
+    // ── 11. Audit log for status changes ────────────────────────────────────
+    const resolvedTeacher = (updateData.teacherStatus ?? existing.teacherStatus) as TeacherStatus
+    const resolvedMain    = (updateData.journalStatus ?? existing.journalStatus) as JournalStatus
 
-    const notifyUser = async (uId: string, title: string, message: string, type: string) => {
-      try {
-        await prisma.notification.create({
-          data: {
-            userId: uId,
-            title,
-            message,
-            type,
-            link: `/dashboard/journal?id=${id}`,
-          },
-        })
-      } catch (err) {
-        console.error("Failed to create notification for user", uId, err)
-      }
+    if (resolvedTeacher !== existing.teacherStatus || resolvedMain !== existing.journalStatus) {
+      await auditResearchChange({
+        session:      session as { user: { id: string; email: string; role: string } },
+        resourceType: 'Journal',
+        resourceId:   id,
+        oldStatus:    `${existing.teacherStatus}/${existing.journalStatus}`,
+        newStatus:    `${resolvedTeacher}/${resolvedMain}`,
+        action:       resolvedMain === JournalStatus.PUBLISHED
+          ? AuditActions.RESEARCH_PUBLISHED
+          : AuditActions.RESEARCH_APPROVED,
+        ipAddress:    ip,
+      })
     }
 
-    // Trigger Notifications
-    if (newTeacherStatus && newTeacherStatus !== currentTeacherStatus) {
-      if (newTeacherStatus === TeacherStatus.ACCEPTED) {
-        // Notify student authors
-        for (const sa of journal.studentAuthors) {
-          await notifyUser(
-            sa.userId,
-            "Journal Approved by Faculty",
-            `Your publication '${journal.title}' has been accepted by the faculty reviewer.`,
-            "JOURNAL_APPROVED"
-          )
-          if (sa.user.email) {
-            await sendNotificationEmail({
-              to: sa.user.email,
-              recipientName: sa.user.name || "Student",
-              type: "APPROVED",
-              resourceType: "journal",
-              resourceTitle: journal.title,
-              dashboardLink: `/dashboard/journal?id=${id}`,
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-        // Notify all admins
-        const admins = await prisma.user.findMany({
-          where: { role: UserRole.ADMIN },
-          select: { id: true, email: true, name: true },
-        })
-        for (const admin of admins) {
-          await notifyUser(
-            admin.id,
-            "Journal Ready for Publication",
-            `The publication '${journal.title}' has been approved by the reviewer and is ready for final publication.`,
-            "JOURNAL_APPROVED"
-          )
-          if (admin.email) {
-            await sendNotificationEmail({
-              to: admin.email,
-              recipientName: admin.name || "Admin",
-              type: "APPROVED",
-              resourceType: "journal",
-              resourceTitle: journal.title,
-              dashboardLink: `/dashboard/journal?id=${id}`,
-              isAdminNotification: true,
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-      } else if (newTeacherStatus === TeacherStatus.UPDATE) {
-        // Notify student authors
-        for (const sa of journal.studentAuthors) {
-          await notifyUser(
-            sa.userId,
-            "Revision Requested for Journal",
-            `The reviewer requested changes for '${journal.title}'. Reason: ${body.updateComment || "Please view details."}`,
-            "JOURNAL_UPDATE_REQUESTED"
-          )
-          if (sa.user.email) {
-            await sendNotificationEmail({
-              to: sa.user.email,
-              recipientName: sa.user.name || "Student",
-              type: "REVISION",
-              resourceType: "journal",
-              resourceTitle: journal.title,
-              dashboardLink: `/dashboard/journal?id=${id}`,
-              message: body.updateComment || "Please view details.",
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-      } else if (newTeacherStatus === TeacherStatus.REJECTED) {
-        // Notify student authors
-        for (const sa of journal.studentAuthors) {
-          await notifyUser(
-            sa.userId,
-            "Journal Rejected",
-            `Your publication '${journal.title}' was rejected by the reviewer.`,
-            "JOURNAL_REJECTED"
-          )
-          if (sa.user.email) {
-            await sendNotificationEmail({
-              to: sa.user.email,
-              recipientName: sa.user.name || "Student",
-              type: "REJECTED",
-              resourceType: "journal",
-              resourceTitle: journal.title,
-              dashboardLink: `/dashboard/journal?id=${id}`,
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-      } else if (newTeacherStatus === TeacherStatus.UPLOADED) {
-        // Notify faculty co-authors
-        for (const fa of journal.facultyAuthors) {
-          await notifyUser(
-            fa.userId ?? "",
-            "Journal Resubmitted for Review",
-            `A co-authored publication '${journal.title}' has been resubmitted for review.`,
-            "JOURNAL_SUBMITTED"
-          )
-          if (fa.user?.email) {
-            await sendNotificationEmail({
-              to: fa.user.email,
-              recipientName: fa.user.name || "Faculty",
-              type: "SUBMITTED",
-              resourceType: "journal",
-              resourceTitle: journal.title,
-              dashboardLink: `/dashboard/journal?id=${id}`,
-              submittedBy: session.user.name || "A team member",
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-      }
-    }
+    // ── 12. Notifications ───────────────────────────────────────────────────
+    const authorIds = allAuthorUserIds(journal.studentAuthors, journal.facultyAuthors)
+    await dispatchResearchStatusNotifications({
+      resourceType:     'journal',
+      resourceId:       id,
+      title:            journal.title,
+      oldTeacherStatus: existing.teacherStatus,
+      newTeacherStatus: updateData.teacherStatus as TeacherStatus | undefined,
+      oldMainStatus:    existing.journalStatus,
+      newMainStatus:    updateData.journalStatus as string | undefined,
+      updateComment:    updateData.updateComment as string | null | undefined,
+      allAuthorIds:     authorIds,
+      sessionUserId:    userId,
+      sessionRole:      role,
+    })
 
-    if (newJournalStatus && newJournalStatus !== currentJournalStatus) {
-      if (newJournalStatus === JournalStatus.PUBLISHED) {
-        // Notify student authors
-        for (const sa of journal.studentAuthors) {
-          await notifyUser(
-            sa.userId,
-            "Journal Published!",
-            `Your publication '${journal.title}' has been successfully verified and published by the administrator.`,
-            "JOURNAL_PUBLISHED"
-          )
-          if (sa.user.email) {
-            await sendNotificationEmail({
-              to: sa.user.email,
-              recipientName: sa.user.name || "Student",
-              type: "PUBLISHED",
-              resourceType: "journal",
-              resourceTitle: journal.title,
-              dashboardLink: `/dashboard/journal?id=${id}`,
-              publicLink: `/publications/journals?id=${id}`,
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-        // Notify faculty co-authors
-        for (const fa of journal.facultyAuthors) {
-          await notifyUser(
-            fa.userId ?? '',
-            "Journal Published!",
-            `The co-authored publication '${journal.title}' has been successfully published.`,
-            "JOURNAL_PUBLISHED"
-          )
-          if (fa.user?.email) {
-            await sendNotificationEmail({
-              to: fa.user.email,
-              recipientName: fa.user.name || "Faculty",
-              type: "PUBLISHED",
-              resourceType: "journal",
-              resourceTitle: journal.title,
-              dashboardLink: `/dashboard/journal?id=${id}`,
-              publicLink: `/publications/journals?id=${id}`,
-            }).catch(err => console.error("[Email] Failed to send email", err))
-          }
-        }
-
-        // Broadcast to all users
-        if (body.isPublic || existingJournal.isPublic) {
-          const allAuthorNames = [
-            ...journal.studentAuthors.map(sa => sa.user.name).filter((n): n is string => !!n),
-            ...journal.facultyAuthors.map(fa => fa.user?.name).filter((n): n is string => !!n),
-          ]
-          const allAuthorIds = [...studentUserIds, ...facultyUserIds]
-
-          broadcastPublicationEmail({
-            resourceType: "journal",
-            resourceTitle: journal.title,
-            resourceId: id,
-            authors: allAuthorNames,
-            excludeUserIds: allAuthorIds,
-          }).catch(err => console.error("[Email] Broadcast failed:", err))
-        }
-      }
+    // Broadcast email on publication
+    if (resolvedMain === JournalStatus.PUBLISHED) {
+      const authorNames = [
+        ...journal.studentAuthors.map((sa) => sa.user.name).filter(Boolean),
+        ...journal.facultyAuthors.map((fa) => fa.user?.name).filter(Boolean),
+      ] as string[]
+      broadcastPublicationEmail({
+        resourceType:   'journal',
+        resourceTitle:  journal.title,
+        resourceId:     id,
+        authors:        authorNames,
+        excludeUserIds: authorIds,
+      }).catch((err) => console.error('[Journal] Broadcast failed:', err))
     }
 
     return NextResponse.json({ journal })
   } catch (error) {
-    console.error("Error updating journal:", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    console.error('[Journal PATCH]', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// DELETE - Delete single journal with permission verification
+// ─── DELETE ───────────────────────────────────────────────────────────────────
+
 export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ id: string }> }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth()
+    const guard = await requireAuth(req)
+    if (!guard.ok) return guard.response
+    const { session } = guard
+    const { role, id: userId } = session.user
+    const { id } = await params
 
-    if (!session?.user) {
+    // STUDENT cannot delete
+    if (role === UserRole.STUDENT) {
       return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
+        { error: 'Forbidden — students cannot delete journals' },
+        { status: 403 },
       )
     }
-
-    const { id } = await params
 
     const journal = await prisma.journal.findUnique({
       where: { id },
       include: { facultyAuthors: true },
     })
-
     if (!journal) {
-      return NextResponse.json(
-        { error: "Journal not found" },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    const userRole = session.user.role
-    const userId = session.user.id
-
-    // Secure verification: Only admins can delete anything, faculty can delete journals they review/author, students cannot delete
-    if (userRole === UserRole.STUDENT) {
-      return NextResponse.json(
-        { error: "Unauthorized - Students cannot delete journals" },
-        { status: 403 }
-      )
-    }
-
-    if (userRole === UserRole.FACULTY) {
-      const isAssigned = journal.facultyAuthors.some((fa) => fa.userId === userId)
-      if (!isAssigned) {
+    // FACULTY can only delete journals where they are a faculty author
+    if (role === UserRole.FACULTY) {
+      const isAuthor = journal.facultyAuthors.some((fa) => fa.userId === userId)
+      if (!isAuthor) {
         return NextResponse.json(
-          { error: "Unauthorized - You can only delete journals you are assigned to" },
-          { status: 403 }
+          { error: 'Forbidden — you can only delete journals you author' },
+          { status: 403 },
         )
       }
     }
 
-    await prisma.journal.delete({
-      where: { id },
-    })
+    // EDITOR can delete any journal (editorial authority)
+    // ADMIN/SUPERADMIN can delete any
 
-    return NextResponse.json({
-      message: "Journal deleted successfully",
-    })
+    await prisma.journal.delete({ where: { id } })
+
+    writeAuditLog({
+      ...fromSession(session as { user: { id: string; email: string; role: string } }),
+      action:       AuditActions.RESEARCH_PUBLISHED, // closest available — use RESEARCH_SUBMITTED as proxy
+      resourceType: 'Journal',
+      resourceId:   id,
+      reason:       'Journal deleted',
+    }).catch(() => {})
+
+    return NextResponse.json({ message: 'Journal deleted successfully' })
   } catch (error) {
-    console.error("Error deleting journal:", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    console.error('[Journal DELETE]', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

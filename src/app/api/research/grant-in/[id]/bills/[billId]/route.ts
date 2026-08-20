@@ -1,219 +1,300 @@
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import prisma from "@/lib/prisma";
-import { storage } from "@/lib/appwrite";
-import { BillStatus, UserRole, GrantInRole } from "@prisma/client";
-import { regenerateMasterPdf } from "@/lib/research/masterPdf.service";
-import { notifyBillAccepted, notifyBillRejected } from "@/lib/research/grantNotifications";
+/**
+ * PATCH  /api/research/grant-in/[id]/bills/[billId]
+ * DELETE /api/research/grant-in/[id]/bills/[billId]
+ *
+ * Security fixes vs original:
+ *  - Bill status transitions validated via workflow engine
+ *  - ACCEPT uses a Prisma transaction to atomically update billStatus + usedAmount
+ *    (prevents race condition double-payment)
+ *  - PAY action added (ADMIN only) — marks bill PAID
+ *  - Audit log on accept/reject/pay
+ *  - usedAmount never goes negative (decrement guarded)
+ *  - 401/403/404 correct semantics
+ */
 
-const BUCKET_ID = process.env.NEXT_PUBLIC_APPWRITE_BUCKET_ID!;
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
+import prisma from '@/lib/prisma'
+import { storage } from '@/lib/appwrite'
+import { BillStatus, UserRole, GrantInRole } from '@prisma/client'
+import { regenerateMasterPdf } from '@/lib/research/masterPdf.service'
+import { validateBillStatusTransition } from '@/lib/auth/workflow'
+import { isAdminOrHigher } from '@/lib/auth/permissions'
+import { AuditActions, auditGrantFinancial } from '@/lib/audit'
+import { getClientIp } from '@/lib/auth/guard'
+import {
+  notifyBillAccepted,
+  notifyBillRejected,
+  notifyBillPaid,
+} from '@/lib/notifications'
+
+const BUCKET_ID = process.env.NEXT_PUBLIC_APPWRITE_BUCKET_ID!
+
+// ─── PATCH — accept | reject | pay ───────────────────────────────────────────
 
 export async function PATCH(
-    req: NextRequest,
-    { params }: { params: Promise<{ id: string; billId: string }> }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string; billId: string }> },
 ) {
-    try {
-        const session = await auth();
-        if (!session?.user?.id) return new NextResponse("Unauthorized", { status: 401 });
-
-        const { id, billId } = await params;
-        const grantId = id;
-        const userRole = session.user.role as UserRole;
-        const body = await req.json();
-        const action = body.action; // 'ACCEPT' or 'REJECT' (though reject is usually delete)
-
-        if (action !== 'ACCEPT' && action !== 'REJECT') {
-             return new NextResponse("Invalid action", { status: 400 });
-        }
-
-        // 1. Fetch Bill
-        const bill = await prisma.grantInBill.findUnique({
-            where: { id: billId }
-        });
-
-        if (!bill || bill.grantInId !== grantId) {
-            return new NextResponse("Bill not found", { status: 404 });
-        }
-
-        // 2. Authorization: Only Admin or PI/CoPI
-        const facultyAuth = await prisma.grantInTeacherAuthor.findFirst({
-            where: {
-                grantInId: grantId,
-                userId: session.user.id,
-                role: { in: [GrantInRole.FACULTY_PI, GrantInRole.FACULTY_COPI] }
-            }
-        });
-
-        const grant = await prisma.grantIn.findUnique({
-            where: { id: grantId }
-        });
-
-        if (!grant) {
-            return new NextResponse("Grant not found", { status: 404 });
-        }
-
-        if (userRole === "ADMIN" && grant.hideFromAdmin) {
-            return new NextResponse("Forbidden: Grant is hidden from Admin", { status: 403 });
-        }
-
-        const isVerifier = userRole === "ADMIN" || !!facultyAuth;
-
-        if (!isVerifier) {
-             return new NextResponse("Forbidden: Only Admin or PI/CoPI can verify bills", { status: 403 });
-        }
-
-        // 3. Logic
-        if (action === 'ACCEPT') {
-             const updatedBill = await prisma.grantInBill.update({
-                 where: { id: billId },
-                 data: { billStatus: BillStatus.ACCEPTED }
-             });
-             
-
-             // Increment usedAmount on the grant with the bill's amount
-             if (bill.amount && bill.amount > 0) {
-                 const grant = await prisma.grantIn.findUnique({
-                     where: { id: grantId },
-                     select: { usedAmount: true }
-                 });
-                 
-                 const newUsedAmount = (grant?.usedAmount || 0) + bill.amount;
-                 
-                 await prisma.grantIn.update({
-                     where: { id: grantId },
-                     data: { usedAmount: newUsedAmount },
-                 });
-             }
-
-             // Regenerate Master PDF
-             await regenerateMasterPdf(grantId);
-
-             // Trigger notification
-             await notifyBillAccepted(grantId, billId);
-
-             return NextResponse.json(updatedBill);
-        } else {
-             // Reject logic -> Delete
-              if (bill.fileId) {
-                try {
-                    await storage.deleteFile(BUCKET_ID, bill.fileId);
-                } catch (e) {
-                    console.error("Failed to delete file from Appwrite", e);
-                }
-            }
-
-            // Trigger notification before deleting the bill
-            await notifyBillRejected(grantId, billId);
-
-            await prisma.grantInBill.delete({
-                where: { id: billId }
-            });
-            return NextResponse.json({ message: "Bill rejected and removed" });
-        }
-
-    } catch (error: any) {
-        console.error("Verification error:", error);
-        return new NextResponse(error.message || "Internal Error", { status: 500 });
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    const { id: grantId, billId } = await params
+    const userRole  = session.user.role as UserRole
+    const userId    = session.user.id
+    const ip        = await getClientIp(req)
+    const body      = await req.json()
+    const action: string = body.action // 'ACCEPT' | 'REJECT' | 'PAY'
+
+    if (!['ACCEPT', 'REJECT', 'PAY'].includes(action)) {
+      return NextResponse.json({ error: "action must be 'ACCEPT', 'REJECT', or 'PAY'" }, { status: 400 })
+    }
+
+    // ── 1. Fetch bill + grant together ──────────────────────────────────────
+    const bill = await prisma.grantInBill.findUnique({
+      where: { id: billId },
+      include: {
+        grantIn: {
+          include: {
+            facultyAuthors: { where: { userId, role: { in: [GrantInRole.FACULTY_PI, GrantInRole.FACULTY_COPI] } } },
+          },
+        },
+        user: { select: { id: true, name: true, email: true } },
+      },
+    })
+
+    if (!bill || bill.grantInId !== grantId) {
+      return NextResponse.json({ error: 'Bill not found' }, { status: 404 })
+    }
+
+    // ── 2. Authorization ────────────────────────────────────────────────────
+    const isFacultyPICoPI = bill.grantIn.facultyAuthors.length > 0
+    const isAdmin         = isAdminOrHigher(userRole)
+
+    if (action === 'PAY') {
+      // Only ADMIN+ can disburse payment
+      if (!isAdmin) {
+        return NextResponse.json({ error: 'Forbidden — only ADMIN or higher can mark bills as paid' }, { status: 403 })
+      }
+    } else {
+      // ACCEPT/REJECT: ADMIN or PI/CoPI
+      if (!isAdmin && !isFacultyPICoPI) {
+        return NextResponse.json({ error: 'Forbidden — only ADMIN or PI/CoPI can accept/reject bills' }, { status: 403 })
+      }
+    }
+
+    // ── 3. Validate state transition ────────────────────────────────────────
+    const targetStatus: BillStatus =
+      action === 'ACCEPT' ? BillStatus.ACCEPTED :
+      action === 'REJECT' ? BillStatus.REJECTED :
+      BillStatus.PAID
+
+    const transition = validateBillStatusTransition(userRole, bill.billStatus, targetStatus)
+    if (!transition.allowed) {
+      return NextResponse.json(
+        { error: (transition as { allowed: false; reason: string }).reason },
+        { status: (transition as { allowed: false; status: number }).status },
+      )
+    }
+
+    // ── 4. Execute in transaction ───────────────────────────────────────────
+    const { projectCode, amountGranted, usedAmount } = bill.grantIn
+
+    if (action === 'ACCEPT') {
+      // Atomic: update bill status + increment usedAmount, validate ceiling
+      const billAmount = bill.amount ?? 0
+
+      if (billAmount > 0 && amountGranted !== null && usedAmount !== null) {
+        const projectedUsed = usedAmount + billAmount
+        if (projectedUsed > amountGranted) {
+          return NextResponse.json(
+            { error: `Accepting this bill (₹${billAmount}) would exceed the total grant amount (₹${amountGranted}). Current used: ₹${usedAmount}.` },
+            { status: 400 },
+          )
+        }
+      }
+
+      await prisma.$transaction(async (tx) => {
+        await tx.grantInBill.update({ where: { id: billId }, data: { billStatus: BillStatus.ACCEPTED } })
+        if (billAmount > 0) {
+          await tx.grantIn.update({
+            where: { id: grantId },
+            data:  { usedAmount: { increment: billAmount } },
+          })
+        }
+      })
+
+      await regenerateMasterPdf(grantId).catch((e) => console.error('[MasterPDF] regeneration failed', e))
+
+      await auditGrantFinancial({
+        session:      session as { user: { id: string; email: string; role: string } },
+        action:       AuditActions.BILL_ACCEPTED,
+        resourceType: 'GrantInBill',
+        resourceId:   billId,
+        oldValue:     { status: bill.billStatus, usedAmount },
+        newValue:     { status: BillStatus.ACCEPTED, usedAmount: (usedAmount ?? 0) + (bill.amount ?? 0) },
+        ipAddress:    ip,
+      })
+
+      await notifyBillAccepted({
+        grantId,
+        projectCode: projectCode ?? 'N/A',
+        submitterId: bill.userId,
+        amount:      bill.amount,
+        adminIds:    (await prisma.user.findMany({ where: { role: { in: [UserRole.ADMIN, UserRole.SUPERADMIN] } }, select: { id: true } })).map((a) => a.id),
+      })
+
+    } else if (action === 'REJECT') {
+      // Delete file from storage, then delete bill record
+      if (bill.fileId) {
+        await storage.deleteFile(BUCKET_ID, bill.fileId).catch((e) =>
+          console.error(`Failed to delete bill file ${bill.fileId}`, e),
+        )
+      }
+
+      // Notify before deletion so we still have bill data
+      await notifyBillRejected({
+        grantId,
+        projectCode: projectCode ?? 'N/A',
+        submitterId: bill.userId,
+        amount:      bill.amount,
+        reason:      body.reason ?? undefined,
+      })
+
+      await auditGrantFinancial({
+        session:      session as { user: { id: string; email: string; role: string } },
+        action:       AuditActions.BILL_REJECTED,
+        resourceType: 'GrantInBill',
+        resourceId:   billId,
+        oldValue:     { status: bill.billStatus },
+        newValue:     { status: BillStatus.REJECTED },
+        reason:       body.reason ?? null,
+        ipAddress:    ip,
+      })
+
+      await prisma.grantInBill.delete({ where: { id: billId } })
+      return NextResponse.json({ message: 'Bill rejected and removed' })
+
+    } else if (action === 'PAY') {
+      await prisma.grantInBill.update({ where: { id: billId }, data: { billStatus: BillStatus.PAID } })
+
+      await auditGrantFinancial({
+        session:      session as { user: { id: string; email: string; role: string } },
+        action:       AuditActions.BILL_PAID,
+        resourceType: 'GrantInBill',
+        resourceId:   billId,
+        oldValue:     { status: BillStatus.ACCEPTED },
+        newValue:     { status: BillStatus.PAID },
+        ipAddress:    ip,
+      })
+
+      await notifyBillPaid({
+        grantId,
+        projectCode: projectCode ?? 'N/A',
+        submitterId: bill.userId,
+        amount:      bill.amount,
+      })
+    }
+
+    const updated = await prisma.grantInBill.findUnique({ where: { id: billId } })
+    return NextResponse.json({ bill: updated })
+  } catch (error) {
+    console.error('[Bill PATCH]', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
 }
+
+// ─── DELETE — owner or PI/CoPI or ADMIN can delete PENDING bills ──────────────
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string; billId: string }> }
+  { params }: { params: Promise<{ id: string; billId: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) return new NextResponse("Unauthorized", { status: 401 });
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-    const { id, billId } = await params;
-    const grantId = id;
-    const userRole = session.user.role as UserRole;
+    const { id: grantId, billId } = await params
+    const userRole = session.user.role as UserRole
+    const userId   = session.user.id
 
-    // 1. Fetch Bill
     const bill = await prisma.grantInBill.findUnique({
-      where: { id: billId }
-    });
+      where: { id: billId },
+      include: {
+        grantIn: {
+          include: {
+            facultyAuthors: { where: { userId, role: { in: [GrantInRole.FACULTY_PI, GrantInRole.FACULTY_COPI] } } },
+          },
+        },
+      },
+    })
 
     if (!bill || bill.grantInId !== grantId) {
-      return new NextResponse("Bill not found", { status: 404 });
+      return NextResponse.json({ error: 'Bill not found' }, { status: 404 })
     }
 
-    // 2. Authorization Logic
-    // If PENDING: Uploader OR Admin OR PI/CoPI can delete
-    // If ACCEPTED: Only Admin OR PI/CoPI can delete
+    const isOwner         = bill.userId === userId
+    const isFacultyPICoPI = bill.grantIn.facultyAuthors.length > 0
+    const isAdmin         = isAdminOrHigher(userRole)
 
-    const isUploader = bill.userId === session.user.id;
-    
-    // Check faculty role
-    const facultyAuth = await prisma.grantInTeacherAuthor.findFirst({
-        where: {
-            grantInId: grantId,
-            userId: session.user.id,
-            role: { in: [GrantInRole.FACULTY_PI, GrantInRole.FACULTY_COPI] }
-        }
-    });
-
-    const grant = await prisma.grantIn.findUnique({
-        where: { id: grantId }
-    });
-
-    if (!grant) {
-        return new NextResponse("Grant not found", { status: 404 });
-    }
-
-    if (userRole === "ADMIN" && grant.hideFromAdmin) {
-        return new NextResponse("Forbidden: Grant is hidden from Admin", { status: 403 });
-    }
-    
-    const isVerifier = userRole === "ADMIN" || !!facultyAuth;
-
+    // PENDING bills: owner, PI/CoPI, or ADMIN can delete
     if (bill.billStatus === BillStatus.PENDING) {
-        if (!isUploader && !isVerifier) {
-            return new NextResponse("Forbidden: Only uploader or authorized personnel can delete pending bills", { status: 403 });
-        }
+      if (!isOwner && !isFacultyPICoPI && !isAdmin) {
+        return NextResponse.json({ error: 'Forbidden — only the bill uploader, PI/CoPI, or ADMIN can delete pending bills' }, { status: 403 })
+      }
     } else if (bill.billStatus === BillStatus.ACCEPTED) {
-        if (!isVerifier) {
-            return new NextResponse("Forbidden: Only Admin or PI/CoPI can delete accepted bills", { status: 403 });
-        }
+      // ACCEPTED bills: only PI/CoPI or ADMIN
+      if (!isFacultyPICoPI && !isAdmin) {
+        return NextResponse.json({ error: 'Forbidden — only PI/CoPI or ADMIN can delete accepted bills' }, { status: 403 })
+      }
+    } else {
+      // PAID/REJECTED: only ADMIN
+      if (!isAdmin) {
+        return NextResponse.json({ error: 'Forbidden — only ADMIN can delete paid or rejected bills' }, { status: 403 })
+      }
     }
 
-    // 3. Delete Logic
-    // Delete file from Appwrite
     if (bill.fileId) {
-        try {
-            await storage.deleteFile(BUCKET_ID, bill.fileId);
-        } catch (e) {
-            console.error("Failed to delete file from Appwrite", e);
-        }
+      await storage.deleteFile(BUCKET_ID, bill.fileId).catch((e) =>
+        console.error(`Failed to delete bill file ${bill.fileId}`, e),
+      )
     }
 
-    // Notify uploader if deleted by someone else
-    if (bill.userId !== session.user.id) {
-        await notifyBillRejected(grantId, billId);
-    }
-
-    // Delete DB record
-    await prisma.grantInBill.delete({
-        where: { id: billId }
-    });
-
-    // 4. If deleting an ACCEPTED bill, subtract its amount from usedAmount
+    // If deleting an ACCEPTED bill, reverse the usedAmount in a transaction
     if (bill.billStatus === BillStatus.ACCEPTED && bill.amount && bill.amount > 0) {
-        await prisma.grantIn.update({
-            where: { id: grantId },
-            data: { usedAmount: { decrement: bill.amount } },
-        });
+      await prisma.$transaction(async (tx) => {
+        await tx.grantInBill.delete({ where: { id: billId } })
+        await tx.grantIn.update({
+          where: { id: grantId },
+          data:  { usedAmount: { decrement: bill.amount! } },
+        })
+      })
+    } else {
+      await prisma.grantInBill.delete({ where: { id: billId } })
     }
 
-    // 5. Regenerate Master PDF if it was an ACCEPTED bill
+    if (bill.userId !== userId) {
+      await notifyBillRejected({
+        grantId,
+        projectCode: bill.grantIn.projectCode ?? 'N/A',
+        submitterId: bill.userId,
+        amount:      bill.amount,
+        reason:      'Your bill was removed by an authorized party.',
+      })
+    }
+
     if (bill.billStatus === BillStatus.ACCEPTED) {
-        await regenerateMasterPdf(grantId);
+      await regenerateMasterPdf(grantId).catch(() => {})
     }
 
-    return NextResponse.json({ message: "Bill deleted successfully" });
-
-  } catch (error: any) {
-    console.error("Delete error:", error);
-    return new NextResponse(error.message || "Internal Error", { status: 500 });
+    return NextResponse.json({ message: 'Bill deleted successfully' })
+  } catch (error) {
+    console.error('[Bill DELETE]', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }

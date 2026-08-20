@@ -1,96 +1,202 @@
 /**
- * Next.js 16+ uses "proxy.ts" instead of the deprecated "middleware.ts".
+ * @file middleware.ts
+ * @description Centralized Next.js route protection middleware.
  *
- * IMPORTANT: We must run in the Node.js runtime (not Edge) because:
- *  - NextAuth JWT verification uses the Node.js `crypto` module
- *  - Argon2 is a native Node.js binding
- *  - Prisma uses Node.js networking APIs
+ * SECURITY CONTRACT:
+ *  - This middleware provides a first line of defense at the edge.
+ *  - It does NOT replace per-route authorization checks — every API route
+ *    and server action MUST independently verify auth and permissions.
+ *  - Authentication state here is derived from the JWT session cookie.
+ *  - Role-based access in this file covers NAVIGATION protection only.
+ *    Data-level authorization always happens inside each route handler.
+ *
+ * Route categories:
+ *  PUBLIC     — accessible without authentication
+ *  AUTH_ONLY  — any authenticated user
+ *  STUDENT+   — STUDENT and higher (all authenticated users)
+ *  FACULTY+   — FACULTY and higher
+ *  EDITOR+    — EDITOR and higher
+ *  ADMIN+     — ADMIN and higher
+ *  SUPERADMIN — SUPERADMIN only
  */
 
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import type { Session } from 'next-auth'
 
-// ── Route groups ──────────────────────────────────────────────────────────────
-const AUTH_ROUTES      = ['/auth/signin', '/auth/signup']
-const ONBOARDING_ROUTE = '/setup-profile'
+// ─── Route pattern helpers ────────────────────────────────────────────────────
 
-const PROTECTED_PREFIXES: Record<string, string[]> = {
-  '/dashboard': ['STUDENT', 'FACULTY', 'EDITOR', 'ADMIN', 'SUPERADMIN'],
-  '/student':   ['STUDENT', 'ADMIN', 'SUPERADMIN'],
-  '/faculty':   ['FACULTY', 'EDITOR', 'ADMIN', 'SUPERADMIN'],
-  '/admin':     ['ADMIN', 'SUPERADMIN'],
+function matchesAny(pathname: string, patterns: string[]): boolean {
+  return patterns.some((p) => {
+    if (p.endsWith('*')) return pathname.startsWith(p.slice(0, -1))
+    return pathname === p || pathname.startsWith(p + '/')
+  })
 }
 
-function isAuthRoute(pathname: string): boolean {
-  return AUTH_ROUTES.some(
-    (r) => pathname === r || pathname.startsWith(r + '/'),
-  )
+// ─── Route definitions ────────────────────────────────────────────────────────
+
+/** Routes that are entirely public — no auth required */
+const PUBLIC_ROUTES = [
+  '/',
+  '/about',
+  '/contact',
+  '/gallery',
+  '/team',
+  '/research',          // public research listing
+  '/achievements',      // public achievements listing
+  '/faculty-verification', // token-based — unauthenticated access intended
+  '/auth/signin',
+  '/auth/signup',
+  '/auth/new-verification',
+  '/auth/reset-password',
+  '/auth/forgot-password',
+  '/studio',            // Sanity Studio
+  '/api/auth*',         // NextAuth routes
+  '/api/public*',       // Public data APIs
+  '/api/faculty-verification/verify*', // Token-based verification
+]
+
+/** Routes that require authentication but no specific role */
+const AUTH_REQUIRED_ROUTES = [
+  '/dashboard',
+  '/api/profile*',
+  '/api/notifications*',
+  '/api/user*',
+]
+
+/** Routes accessible to FACULTY and higher */
+const FACULTY_ROUTES = [
+  '/api/faculty-verification*',
+]
+
+/** Routes accessible to EDITOR and higher */
+const EDITOR_ROUTES = [
+  '/dashboard/editor*',
+  '/dashboard/events*',
+]
+
+/** Routes accessible to ADMIN and higher */
+const ADMIN_ROUTES = [
+  '/dashboard/admin*',
+  '/api/admin*',
+]
+
+/** Routes accessible to SUPERADMIN only */
+const SUPERADMIN_ROUTES = [
+  '/dashboard/superadmin*',
+  '/api/superadmin*',
+]
+
+// ─── Role rank lookup ─────────────────────────────────────────────────────────
+
+const ROLE_RANK: Record<string, number> = {
+  STUDENT:    0,
+  FACULTY:    1,
+  EDITOR:     2,
+  ADMIN:      3,
+  SUPERADMIN: 4,
 }
 
-function getAllowedRoles(pathname: string): string[] | null {
-  for (const [prefix, roles] of Object.entries(PROTECTED_PREFIXES)) {
-    if (pathname === prefix || pathname.startsWith(prefix + '/')) {
-      return roles
-    }
+function rankOf(role: string): number {
+  return ROLE_RANK[role] ?? -1
+}
+
+// ─── Middleware ───────────────────────────────────────────────────────────────
+
+export default auth(async function middleware(req: NextRequest & { auth?: unknown }) {
+  const { pathname } = req.nextUrl
+  const session = (req as any).auth as
+    | { user: { id: string; role: string; profileCompleted: boolean } }
+    | null
+
+  // ── 1. Always allow public routes ────────────────────────────────────────
+  if (matchesAny(pathname, PUBLIC_ROUTES)) {
+    return NextResponse.next()
   }
-  return null
-}
 
-// Augmented request type — auth() injects `auth: Session | null` at runtime
-type NextAuthRequest = NextRequest & { auth: Session | null }
+  // ── 2. Require authentication for all other routes ────────────────────────
+  if (!session?.user?.id) {
+    // API routes return 401 JSON, page routes redirect to signin
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        { error: 'Unauthorized — authentication required' },
+        { status: 401 },
+      )
+    }
+    const signInUrl = new URL('/auth/signin', req.url)
+    signInUrl.searchParams.set('callbackUrl', pathname)
+    return NextResponse.redirect(signInUrl)
+  }
 
-export default auth(async function proxy(request: NextRequest) {
-  // Cast to augmented type to access session injected by auth()
-  const req        = request as NextAuthRequest
-  const session    = req.auth
-  const pathname   = req.nextUrl.pathname
-  const isLoggedIn = !!session?.user
+  const { role, profileCompleted } = session.user
 
-  // ── 1. Redirect authenticated users away from auth pages ─────────────────
-  if (isAuthRoute(pathname)) {
-    if (isLoggedIn) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+  // ── 3. Force profile completion for non-setup pages ───────────────────────
+  if (
+    !profileCompleted &&
+    !pathname.startsWith('/auth/setup-profile') &&
+    !pathname.startsWith('/api/auth') &&
+    !pathname.startsWith('/api/profile')
+  ) {
+    if (!pathname.startsWith('/api/')) {
+      return NextResponse.redirect(new URL('/auth/setup-profile', req.url))
+    }
+    // API calls during setup are allowed through
+  }
+
+  // ── 4. SUPERADMIN-only routes ─────────────────────────────────────────────
+  if (matchesAny(pathname, SUPERADMIN_ROUTES)) {
+    if (rankOf(role) < rankOf('SUPERADMIN')) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      return NextResponse.redirect(new URL('/dashboard', req.url))
     }
     return NextResponse.next()
   }
 
-  // ── 2. Require authentication for all protected route groups ──────────────
-  const allowedRoles = getAllowedRoles(pathname)
-  if (allowedRoles !== null) {
-    if (!isLoggedIn) {
-      const signInUrl = new URL('/auth/signin', request.url)
-      signInUrl.searchParams.set('callbackUrl', pathname)
-      return NextResponse.redirect(signInUrl)
+  // ── 5. ADMIN+ routes ──────────────────────────────────────────────────────
+  if (matchesAny(pathname, ADMIN_ROUTES)) {
+    if (rankOf(role) < rankOf('ADMIN')) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      return NextResponse.redirect(new URL('/dashboard', req.url))
     }
-
-    const userRole = (session?.user as { role?: string })?.role ?? 'STUDENT'
-
-    // ── 3. Role-based access control ──────────────────────────────────────
-    if (!allowedRoles.includes(userRole)) {
-      if (userRole === 'SUPERADMIN') return NextResponse.redirect(new URL('/dashboard', request.url))
-      if (userRole === 'ADMIN')   return NextResponse.redirect(new URL('/dashboard', request.url))
-      if (userRole === 'EDITOR')  return NextResponse.redirect(new URL('/dashboard', request.url))
-      if (userRole === 'FACULTY') return NextResponse.redirect(new URL('/dashboard', request.url))
-      return NextResponse.redirect(new URL('/dashboard', request.url))
-    }
+    return NextResponse.next()
   }
 
+  // ── 6. EDITOR+ routes ─────────────────────────────────────────────────────
+  if (matchesAny(pathname, EDITOR_ROUTES)) {
+    if (rankOf(role) < rankOf('EDITOR')) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+    return NextResponse.next()
+  }
 
+  // ── 7. FACULTY+ routes ────────────────────────────────────────────────────
+  if (matchesAny(pathname, FACULTY_ROUTES)) {
+    if (rankOf(role) < rankOf('FACULTY')) {
+      if (pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
+      return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+    return NextResponse.next()
+  }
+
+  // ── 8. Auth-required routes (any authenticated user) ──────────────────────
+  // Already authenticated at step 2 — allow through
   return NextResponse.next()
 })
 
+// ─── Matcher ──────────────────────────────────────────────────────────────────
+// The middleware runs on all routes EXCEPT static files and Next.js internals.
+
 export const config = {
   matcher: [
-    /*
-     * Match all paths EXCEPT:
-     *  - _next/static  (Next.js static assets)
-     *  - _next/image   (image optimisation)
-     *  - favicon.ico
-     *  - /api/auth/*   (NextAuth internal handlers — must be unrestricted)
-     *  - public file extensions (images, fonts, css, js)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|api/auth|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|css|js|woff|woff2|ttf|eot)).*)',
   ],
 }

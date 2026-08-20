@@ -571,7 +571,7 @@ model Notification {
 }
 
 model Event {
-  id               String   @id @default(cuid())
+  id               String      @id @default(cuid())
   name             String
   posterUrl        String?
   registrationCost Float?
@@ -580,10 +580,45 @@ model Event {
   contactName      String
   contactPhone     String
   eventDate        DateTime
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
+  /// Lifecycle status — DRAFT until an editor/admin publishes it
+  eventStatus      EventStatus @default(DRAFT)
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
 
   @@map("events")
+}
+
+/// Append-only audit trail for every significant system action.
+/// Normal users must never be able to delete or modify audit records.
+model AuditLog {
+  id           String   @id @default(cuid())
+  /// The user who performed the action (null for anonymous/system actions)
+  actorId      String?  @map("actor_id")
+  actorEmail   String?  @map("actor_email")
+  actorRole    String?  @map("actor_role")
+  /// The action that was performed (e.g. RESEARCH_PUBLISHED, ROLE_CHANGED)
+  action       String
+  /// Resource type (e.g. Journal, Achievement, GrantIn, User)
+  resourceType String   @map("resource_type")
+  /// ID of the affected resource
+  resourceId   String   @map("resource_id")
+  /// JSON snapshot of old value (for updates/status changes)
+  oldValue     Json?    @map("old_value")
+  /// JSON snapshot of new value
+  newValue     Json?    @map("new_value")
+  /// Human-readable reason / override justification
+  reason       String?
+  /// Client IP (best-effort — populated from x-forwarded-for)
+  ipAddress    String?  @map("ip_address")
+  /// Any extra structured metadata
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([actorId])
+  @@index([resourceType, resourceId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 enum UserRole {
@@ -763,6 +798,59 @@ enum AchievementStatus {
   UNDER_REVIEW
   APPROVED
   REJECTED
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  ARCHIVED
+}
+
+/// Audit action constants — keep in sync with src/lib/audit.ts
+enum AuditAction {
+  // Auth
+  USER_REGISTERED
+  USER_ROLE_CHANGED
+  USER_DELETED
+  // Research
+  RESEARCH_SUBMITTED
+  RESEARCH_REVIEW_STARTED
+  RESEARCH_UPDATE_REQUESTED
+  RESEARCH_APPROVED
+  RESEARCH_REJECTED
+  RESEARCH_PUBLISHED
+  // Grant
+  GRANT_CREATED
+  GRANT_APPROVED
+  GRANT_REJECTED
+  GRANT_COMPLETED
+  GRANT_TEAM_UPDATED
+  // Bills
+  BILL_SUBMITTED
+  BILL_ACCEPTED
+  BILL_REJECTED
+  BILL_PAID
+  // Achievements
+  ACHIEVEMENT_SUBMITTED
+  ACHIEVEMENT_APPROVED
+  ACHIEVEMENT_REJECTED
+  // Events
+  EVENT_CREATED
+  EVENT_PUBLISHED
+  EVENT_CANCELLED
+  EVENT_ARCHIVED
+  // Faculty verification
+  FACULTY_VERIFICATION_CREATED
+  FACULTY_VERIFICATION_ACCEPTED
+  FACULTY_VERIFICATION_REJECTED
+  FACULTY_VERIFICATION_OVERRIDE
+  // Grant mapping
+  GRANT_MAPPING_CREATED
+  GRANT_MAPPING_DELETED
+  // Admin override
+  ADMIN_OVERRIDE
+  SUPERADMIN_OVERRIDE
 }
 
 enum crdb_internal_region {

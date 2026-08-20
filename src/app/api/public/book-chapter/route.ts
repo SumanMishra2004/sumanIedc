@@ -38,15 +38,12 @@ export async function GET(req: NextRequest) {
     // Build where clause
     const where: any = {}
 
-    where.isPublic = true // Only show public chapters by default
-    // Apply filters
-    if (bookChapterStatus) {
-      where.bookChapterStatus = bookChapterStatus as BookchapterStatus
-    }
+    // HARD LOCK: public API always returns only isPublic=true + PUBLISHED records.
+    // Client query params cannot override these.
+    where.isPublic           = true
+    where.bookChapterStatus  = BookchapterStatus.PUBLISHED
 
-    if (teacherStatus) {
-      where.teacherStatus = teacherStatus as TeacherStatus
-    }
+    // Safe client filters (status/visibility not overridable)
 
     if (keyword) {
       where.keywords = {

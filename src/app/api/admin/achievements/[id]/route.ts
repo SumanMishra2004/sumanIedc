@@ -1,138 +1,126 @@
-import { NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
-import prisma from "@/lib/prisma"
-import { AchievementStatus } from "@prisma/client"
-import { isAdminOrHigher } from "@/lib/auth/permissions"
+/**
+ * PATCH  /api/admin/achievements/[id]  — EDITOR+ can review; ADMIN+ can also manage
+ * DELETE /api/admin/achievements/[id]  — ADMIN+
+ *
+ * Fixes vs original:
+ *  - Changed requireAdmin → requireEditor for review actions (EDITOR is primary reviewer)
+ *  - Status transitions validated via workflow engine
+ *  - Field allowlist applied (no arbitrary field injection)
+ *  - Audit log on every status change
+ *  - Centralized notifications
+ */
 
-// Admin verification helper
-async function requireAdmin() {
-  const session = await auth()
-  if (!session?.user || !isAdminOrHigher(session.user.role)) {
-    return null
-  }
-  return session
-}
+import { NextRequest, NextResponse } from 'next/server'
+import prisma from '@/lib/prisma'
+import { requireEditor, requireAdmin, getClientIp } from '@/lib/auth/guard'
+import { canApproveAchievement, isAdminOrHigher } from '@/lib/auth/permissions'
+import { validateAchievementStatusTransition } from '@/lib/auth/workflow'
+import { pickAllowedFields, ACHIEVEMENT_EDITOR_FIELDS } from '@/lib/auth/field-allowlists'
+import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+import {
+  notifyAchievementApproved,
+  notifyAchievementRejected,
+  notifyAchievementUpdateRequested,
+} from '@/lib/notifications'
+import { AchievementStatus } from '@prisma/client'
 
-// PATCH - Review and verify an achievement submission
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await requireAdmin()
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized — ADMIN access required" },
-        { status: 403 }
-      )
-    }
-
+    // EDITOR or higher can review achievements
+    const guard = await requireEditor(req)
+    if (!guard.ok) return guard.response
+    const { session } = guard
     const { id } = await params
     const body = await req.json()
-    const { achievementStatus, isPublic, updateComment } = body
+    const { role } = session.user
+    const ip = await getClientIp(req)
 
-    const achievement = await prisma.achievement.findUnique({
-      where: { id },
-    })
+    const achievement = await prisma.achievement.findUnique({ where: { id } })
+    if (!achievement) return NextResponse.json({ error: 'Achievement not found' }, { status: 404 })
 
-    if (!achievement) {
-      return NextResponse.json({ error: "Achievement not found" }, { status: 404 })
-    }
+    const oldStatus = achievement.achievementStatus
 
-    const updateData: any = {}
+    // Field allowlist — reviewer can only set allowed editorial fields
+    const safeBody  = pickAllowedFields(body, ACHIEVEMENT_EDITOR_FIELDS) as Record<string, unknown>
+    const newStatus = safeBody.achievementStatus as AchievementStatus | undefined
 
-    if (achievementStatus !== undefined) {
-      if (!Object.values(AchievementStatus).includes(achievementStatus as AchievementStatus)) {
+    // Validate transition
+    if (newStatus && newStatus !== oldStatus) {
+      const transition = validateAchievementStatusTransition(role, oldStatus, newStatus)
+      if (!transition.allowed) {
         return NextResponse.json(
-          { error: "Invalid achievement status value" },
-          { status: 400 }
+          { error: (transition as { allowed: false; reason: string }).reason },
+          { status: (transition as { allowed: false; status: number }).status },
         )
       }
-      updateData.achievementStatus = achievementStatus as AchievementStatus
-    }
 
-    if (isPublic !== undefined) {
-      updateData.isPublic = Boolean(isPublic)
-    }
+      if (newStatus === AchievementStatus.APPROVED && !canApproveAchievement(role)) {
+        return NextResponse.json({ error: 'Forbidden — only EDITOR or higher can approve achievements' }, { status: 403 })
+      }
 
-    if (updateComment !== undefined) {
-      updateData.updateComment = updateComment
+      // Approval → make public
+      if (newStatus === AchievementStatus.APPROVED) safeBody.isPublic = true
+      // Rejection → remove from public
+      if (newStatus === AchievementStatus.REJECTED)  safeBody.isPublic = false
     }
 
     const updated = await prisma.achievement.update({
       where: { id },
-      data: updateData,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-            department: true,
-          },
-        },
-      },
+      data:  safeBody,
+      include: { user: { select: { id: true, name: true, email: true, image: true, department: true, role: true } } },
     })
 
-    // Optional: Send system notification to the user about status change
-    try {
-      await prisma.notification.create({
-        data: {
-          userId: achievement.userId,
-          title: `Achievement Status Updated`,
-          message: `Your achievement "${achievement.title}" status has been set to ${achievementStatus || achievement.achievementStatus}.${updateComment ? ` Reason: ${updateComment}` : ""}`,
-          type: "ACHIEVEMENT_UPDATE",
-          link: "/dashboard/achievements",
-        },
+    if (newStatus && newStatus !== oldStatus) {
+      await writeAuditLog({
+        ...fromSession(session as { user: { id: string; email: string; role: string } }),
+        action:       newStatus === AchievementStatus.APPROVED
+          ? AuditActions.ACHIEVEMENT_APPROVED
+          : AuditActions.ACHIEVEMENT_REJECTED,
+        resourceType: 'Achievement',
+        resourceId:   id,
+        oldValue:     { status: oldStatus },
+        newValue:     { status: newStatus },
+        ipAddress:    ip,
       })
-    } catch (notifErr) {
-      console.error("Failed to create notification:", notifErr)
+
+      const updateComment = safeBody.updateComment as string | undefined
+
+      if (newStatus === AchievementStatus.APPROVED) {
+        await notifyAchievementApproved({ achievementId: id, title: achievement.title, userId: achievement.userId })
+      } else if (newStatus === AchievementStatus.REJECTED) {
+        await notifyAchievementRejected({ achievementId: id, title: achievement.title, userId: achievement.userId, reason: updateComment })
+      } else if (newStatus === AchievementStatus.SUBMITTED && updateComment) {
+        await notifyAchievementUpdateRequested({ achievementId: id, title: achievement.title, userId: achievement.userId, updateComment })
+      }
     }
 
     return NextResponse.json({ achievement: updated })
   } catch (error) {
-    console.error("Error updating admin achievement details:", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    console.error('[Admin Achievement PATCH]', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// DELETE - Remove an achievement submission (Admin bypass)
 export async function DELETE(
-  _req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await requireAdmin()
-    if (!session) {
-      return NextResponse.json(
-        { error: "Unauthorized — ADMIN access required" },
-        { status: 403 }
-      )
-    }
-
+    // Hard delete requires ADMIN+
+    const guard = await requireAdmin(req)
+    if (!guard.ok) return guard.response
     const { id } = await params
-    const achievement = await prisma.achievement.findUnique({
-      where: { id },
-    })
 
-    if (!achievement) {
-      return NextResponse.json({ error: "Achievement not found" }, { status: 404 })
-    }
+    const achievement = await prisma.achievement.findUnique({ where: { id } })
+    if (!achievement) return NextResponse.json({ error: 'Achievement not found' }, { status: 404 })
 
-    await prisma.achievement.delete({
-      where: { id },
-    })
-
-    return NextResponse.json({ message: "Achievement deleted successfully by admin" })
+    await prisma.achievement.delete({ where: { id } })
+    return NextResponse.json({ message: 'Achievement deleted successfully' })
   } catch (error) {
-    console.error("Error deleting admin achievement:", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    console.error('[Admin Achievement DELETE]', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
