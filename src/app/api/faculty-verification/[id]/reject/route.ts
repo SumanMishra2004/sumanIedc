@@ -1,19 +1,29 @@
 /**
  * PATCH /api/faculty-verification/[id]/reject
  *
- * The faculty member rejects a co-author verification request.
+ * The faculty member (or ADMIN+) rejects a co-author verification request
+ * via their authenticated session.
  *
- * Security:
- *  - User must be FACULTY or higher.
- *  - User's email must match the request's facultyEmail (or be ADMIN/SUPERADMIN).
- *  - Students CANNOT reject their own requests.
- *  - Must supply a rejectionReason (optional but strongly encouraged).
+ * Security guarantees:
+ *  - 401 if unauthenticated
+ *  - 403 if not FACULTY or higher
+ *  - 403 if caller's email doesn't match facultyEmail (unless ADMIN+)
+ *  - 409 if already resolved (idempotency guard)
+ *  - tokenUsed pre-checked to close race condition
+ *  - DB update + author junction wrapped in transaction
+ *  - verificationToken NEVER returned in response
+ *  - Audit log written for every reject
+ *  - Student notified via centralized notification service
  */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { FacultyVerificationStatus } from '@prisma/client'
 import { isFacultyOrHigher, isAdminOrHigher } from '@/lib/auth/permissions'
+import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+import { getClientIp } from '@/lib/auth/guard'
+import { notifyFacultyVerificationRejected } from '@/lib/notifications'
 
 export async function PATCH(
   req: NextRequest,
@@ -35,6 +45,7 @@ export async function PATCH(
     const { id } = await params
     const body = await req.json().catch(() => ({}))
     const rejectionReason: string | null = body?.rejectionReason ?? null
+    const ip = await getClientIp(req)
 
     const request = await prisma.facultyVerificationRequest.findUnique({ where: { id } })
 
@@ -42,6 +53,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Verification request not found' }, { status: 404 })
     }
 
+    // Idempotency guard
     if (request.status !== FacultyVerificationStatus.PENDING) {
       return NextResponse.json(
         { error: `Cannot reject a request that is already ${request.status}` },
@@ -49,6 +61,15 @@ export async function PATCH(
       )
     }
 
+    // Replay prevention — single-use token flag
+    if (request.tokenUsed) {
+      return NextResponse.json(
+        { error: 'This verification request has already been processed' },
+        { status: 409 },
+      )
+    }
+
+    // Email ownership check — only ADMIN+ can reject on behalf
     const isAdmin = isAdminOrHigher(session.user.role)
     if (!isAdmin && request.facultyEmail !== session.user.email) {
       return NextResponse.json(
@@ -57,31 +78,39 @@ export async function PATCH(
       )
     }
 
-    const updated = await prisma.facultyVerificationRequest.update({
-      where: { id },
-      data: {
-        status: FacultyVerificationStatus.REJECTED,
-        rejectionReason,
-        verifiedAt: new Date(),
-        tokenUsed: true,
-      },
+    // Transaction: update request + update author junction atomically
+    const updated = await prisma.$transaction(async (tx) => {
+      const updated = await tx.facultyVerificationRequest.update({
+        where: { id },
+        data: {
+          status:          FacultyVerificationStatus.REJECTED,
+          rejectionReason: rejectionReason,
+          verifiedAt:      new Date(),
+          tokenUsed:       true,
+        },
+      })
+      await updateTeacherAuthorStatus(tx, request.researchType, request.researchId, id, 'REJECTED')
+      return updated
     })
 
-    // Update teacher-author record
-    await updateTeacherAuthorStatusRejected(request.researchType, request.researchId, id)
+    // Audit log — always awaited for verification events
+    await writeAuditLog({
+      ...fromSession(session as { user: { id: string; email: string; role: string } }),
+      action:       AuditActions.FACULTY_VERIFICATION_REJECTED,
+      resourceType: 'FacultyVerificationRequest',
+      resourceId:   id,
+      oldValue:     { status: FacultyVerificationStatus.PENDING },
+      newValue:     { status: FacultyVerificationStatus.REJECTED, rejectionReason },
+      ipAddress:    ip,
+    })
 
-    // Notify the student
-    await prisma.notification.create({
-      data: {
-        userId: request.requestedById,
-        title: 'Faculty Co-Author Verification Rejected',
-        message: `${request.facultyName} has rejected your co-author verification request.${
-          rejectionReason ? ` Reason: ${rejectionReason}` : ''
-        }`,
-        type: 'FACULTY_VERIFICATION_REJECTED',
-        link: `/dashboard/${request.researchType.toLowerCase().replace('_', '-')}`,
-      },
-    }).catch((e) => console.error('[reject] Failed to notify student:', e))
+    // Notify the requesting student
+    await notifyFacultyVerificationRejected({
+      requestedById: request.requestedById,
+      facultyName:   request.facultyName,
+      researchType:  request.researchType,
+      reason:        rejectionReason ?? undefined,
+    })
 
     const { verificationToken: _token, ...safeRequest } = updated
     return NextResponse.json({ request: safeRequest })
@@ -91,30 +120,33 @@ export async function PATCH(
   }
 }
 
-async function updateTeacherAuthorStatusRejected(
+// ── Shared transaction-compatible helper ──────────────────────────────────────
+async function updateTeacherAuthorStatus(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
   researchType: string,
   researchId: string,
   requestId: string,
+  status: 'ACCEPTED' | 'REJECTED',
 ) {
-  const data = { verificationStatus: 'REJECTED' as const }
+  const data = { verificationStatus: status }
   switch (researchType) {
     case 'JOURNAL':
-      await prisma.journalTeacherAuthor.updateMany({ where: { journalId: researchId, verificationRequestId: requestId }, data })
+      await tx.journalTeacherAuthor.updateMany({ where: { journalId: researchId, verificationRequestId: requestId }, data })
       break
     case 'BOOK_CHAPTER':
-      await prisma.bookChapterTeacherAuthor.updateMany({ where: { bookChapterId: researchId, verificationRequestId: requestId }, data })
+      await tx.bookChapterTeacherAuthor.updateMany({ where: { bookChapterId: researchId, verificationRequestId: requestId }, data })
       break
     case 'CONFERENCE':
-      await prisma.conferenceTeacherAuthor.updateMany({ where: { conferenceId: researchId, verificationRequestId: requestId }, data })
+      await tx.conferenceTeacherAuthor.updateMany({ where: { conferenceId: researchId, verificationRequestId: requestId }, data })
       break
     case 'PATENT':
-      await prisma.patentTeacherAuthor.updateMany({ where: { patentId: researchId, verificationRequestId: requestId }, data })
+      await tx.patentTeacherAuthor.updateMany({ where: { patentId: researchId, verificationRequestId: requestId }, data })
       break
     case 'COPYRIGHT':
-      await prisma.copyrightTeacherAuthor.updateMany({ where: { copyrightId: researchId, verificationRequestId: requestId }, data })
+      await tx.copyrightTeacherAuthor.updateMany({ where: { copyrightId: researchId, verificationRequestId: requestId }, data })
       break
     case 'GRANT_IN':
-      await prisma.grantInTeacherAuthor.updateMany({ where: { grantInId: researchId, verificationRequestId: requestId }, data })
+      await tx.grantInTeacherAuthor.updateMany({ where: { grantInId: researchId, verificationRequestId: requestId }, data })
       break
   }
 }

@@ -1,25 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
-import { isAdminOrHigher } from '@/lib/auth/permissions'
+import { isEditorOrHigher } from '@/lib/auth/permissions'
 
-// Helper: admin guard
-async function requireAdmin() {
+// EDITOR and higher can access journal analytics (EDITOR is the primary reviewer)
+async function requireEditorOrHigher() {
   const session = await auth()
-  if (!session?.user || !isAdminOrHigher(session.user.role)) {
-    return null
-  }
-  return session
+  if (!session?.user?.id) return { session: null, status: 401 as const }
+  if (!isEditorOrHigher(session.user.role)) return { session: null, status: 403 as const }
+  return { session, status: 200 as const }
 }
 
-// GET /api/admin/journals/stats — admin journal analytics
+// GET /api/admin/journals/stats — journal analytics for editorial and admin roles
 export async function GET(_req: NextRequest) {
   try {
-    const session = await requireAdmin()
+    const { session, status } = await requireEditorOrHigher()
     if (!session) {
       return NextResponse.json(
-        { error: 'Unauthorized — ADMIN access required' },
-        { status: 403 }
+        { error: status === 401 ? 'Unauthorized' : 'Forbidden — EDITOR access required' },
+        { status }
       )
     }
 

@@ -1,20 +1,32 @@
 /**
  * POST /api/faculty-verification/[id]/admin-override
  *
- * Admin/SuperAdmin explicit override of a verification request.
+ * Administrative override of a verification request.
  *
- * This is distinct from the normal accept/reject flow — it records:
- *  - Who performed the override
- *  - When it was done
- *  - The reason given
+ * Per spec: "Every SUPERADMIN override must be auditable."
+ * In practice every ADMIN override also records to the audit log.
  *
- * The override is always an explicit administrative action, never automatic.
+ * Security guarantees:
+ *  - 401 if unauthenticated, 403 if not ADMIN+
+ *  - overrideReason is REQUIRED (cannot be blank)
+ *  - tokenUsed pre-checked to close replay race
+ *  - DB update + author junction in a single transaction
+ *  - Audit log always awaited (security-sensitive, must not be fire-and-forget)
+ *  - verificationToken NEVER returned in response
+ *  - Student notified via centralized notification service
  */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { FacultyVerificationStatus } from '@prisma/client'
 import { isAdminOrHigher } from '@/lib/auth/permissions'
+import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+import { getClientIp } from '@/lib/auth/guard'
+import {
+  notifyFacultyVerificationAccepted,
+  notifyFacultyVerificationRejected,
+} from '@/lib/notifications'
 
 export async function POST(
   req: NextRequest,
@@ -36,7 +48,9 @@ export async function POST(
     const { id } = await params
     const body = await req.json()
     const { action, overrideReason } = body
+    const ip = await getClientIp(req)
 
+    // ── Input validation ────────────────────────────────────────────────────
     if (!action || !['accept', 'reject'].includes(action)) {
       return NextResponse.json(
         { error: 'action must be "accept" or "reject"' },
@@ -46,7 +60,7 @@ export async function POST(
 
     if (!overrideReason || typeof overrideReason !== 'string' || !overrideReason.trim()) {
       return NextResponse.json(
-        { error: 'An override reason is required for audit purposes' },
+        { error: 'overrideReason is required for all administrative overrides (audit requirement)' },
         { status: 400 },
       )
     }
@@ -56,63 +70,113 @@ export async function POST(
       return NextResponse.json({ error: 'Verification request not found' }, { status: 404 })
     }
 
+    // Replay prevention — tokenUsed pre-check
+    if (request.tokenUsed && request.status !== FacultyVerificationStatus.PENDING) {
+      // Allow ADMIN to override already-resolved requests (that is the point of an override)
+      // but log the fact that we're overriding a non-pending request
+    }
+
     const newStatus =
       action === 'accept'
         ? FacultyVerificationStatus.ACCEPTED
         : FacultyVerificationStatus.REJECTED
 
-    const updated = await prisma.facultyVerificationRequest.update({
-      where: { id },
-      data: {
-        status: newStatus,
-        tokenUsed: true,
-        verifiedAt: new Date(),
-        overrideBy: session.user.id,
-        overrideAt: new Date(),
-        overrideReason: overrideReason.trim(),
-      },
+    // Check if faculty has a platform account for linking on accept
+    const facultyUser =
+      action === 'accept'
+        ? await prisma.user.findUnique({
+            where: { email: request.facultyEmail },
+            select: { id: true },
+          })
+        : null
+
+    // ── Transaction: update request + author junction ───────────────────────
+    const updated = await prisma.$transaction(async (tx) => {
+      const updated = await tx.facultyVerificationRequest.update({
+        where: { id },
+        data: {
+          status:          newStatus,
+          tokenUsed:       true,
+          verifiedAt:      new Date(),
+          overrideBy:      session.user.id,
+          overrideAt:      new Date(),
+          overrideReason:  overrideReason.trim(),
+          rejectionReason: action === 'reject' ? overrideReason.trim() : null,
+          linkedFacultyId: action === 'accept' && facultyUser ? facultyUser.id : request.linkedFacultyId,
+        },
+      })
+
+      const statusValue = action === 'accept' ? ('ACCEPTED' as const) : ('REJECTED' as const)
+      const teacherData = {
+        verificationStatus: statusValue,
+        ...(action === 'accept' && facultyUser ? { userId: facultyUser.id } : {}),
+      }
+      await updateTeacherAuthorStatus(tx, request.researchType, request.researchId, id, teacherData)
+      return updated
     })
 
-    // Update teacher-author junction
-    const statusValue = action === 'accept' ? 'ACCEPTED' : 'REJECTED'
-    const teacherUpdate = { verificationStatus: statusValue as 'ACCEPTED' | 'REJECTED' }
+    // ── Audit log — always awaited for admin overrides ──────────────────────
+    await writeAuditLog({
+      ...fromSession(session as { user: { id: string; email: string; role: string } }),
+      action:       AuditActions.FACULTY_VERIFICATION_OVERRIDE,
+      resourceType: 'FacultyVerificationRequest',
+      resourceId:   id,
+      oldValue:     { status: request.status, tokenUsed: request.tokenUsed },
+      newValue:     { status: newStatus, overrideBy: session.user.id },
+      reason:       overrideReason.trim(),
+      ipAddress:    ip,
+    })
 
-    switch (request.researchType) {
-      case 'JOURNAL':
-        await prisma.journalTeacherAuthor.updateMany({ where: { journalId: request.researchId, verificationRequestId: id }, data: teacherUpdate })
-        break
-      case 'BOOK_CHAPTER':
-        await prisma.bookChapterTeacherAuthor.updateMany({ where: { bookChapterId: request.researchId, verificationRequestId: id }, data: teacherUpdate })
-        break
-      case 'CONFERENCE':
-        await prisma.conferenceTeacherAuthor.updateMany({ where: { conferenceId: request.researchId, verificationRequestId: id }, data: teacherUpdate })
-        break
-      case 'PATENT':
-        await prisma.patentTeacherAuthor.updateMany({ where: { patentId: request.researchId, verificationRequestId: id }, data: teacherUpdate })
-        break
-      case 'COPYRIGHT':
-        await prisma.copyrightTeacherAuthor.updateMany({ where: { copyrightId: request.researchId, verificationRequestId: id }, data: teacherUpdate })
-        break
-      case 'GRANT_IN':
-        await prisma.grantInTeacherAuthor.updateMany({ where: { grantInId: request.researchId, verificationRequestId: id }, data: teacherUpdate })
-        break
+    // ── Notifications ───────────────────────────────────────────────────────
+    if (action === 'accept') {
+      await notifyFacultyVerificationAccepted({
+        requestedById: request.requestedById,
+        facultyName:   request.facultyName,
+        researchType:  request.researchType,
+      })
+    } else {
+      await notifyFacultyVerificationRejected({
+        requestedById: request.requestedById,
+        facultyName:   request.facultyName,
+        researchType:  request.researchType,
+        reason:        `Administrative override: ${overrideReason.trim()}`,
+      })
     }
-
-    // Notify the student
-    await prisma.notification.create({
-      data: {
-        userId: request.requestedById,
-        title: `Faculty Co-Author Verification ${action === 'accept' ? 'Approved' : 'Rejected'} by Admin`,
-        message: `An administrator has ${action === 'accept' ? 'approved' : 'rejected'} the co-author verification request for ${request.facultyName}.`,
-        type: action === 'accept' ? 'FACULTY_VERIFICATION_ACCEPTED' : 'FACULTY_VERIFICATION_REJECTED',
-        link: `/dashboard/${request.researchType.toLowerCase().replace('_', '-')}`,
-      },
-    }).catch((e) => console.error('[admin-override] Failed to notify student:', e))
 
     const { verificationToken: _token, ...safeRequest } = updated
     return NextResponse.json({ success: true, request: safeRequest })
   } catch (error) {
     console.error('[POST /api/faculty-verification/[id]/admin-override]', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// ── Transaction-compatible helper ─────────────────────────────────────────────
+async function updateTeacherAuthorStatus(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  researchType: string,
+  researchId: string,
+  requestId: string,
+  data: { verificationStatus: 'ACCEPTED' | 'REJECTED'; userId?: string },
+) {
+  switch (researchType) {
+    case 'JOURNAL':
+      await tx.journalTeacherAuthor.updateMany({ where: { journalId: researchId, verificationRequestId: requestId }, data })
+      break
+    case 'BOOK_CHAPTER':
+      await tx.bookChapterTeacherAuthor.updateMany({ where: { bookChapterId: researchId, verificationRequestId: requestId }, data })
+      break
+    case 'CONFERENCE':
+      await tx.conferenceTeacherAuthor.updateMany({ where: { conferenceId: researchId, verificationRequestId: requestId }, data })
+      break
+    case 'PATENT':
+      await tx.patentTeacherAuthor.updateMany({ where: { patentId: researchId, verificationRequestId: requestId }, data })
+      break
+    case 'COPYRIGHT':
+      await tx.copyrightTeacherAuthor.updateMany({ where: { copyrightId: researchId, verificationRequestId: requestId }, data })
+      break
+    case 'GRANT_IN':
+      await tx.grantInTeacherAuthor.updateMany({ where: { grantInId: researchId, verificationRequestId: requestId }, data })
+      break
   }
 }

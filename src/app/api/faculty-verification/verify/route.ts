@@ -160,44 +160,49 @@ export async function POST(req: NextRequest) {
       select: { id: true },
     })
 
-    const updated = await prisma.facultyVerificationRequest.update({
-      where: { id: request.id },
-      data: {
-        status: newStatus,
-        tokenUsed: true,
-        verifiedAt: new Date(),
-        rejectionReason: action === 'reject' ? (rejectionReason ?? null) : null,
-        linkedFacultyId: action === 'accept' && facultyUser ? facultyUser.id : null,
-      },
-    })
-
-    // Update teacher-author junction records
-    const statusValue = action === 'accept' ? 'ACCEPTED' : 'REJECTED'
+    // Wrap request update + author junction in a single transaction to prevent
+    // partial failure leaving the request accepted but author junction stale
+    const statusValue = action === 'accept' ? ('ACCEPTED' as const) : ('REJECTED' as const)
     const teacherUpdate = {
-      verificationStatus: statusValue as 'ACCEPTED' | 'REJECTED',
+      verificationStatus: statusValue,
       ...(action === 'accept' && facultyUser ? { userId: facultyUser.id } : {}),
     }
 
-    switch (request.researchType) {
-      case 'JOURNAL':
-        await prisma.journalTeacherAuthor.updateMany({ where: { journalId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
-        break
-      case 'BOOK_CHAPTER':
-        await prisma.bookChapterTeacherAuthor.updateMany({ where: { bookChapterId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
-        break
-      case 'CONFERENCE':
-        await prisma.conferenceTeacherAuthor.updateMany({ where: { conferenceId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
-        break
-      case 'PATENT':
-        await prisma.patentTeacherAuthor.updateMany({ where: { patentId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
-        break
-      case 'COPYRIGHT':
-        await prisma.copyrightTeacherAuthor.updateMany({ where: { copyrightId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
-        break
-      case 'GRANT_IN':
-        await prisma.grantInTeacherAuthor.updateMany({ where: { grantInId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
-        break
-    }
+    const updated = await prisma.$transaction(async (tx) => {
+      const updated = await tx.facultyVerificationRequest.update({
+        where: { id: request.id },
+        data: {
+          status:          newStatus,
+          tokenUsed:       true,
+          verifiedAt:      new Date(),
+          rejectionReason: action === 'reject' ? (rejectionReason ?? null) : null,
+          linkedFacultyId: action === 'accept' && facultyUser ? facultyUser.id : null,
+        },
+      })
+
+      switch (request.researchType) {
+        case 'JOURNAL':
+          await tx.journalTeacherAuthor.updateMany({ where: { journalId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
+          break
+        case 'BOOK_CHAPTER':
+          await tx.bookChapterTeacherAuthor.updateMany({ where: { bookChapterId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
+          break
+        case 'CONFERENCE':
+          await tx.conferenceTeacherAuthor.updateMany({ where: { conferenceId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
+          break
+        case 'PATENT':
+          await tx.patentTeacherAuthor.updateMany({ where: { patentId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
+          break
+        case 'COPYRIGHT':
+          await tx.copyrightTeacherAuthor.updateMany({ where: { copyrightId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
+          break
+        case 'GRANT_IN':
+          await tx.grantInTeacherAuthor.updateMany({ where: { grantInId: request.researchId, verificationRequestId: request.id }, data: teacherUpdate })
+          break
+      }
+
+      return updated
+    })
 
     // Notify the requesting student
     await prisma.notification.create({

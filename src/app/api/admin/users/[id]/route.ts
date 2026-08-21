@@ -7,27 +7,28 @@ import {
   canAssignRole,
   type UserRoleString,
 } from "@/lib/auth/permissions";
+import { auditRoleChange, AuditActions, writeAuditLog, fromSession } from "@/lib/audit";
+import { getClientIp } from "@/lib/auth/guard";
 
-// Helper: require ADMIN or higher
+// Helper: require ADMIN or higher — returns 401 when unauthenticated, 403 when insufficient role
 async function requireAdminOrHigher() {
   const session = await auth();
-  if (!session?.user || !isAdminOrHigher(session.user.role)) {
-    return null;
-  }
-  return session;
+  if (!session?.user?.id) return { session: null, status: 401 as const };
+  if (!isAdminOrHigher(session.user.role)) return { session: null, status: 403 as const };
+  return { session, status: 200 as const };
 }
 
 // GET /api/admin/users/[id] — fetch single user details
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireAdminOrHigher();
+    const { session, status } = await requireAdminOrHigher();
     if (!session) {
       return NextResponse.json(
-        { error: "Unauthorized — ADMIN access required" },
-        { status: 403 }
+        { error: status === 401 ? "Unauthorized" : "Forbidden — ADMIN access required" },
+        { status }
       );
     }
 
@@ -70,23 +71,22 @@ export async function GET(
 }
 
 // PATCH /api/admin/users/[id] — update profile fields OR assign role
-// Role assignment lives in a separate body field `newRole` to make it
-// intentionally explicit. All other editable profile fields are also allowed.
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireAdminOrHigher();
+    const { session, status } = await requireAdminOrHigher();
     if (!session) {
       return NextResponse.json(
-        { error: "Unauthorized — ADMIN access required" },
-        { status: 403 }
+        { error: status === 401 ? "Unauthorized" : "Forbidden — ADMIN access required" },
+        { status }
       );
     }
 
     const { id } = await params;
     const body = await req.json();
+    const ip = await getClientIp(req);
 
     // ── Role assignment path ──────────────────────────────────────────────
     if (body.newRole !== undefined) {
@@ -141,6 +141,18 @@ export async function PATCH(
         select: { id: true, name: true, email: true, role: true },
       });
 
+      // Audit log — always awaited for role changes (security-critical)
+      await auditRoleChange({
+        actorId:      session.user.id,
+        actorEmail:   session.user.email,
+        actorRole:    session.user.role,
+        targetUserId: id,
+        targetEmail:  targetUser.email ?? "",
+        oldRole:      targetUser.role,
+        newRole:      targetRole,
+        ipAddress:    ip,
+      });
+
       // Keep SpecialUser table in sync (upsert so it covers both new and existing entries)
       if (targetUser.email) {
         await prisma.specialUser.upsert({
@@ -155,16 +167,16 @@ export async function PATCH(
 
     // ── Profile fields update path ────────────────────────────────────────
     // Fetch target to check canManageUser
-    const targetUser = await prisma.user.findUnique({
+    const targetUserForProfile = await prisma.user.findUnique({
       where: { id },
       select: { role: true },
     });
 
-    if (!targetUser) {
+    if (!targetUserForProfile) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (!canManageUser(session.user.role, targetUser.role)) {
+    if (!canManageUser(session.user.role, targetUserForProfile.role)) {
       return NextResponse.json(
         { error: "Insufficient permissions to manage this user" },
         { status: 403 }
@@ -226,17 +238,18 @@ export async function PATCH(
 
 // DELETE /api/admin/users/[id] — delete user
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireAdminOrHigher();
+    const { session, status } = await requireAdminOrHigher();
     if (!session) {
       return NextResponse.json(
-        { error: "Unauthorized — ADMIN access required" },
-        { status: 403 }
+        { error: status === 401 ? "Unauthorized" : "Forbidden — ADMIN access required" },
+        { status }
       );
     }
+    const ip = await getClientIp(req);
 
     const { id } = await params;
 
@@ -266,6 +279,18 @@ export async function DELETE(
     }
 
     await prisma.user.delete({ where: { id } });
+
+    // Audit deleted user (fire-and-forget — deletion already succeeded)
+    writeAuditLog({
+      actorId:      session.user.id,
+      actorEmail:   session.user.email,
+      actorRole:    session.user.role,
+      action:       AuditActions.USER_DELETED,
+      resourceType: "User",
+      resourceId:   id,
+      oldValue:     { role: targetUser.role },
+      ipAddress:    ip,
+    }).catch(() => {});
 
     return NextResponse.json({
       success: true,
