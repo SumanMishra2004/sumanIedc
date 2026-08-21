@@ -1,19 +1,18 @@
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
-import fs from 'fs'
-import path from 'path'
 
-const ca = fs.readFileSync(
-  path.join(process.cwd(), 'certs', 'ca.pem'),
-  'utf8'
-)
+const ca = process.env.DATABASE_CA_CERT?.replace(/\\n/g, '\n')
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
-  ssl: {
-    ca,
-    rejectUnauthorized: true,
-  },
+  ssl: ca
+    ? {
+        ca,
+        rejectUnauthorized: true,
+      }
+    : {
+        rejectUnauthorized: true,
+      },
 })
 
 const globalForPrisma = globalThis as unknown as {
