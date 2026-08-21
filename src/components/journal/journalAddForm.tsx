@@ -251,7 +251,8 @@ export default function JournalDialog({
   const documentInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<JournalFormValues>({
-    resolver: zodResolver(journalSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(journalSchema as any),
     defaultValues: {
       serialNo: "",
       journalName: "",

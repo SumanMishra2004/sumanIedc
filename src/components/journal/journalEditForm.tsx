@@ -121,7 +121,8 @@ export default function EditJournalDialog({
   ];
 
   const form = useForm<JournalFormValues>({
-    resolver: zodResolver(journalSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(journalSchema as any),
     defaultValues: {
       serialNo: "",
       title: "",

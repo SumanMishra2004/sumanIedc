@@ -277,7 +277,8 @@ export default function EditBookChapterDialog({
   const documentInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<BookChapterFormValues>({
-    resolver: zodResolver(bookChapterSchema),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    resolver: zodResolver(bookChapterSchema as any),
     defaultValues: {
       title: "",
       imageUrl: "",
