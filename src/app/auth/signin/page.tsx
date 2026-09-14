@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, Suspense } from 'react'
-import { signIn } from 'next-auth/react'
+import { signIn, getSession } from 'next-auth/react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { loginAction } from '@/lib/actions/auth'
@@ -78,7 +78,13 @@ function SignInContent() {
       if (result?.error) {
         setError(result.error)
       } else {
-        window.location.href = callbackUrl
+        // Read the freshly-issued session to check profileCompleted
+        const session = await getSession()
+        if (session?.user && !session.user.profileCompleted) {
+          window.location.href = '/auth/setup-profile'
+        } else {
+          window.location.href = callbackUrl
+        }
       }
     } catch {
       setError('Something went wrong. Please try again.')

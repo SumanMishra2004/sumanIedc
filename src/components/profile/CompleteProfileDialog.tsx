@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { useSession } from "next-auth/react"
+import { usePathname } from "next/navigation"
 import { setupProfileAction, skipProfileSetupAction } from "@/lib/actions/auth"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -14,6 +15,7 @@ import { Loader2 } from "lucide-react"
 export function CompleteProfileDialog() {
   const { data: session, update } = useSession()
   const { toast } = useToast()
+  const pathname = usePathname()
 
   const [isOpen, setIsOpen] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(false)
@@ -25,13 +27,18 @@ export function CompleteProfileDialog() {
   const [bio, setBio] = React.useState("")
 
   React.useEffect(() => {
+    // Don't open the dialog while the user is on the dedicated setup-profile page
+    if (pathname === '/auth/setup-profile') {
+      setIsOpen(false)
+      return
+    }
     if (session?.user && !session.user.profileCompleted) {
       setName(session.user.name ?? "")
       setIsOpen(true)
     } else {
       setIsOpen(false)
     }
-  }, [session])
+  }, [session, pathname])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
