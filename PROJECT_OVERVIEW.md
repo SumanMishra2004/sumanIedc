@@ -1,196 +1,276 @@
-# Project Overview
+# System Overview & Architecture
 
-This website is a role-based research and administration portal for an Innovation and Entrepreneurship Development Cell (IEDC). It combines a public-facing institutional website with a secure internal dashboard for students, faculty, and administrators to manage research outputs, approvals, and special-user access.
+## Project Overview
 
-## What The Website Does
+This is a role-based **Research & Institutional Management Portal**. It combines a public-facing site with an authenticated dashboard where students and faculty submit, track, and get approval on academic/research output — journals, conferences, patents, book chapters, copyrights, grants, certificates, FDPs, and achievements — while admins/editors manage users, verify faculty authorship, publish content, and audit every significant action.
 
-The platform is organized around three main experiences:
+## Tech Stack
 
-1. Public website for visitors to learn about the institution, explore the landing page, and view public journal content.
-2. Authenticated dashboard for students and faculty to manage research-related records such as journals, conferences, patents, book chapters, certificates, FDPs, copyright, and grants.
-3. Admin console for managing special users and assigning elevated access before or after signup.
+- **Database:** CockroachDB (region: `aws-ap-south-1`)
+- **ORM:** Prisma
+- **Auth:** NextAuth (Account/Session/VerificationToken model shape)
+- **IDs:** `cuid()` on every model
 
 ## User Roles
 
-- Student: can access the student dashboard and create or manage their own academic/research records.
-- Faculty: can access faculty-level dashboard areas and research management flows.
-- Admin: has full access, including the special-user management screen.
+```
+STUDENT < FACULTY < EDITOR < ADMIN < SUPERADMIN
+```
 
-The system also supports a special-user mapping table, which pre-assigns roles based on email address. This is useful when the organization wants a user to receive a specific role as soon as they sign in.
+- **STUDENT** (default) — submits and manages own research records
+- **FACULTY** — same, plus appears as verifiable co-author on student work
+- **EDITOR** — review/publish workflow on submitted research
+- **ADMIN / SUPERADMIN** — user management, role overrides, full audit visibility
 
-## Main Modules
+Roles can be **pre-assigned** via `SpecialUser` (email → role), so a user gets the correct role automatically on first login instead of defaulting to STUDENT.
 
-- Authentication and account creation
-- Profile completion onboarding
-- Dashboard and sidebar navigation
-- Research record management
-- Grant and bill tracking
-- Admin special-user management
-- Public journal viewing
+## Admin vs Superadmin
+
+The schema does **not** define a separate permissions table — `ADMIN` and `SUPERADMIN` are two values in the same `UserRole` enum, positioned as the top two tiers (`STUDENT < FACULTY < EDITOR < ADMIN < SUPERADMIN`). Their difference has to be read off two schema-level signals: the enum ordering itself, and the fact that `AuditAction` tracks `ADMIN_OVERRIDE` and `SUPERADMIN_OVERRIDE` as **distinct, separately-logged actions**.
+
+### What's schema-verified vs assumed
+
+| | Evidence in schema | Status |
+|---|---|---|
+| Both roles can override a `FacultyVerificationRequest` (`overrideBy` / `overrideAt` / `overrideReason`) | Field-level, generic — no role check encoded in the model | ✅ verified |
+| Both roles are logged as distinct audit events | `AuditAction.ADMIN_OVERRIDE` vs `AuditAction.SUPERADMIN_OVERRIDE` | ✅ verified |
+| `SUPERADMIN` ranks above `ADMIN` | Enum declaration order (`UserRole`) | ✅ verified (ordinal only — Prisma enums carry no numeric weight at the DB level, this is a convention your app code must enforce) |
+| ADMIN manages `SpecialUser` records, publishes/rejects research, manages events | Implied by "Admin console" in project docs, not by any field restricting these mutations to `ADMIN` only | ⚠️ inferred, not enforced by schema |
+| SUPERADMIN can change any user's role, including demoting another ADMIN | Implied by hierarchy convention (`USER_ROLE_CHANGED` audit action exists, but no field restricts *who* can trigger it) | ⚠️ inferred, not enforced by schema |
+| Any hard-delete capability (`USER_DELETED` action exists) is SUPERADMIN-only | Reasonable convention given irreversibility, **not stated anywhere in the schema** | ⚠️ assumed |
+
+**Data availability caveat:** the schema gives you an *identity* layer (who is ADMIN vs SUPERADMIN) and an *audit* layer (what got overridden and by whom), but authorization logic — which routes/actions each role may call — lives in application code (route guards / middleware), not in Prisma. If you want the real permission matrix, it needs to be pulled from your `proxy.ts` / API route guards, not the schema.
+
+### Capability comparison (based on available signals)
+
+| Capability | ADMIN | SUPERADMIN |
+|---|---|---|
+| Access `/dashboard`, `/faculty`, `/admin` | ✅ | ✅ |
+| Manage `SpecialUser` (pre-assign roles) | ✅ (assumed) | ✅ |
+| Override faculty verification | ✅ (`ADMIN_OVERRIDE`) | ✅ (`SUPERADMIN_OVERRIDE`) |
+| Change another user's role | ⚠️ likely capped below ADMIN/SUPERADMIN | ✅ full range, incl. promoting/demoting ADMINs |
+| Trigger `USER_DELETED` | ⚠️ unconfirmed | ✅ assumed sole owner |
+| Appears as highest audit-trust actor | No | Yes — separate `SUPERADMIN_OVERRIDE` action exists specifically to distinguish this tier in logs |
+
+### Escalation / override flow
+
+```mermaid
+flowchart TD
+  REQ[Action needs elevated approval\ne.g. faculty verification, role change, record deletion] --> CHK{Who initiates?}
+  CHK -->|ADMIN| A1[Action executed]
+  A1 --> LOG1[AuditLog: action = ADMIN_OVERRIDE]
+  CHK -->|SUPERADMIN| S1[Action executed]
+  S1 --> LOG2[AuditLog: action = SUPERADMIN_OVERRIDE]
+  LOG1 --> TRAIL[(audit_logs — append-only)]
+  LOG2 --> TRAIL
+  S1 -.can also act on.-> ADMINROW[ADMIN-owned records / ADMIN role itself]
+  A1 -.cannot act on.-> SUPERROW[SUPERADMIN role itself]
+```
+
+### Role hierarchy at a glance
+
+```mermaid
+flowchart LR
+  ST[STUDENT] --> FA[FACULTY]
+  FA --> ED[EDITOR]
+  ED --> AD[ADMIN]
+  AD --> SA[SUPERADMIN]
+  style SA fill:#333,color:#fff
+  style AD fill:#666,color:#fff
+```
+
+## Role-Based Access Control (RBAC)
+
+Access control is **route/middleware-enforced**, not schema-enforced — Prisma only stores the `role` value on `User`; the gate that decides what a role may reach lives in the app's proxy/route-guard layer. Documented route rules (`/dashboard`, `/faculty`, `/admin`) only distinguish STUDENT / FACULTY / ADMIN; EDITOR and SUPERADMIN's exact route boundaries aren't independently documented, so those cells below are marked as inferred from the role hierarchy rather than confirmed.
+
+### Access matrix
+
+| Area / Action | STUDENT | FACULTY | EDITOR | ADMIN | SUPERADMIN |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Public pages / public journal feed | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `/dashboard` (own research records) | ✅ | ✅ | ✅ (assumed) | ✅ | ✅ |
+| `/faculty` (faculty-level views) | ❌ | ✅ | ⚠️ inferred | ✅ | ✅ |
+| Review/approve submitted research | ❌ | ❌ | ✅ (assumed role purpose) | ✅ | ✅ |
+| `/admin` (special-user management) | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Override faculty verification | ❌ | ❌ | ❌ | ✅ (`ADMIN_OVERRIDE`) | ✅ (`SUPERADMIN_OVERRIDE`) |
+| Manage `SpecialUser` (pre-assign roles) | ❌ | ❌ | ❌ | ✅ (assumed) | ✅ |
+| Change another user's role | ❌ | ❌ | ❌ | ⚠️ capped, inferred | ✅ full range |
+| Delete a user (`USER_DELETED`) | ❌ | ❌ | ❌ | ⚠️ unconfirmed | ✅ assumed |
+| View full `AuditLog` | ❌ | ❌ | ❌ | ✅ (assumed) | ✅ |
+
+✅ = confirmed by docs/schema · ⚠️ = inferred from role ordering, not explicitly documented · ❌ = no evidence of access
+
+### Access flow diagram
+
+```mermaid
+flowchart TD
+  REQ[Incoming request] --> SESS[NextAuth session check]
+  SESS -->|no session| PUB[Public pages only]
+  SESS -->|session found| ROLE[Read User.role]
+  ROLE --> GATE{Route Guard}
+
+  GATE -->|STUDENT| R1[/dashboard: own records only/]
+  GATE -->|FACULTY| R2[/dashboard + /faculty: own + co-authored records/]
+  GATE -->|EDITOR| R3[/dashboard + review queue: approve/reject submissions/]
+  GATE -->|ADMIN| R4[/dashboard + /faculty + /admin: special users, overrides, publishing/]
+  GATE -->|SUPERADMIN| R5[Full access incl. role changes on ADMINs, deletions/]
+
+  R1 --> API[API route: role re-checked per request]
+  R2 --> API
+  R3 --> API
+  R4 --> API
+  R5 --> API
+  API --> AUDIT[Sensitive actions logged to AuditLog]
+```
+
+### Text summary
+
+- **STUDENT** — sandboxed to their own dashboard and their own research records as an author; no review or admin surface.
+- **FACULTY** — same dashboard access, plus `/faculty`-tier views and appears as a verifiable co-author across student submissions.
+- **EDITOR** — sits above FACULTY in the enum; its purpose (per role name) is reviewing/approving submitted research, though the schema has no field that restricts `teacherStatus`/status transitions to EDITOR specifically — this is enforced in application logic, not in Prisma.
+- **ADMIN** — reaches `/admin`, manages `SpecialUser` pre-assignments, can override faculty verification (logged as `ADMIN_OVERRIDE`), and likely handles day-to-day publishing/moderation.
+- **SUPERADMIN** — same admin surface plus the actions reserved for the top of the hierarchy: changing an ADMIN's own role, deleting users, and any override that needs to be distinguishable in the audit trail as `SUPERADMIN_OVERRIDE` rather than `ADMIN_OVERRIDE`.
+
+Every role transition and override is written to `AuditLog` regardless of tier, so even where the *permission boundary* isn't visible in the schema, the *consequence* of crossing it always is.
 
 ## High-Level Architecture
 
 ```mermaid
 flowchart LR
-  A[Visitor / User Browser] --> B[Next.js App Router UI]
-  B --> C[Auth Layer: NextAuth]
-  C --> D[Role + Profile Gate in proxy.ts]
-  D --> E[Dashboard Pages]
-  D --> F[Public Pages]
-  E --> G[API Routes]
-  G --> H[Prisma Client]
-  H --> I[(CockroachDB)]
-  E --> J[Appwrite File Storage]
-  E --> K[Charts / Tables / Forms]
-  F --> L[Public Journal Feed]
+  U[User Browser] --> UI[App UI]
+  UI --> AUTH[NextAuth: Account / Session]
+  AUTH --> ROLE[SpecialUser lookup by email]
+  ROLE --> GATE[Role + Profile Gate]
+  GATE --> DASH[Dashboard: Student / Faculty / Admin]
+  GATE --> PUBLIC[Public Pages]
+  DASH --> API[API Routes]
+  API --> PRISMA[Prisma Client]
+  PRISMA --> DB[(CockroachDB)]
+  API --> AUDIT[AuditLog writer]
+  AUDIT --> DB
 ```
 
-## Working Flow
+## Core Data Model
 
-### 1. First Visit
+### Identity & Access
 
-The homepage presents the institution brand, overview sections, achievements, visuals, and footer content. A visitor can browse public information without authentication.
+| Model | Purpose |
+|---|---|
+| `User` | Central profile — role, degree, department, skills, links, research relations |
+| `Account` / `Session` | NextAuth OAuth + session storage |
+| `VerificationToken` / `PasswordResetToken` | Email verification & password reset flows |
+| `SpecialUser` | Pre-registers an email with a role (e.g. auto-FACULTY on signup) |
+| `Notification` | Per-user in-app notifications with read state |
 
-### 2. Sign In or Sign Up
+### Research Output Modules
 
-Users authenticate through the auth pages. The auth layer verifies credentials, checks email verification, and loads the user session.
+Each of these follows the **same student/faculty co-authorship pattern**:
 
-### 3. Role Resolution
+| Module | Status Enum | Notes |
+|---|---|---|
+| `Journal` | `JournalStatus` | scope, review type, access type, indexing, quartile, impact factor |
+| `Conference` | `ConferenceStatus` | mode (online/offline/hybrid), presentation/publication dates |
+| `Patent` | `PatentStatus` | filing → grant lifecycle, grantedPatentNo |
+| `BookChapter` | `BookchapterStatus` | ISBN/ISSN, publisher, DOI |
+| `Copyright` | `CopyrightStatus` | registration number, filing/grant dates |
+| `Certificate` | `CertificateStatus` | offeredBy, completion date |
+| `FDP` | `FDPStatus` | faculty development program record |
+| `Achievement` | `AchievementStatus` | category, year |
 
-After authentication, the system checks the `SpecialUser` table using the user email.
+Each publication-type module (Journal, Conference, Patent, BookChapter, Copyright) has:
 
-- If an entry exists, the role from `SpecialUser` is applied.
-- If no entry exists, the user defaults to `STUDENT`.
+- **`<Model>StudentAuthor`** — direct join to `User` (student)
+- **`<Model>TeacherAuthor`** — join to `User` (nullable — faculty may be unlisted), plus `FacultyVerificationStatus` and a link to a `FacultyVerificationRequest`
+- **`teacherStatus`** (`TeacherStatus`) — independent internal review track (UPLOADED → ACCEPTED → PUBLISHED / UPDATE / REJECTED)
+- **`isPublic`** flag — gates visibility on the public journal/research feed
 
-### 4. Profile Completion
-
-If the user profile is not yet completed, the routing layer redirects the user to the setup profile page. This page collects profile details and can upload the profile image to Appwrite.
-
-### 5. Protected Routing
-
-The proxy layer enforces access rules:
-
-- `/dashboard` for STUDENT, FACULTY, and ADMIN
-- `/faculty` for FACULTY and ADMIN
-- `/admin` for ADMIN only
-
-### 6. Dashboard Usage
-
-The dashboard exposes forms, tables, export actions, and stats for the academic/research modules. These pages call API routes, which use Prisma to read and write the database.
-
-### 7. Admin Management
-
-Admins can add, edit, list, or delete special users. This is the control point for assigning future users their intended role.
-
-## Data Flow
+### Faculty Verification
 
 ```mermaid
 flowchart TD
-  U[User submits form] --> UI[React form/component]
-  UI --> API[Next.js API route]
-  API --> AUTH[Auth check / role check]
-  AUTH --> PRISMA[Prisma client]
-  PRISMA --> DB[(CockroachDB)]
-  DB --> PRISMA
-  PRISMA --> API
-  API --> UI
-  UI --> VIEW[Updated table, chart, or status message]
+  A[Student adds unlisted faculty co-author] --> B[FacultyVerificationRequest created]
+  B --> C[Single-use token emailed to faculty]
+  C --> D{Faculty responds}
+  D -->|Accepts| E[Status: ACCEPTED, linkedFacultyId set]
+  D -->|Rejects| F[Status: REJECTED, rejectionReason]
+  D -->|No action / Admin steps in| G[Admin/Superadmin override]
+  G --> H[overrideBy, overrideAt, overrideReason logged]
+  E --> I[AuditLog: FACULTY_VERIFICATION_ACCEPTED]
+  F --> J[AuditLog: FACULTY_VERIFICATION_REJECTED]
+  G --> K[AuditLog: ADMIN_OVERRIDE / SUPERADMIN_OVERRIDE]
 ```
 
-## Authentication And Role Flow
+### Grants & Bills
+
+```mermaid
+flowchart LR
+  GI[GrantIn: APPLIED → GRANTED → COMPLETED] --> GIT[GrantInTeacherAuthor: PI / Co-PI / Author]
+  GI --> GIS[GrantInStudentAuthor]
+  GI --> GB[GrantInBill: PENDING → ACCEPTED → PAID]
+  GI --> GM[GrantInMapping]
+  GM --> J2[Journal]
+  GM --> C2[Conference]
+  GM --> P2[Patent]
+  GM --> BC[BookChapter]
+  GM --> CR[Copyright]
+```
+
+`GrantInMapping` links a grant to whichever publication it funded (`publicationType` discriminates which FK is populated). `GrantInBill` tracks reimbursement/expense documents (registration, travel, accommodation, hardware, subscription) with an approval + payment status.
+
+### Public Website
+
+`Event` (DRAFT → PUBLISHED → CANCELLED/ARCHIVED) powers public event listings. Any record with `isPublic = true` and a published status surfaces on the public research/journal feed — no auth required to view.
+
+### Audit Trail
+
+```mermaid
+flowchart LR
+  ACT[Any significant write: role change, submission, review, override, bill, event] --> LOG[AuditLog entry]
+  LOG --> FIELDS[actor, action, resourceType/Id, oldValue, newValue, reason, ip, metadata]
+  FIELDS --> DB[(audit_logs — append-only)]
+```
+
+`AuditLog` is append-only by design (normal users cannot modify/delete). `AuditAction` enumerates every tracked event: auth, research lifecycle, grants, bills, achievements, events, faculty verification, and admin overrides.
+
+## Request Lifecycle
 
 ```mermaid
 sequenceDiagram
   participant Browser
   participant NextAuth
-  participant Proxy as Route Guard
+  participant Guard as Role/Profile Gate
+  participant API as API Route
   participant Prisma
   participant DB as CockroachDB
 
-  Browser->>NextAuth: Sign in / sign up
-  NextAuth->>Prisma: Verify user and session data
-  Prisma->>DB: Read user and special-user records
-  DB-->>Prisma: Return role / profile state
-  Prisma-->>NextAuth: Session with role data
-  NextAuth-->>Proxy: Authenticated request
-  Proxy->>Proxy: Check role and profile completion
-  Proxy-->>Browser: Redirect or allow access
+  Browser->>NextAuth: Sign in
+  NextAuth->>Prisma: Verify credentials / session
+  Prisma->>DB: Check User + SpecialUser
+  DB-->>Prisma: Role, profileCompleted
+  Prisma-->>NextAuth: Session w/ role
+  NextAuth-->>Guard: Authenticated request
+  Guard->>Guard: Route by role + profile status
+  Guard-->>Browser: Dashboard / Public / Setup redirect
+
+  Browser->>API: Submit/update research record
+  API->>API: Session + role validation
+  API->>Prisma: Write record + author joins
+  Prisma->>DB: Persist change
+  API->>Prisma: Write AuditLog entry
+  Prisma->>DB: Persist audit record
+  DB-->>API: Success
+  API-->>Browser: Updated record / status
 ```
 
-## Research And Record Management Flow
+## Enum Summary
 
-Each research module follows the same pattern:
+- **Lifecycle statuses** (per module): `SUBMITTED → UNDER_REVIEW → APPROVED → PUBLISHED` (pattern repeats with module-specific extra states: `PRESENTED` for conferences, `GRANTED` for patents/grants)
+- **`TeacherStatus`**: `UPLOADED → ACCEPTED → PUBLISHED`, with `UPDATE` / `REJECTED` branches
+- **`FacultyVerificationStatus`**: `PENDING / ACCEPTED / REJECTED`
+- **`UserRole`**: `STUDENT / FACULTY / EDITOR / ADMIN / SUPERADMIN`
+- **`BillStatus`**: `PENDING / ACCEPTED / REJECTED / PAID`
+- **`EventStatus`**: `DRAFT / PUBLISHED / CANCELLED / ARCHIVED`
 
-1. User opens a module such as journal, conference, patent, book chapter, certificate, FDP, copyright, or grant.
-2. The page loads data from a dedicated API route.
-3. The user creates, edits, exports, or deletes records through a form or table.
-4. The API validates the session and role.
-5. Prisma writes the change to CockroachDB.
-6. The UI refreshes statistics, lists, and charts after the update.
+## Summary
 
-```mermaid
-flowchart LR
-  P[Module Page] --> F[Form / Table / Export Action]
-  F --> R[Research API Route]
-  R --> V[Validation + Role Check]
-  V --> S[Prisma Write / Read]
-  S --> D[(CockroachDB)]
-  D --> S
-  S --> C[Charts / Lists / Downloads]
-  C --> P
-```
-
-## Special-User Management Flow
-
-The special-user system is the main way administrators pre-assign roles.
-
-```mermaid
-flowchart TD
-  A[Admin opens Special Users page] --> B[Add email + role]
-  B --> C[POST /api/admin/special-users]
-  C --> D[Prisma upsert or create]
-  D --> E[(special_users table)]
-  E --> F[Next sign-in resolves role]
-  F --> G[User is routed to the correct dashboard]
-```
-
-## Public Website Flow
-
-- The landing page introduces the institution and the IEDC identity.
-- Public pages are separated from authenticated dashboard content.
-- Public journal content is available without requiring a login.
-- The public layout stays lightweight and focused on content display.
-
-## Internal Dashboard Areas
-
-- Home dashboard summary cards
-- Book chapters
-- Certificates
-- Conferences
-- Copyright entries
-- FDP records
-- Grant-in records and bill uploads
-- Journal management
-- Patent records
-- Admin special-user management
-
-## Supporting Services
-
-- Prisma ORM for database access
-- CockroachDB for persistent storage
-- NextAuth for authentication and session handling
-- Appwrite for file upload support in profile setup
-- Redis-backed utilities for cache or rate-limit style support where used
-
-## Default Seeded Special User
-
-The project includes a Prisma seed that creates or updates the following special user:
-
-- Email: velocium.iot@gmail.com
-- Role: FACULTY
-
-This ensures the account is recognized as faculty during login even before any manual admin update.
-
-## Client Summary
-
-This website is not only a content site. It is a complete institutional workflow system for login, role assignment, onboarding, and academic record management. The client can use it to manage users, control access, track research outputs, and present a professional public-facing institutional brand from the same application.
+The schema is built around one repeating pattern — **record + student authors + faculty authors (with verification) + status + isPublic flag** — applied consistently across seven research/output types, layered with a grants/billing subsystem, a faculty-verification workflow, role pre-assignment via `SpecialUser`, and an append-only `AuditLog` covering every meaningful state change in the system.
