@@ -1,7 +1,5 @@
 /**
- * @file middleware.ts
- * @description Centralized Next.js route protection middleware.
- *
+ 
  * SECURITY CONTRACT:
  *  - This middleware provides a first line of defense at the edge.
  *  - It does NOT replace per-route authorization checks — every API route
