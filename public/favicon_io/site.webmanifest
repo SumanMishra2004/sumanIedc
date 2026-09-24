@@ -1,0 +1,21 @@
+{
+  "name": "IEDC | Innovation & Entrepreneurship Development Cell",
+  "short_name": "IEDC",
+  "description": "Official portal for research output management — journals, conferences, patents, grants, and institutional achievements.",
+  "start_url": "/",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#000000",
+  "icons": [
+    {
+      "src": "/favicon_io/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon_io/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
