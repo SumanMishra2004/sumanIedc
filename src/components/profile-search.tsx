@@ -52,10 +52,10 @@ export function ProfileSearch() {
     const timer = setTimeout(async () => {
       setIsLoading(true)
       try {
-        const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`)
+        const res = await fetch(`/api/user?search=${encodeURIComponent(query)}&limit=10`)
         if (res.ok) {
           const data = await res.json()
-          setResults(data.users || [])
+          setResults(data.data || [])
           setIsOpen(true)
         }
       } catch (error) {
