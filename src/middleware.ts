@@ -1,5 +1,4 @@
 /**
- 
  * SECURITY CONTRACT:
  *  - This middleware provides a first line of defense at the edge.
  *  - It does NOT replace per-route authorization checks — every API route
@@ -8,19 +7,14 @@
  *  - Role-based access in this file covers NAVIGATION protection only.
  *    Data-level authorization always happens inside each route handler.
  *
- * Route categories:
- *  PUBLIC     — accessible without authentication
- *  AUTH_ONLY  — any authenticated user
- *  STUDENT+   — STUDENT and higher (all authenticated users)
- *  FACULTY+   — FACULTY and higher
- *  EDITOR+    — EDITOR and higher
- *  ADMIN+     — ADMIN and higher
- *  SUPERADMIN — SUPERADMIN only
+ * Route protection now uses centralized ROUTE_ACCESS configuration from
+ * src/lib/config/sidebar.ts for consistency between sidebar and middleware.
  */
 
 import { auth } from '@/lib/auth'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { canAccess, type Role } from '@/lib/config/sidebar'
 
 // ─── Route pattern helpers ────────────────────────────────────────────────────
 
@@ -31,7 +25,7 @@ function matchesAny(pathname: string, patterns: string[]): boolean {
   })
 }
 
-// ─── Route definitions ────────────────────────────────────────────────────────
+// ─── Public route definitions ─────────────────────────────────────────────────
 
 /** Routes that are entirely public — no auth required */
 const PUBLIC_ROUTES = [
@@ -52,51 +46,6 @@ const PUBLIC_ROUTES = [
   '/api/public*',       // Public data APIs
   '/api/faculty-verification/verify*', // Token-based verification
 ]
-
-/** Routes that require authentication but no specific role */
-const AUTH_REQUIRED_ROUTES = [
-  '/dashboard',
-  '/api/profile*',
-  '/api/notifications*',
-  '/api/user*',
-]
-
-/** Routes accessible to FACULTY and higher */
-const FACULTY_ROUTES = [
-  '/api/faculty-verification*',
-]
-
-/** Routes accessible to EDITOR and higher */
-const EDITOR_ROUTES = [
-  '/dashboard/editor*',
-  '/dashboard/events*',
-]
-
-/** Routes accessible to ADMIN and higher */
-const ADMIN_ROUTES = [
-  '/dashboard/admin*',
-  '/api/admin*',
-]
-
-/** Routes accessible to SUPERADMIN only */
-const SUPERADMIN_ROUTES = [
-  '/dashboard/superadmin*',
-  '/api/superadmin*',
-]
-
-// ─── Role rank lookup ─────────────────────────────────────────────────────────
-
-const ROLE_RANK: Record<string, number> = {
-  STUDENT:    0,
-  FACULTY:    1,
-  EDITOR:     2,
-  ADMIN:      3,
-  SUPERADMIN: 4,
-}
-
-function rankOf(role: string): number {
-  return ROLE_RANK[role] ?? -1
-}
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
@@ -140,52 +89,48 @@ export default auth(async function middleware(req: NextRequest & { auth?: unknow
     // API calls during setup are allowed through
   }
 
-  // ── 4. SUPERADMIN-only routes ─────────────────────────────────────────────
-  if (matchesAny(pathname, SUPERADMIN_ROUTES)) {
-    if (rankOf(role) < rankOf('SUPERADMIN')) {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
+  // ── 4. Dashboard route authorization using centralized config ─────────────
+  if (pathname.startsWith('/dashboard')) {
+    const userRole = role as Role
+    
+    if (!canAccess(userRole, pathname)) {
+      // User doesn't have permission for this dashboard route
       return NextResponse.redirect(new URL('/dashboard', req.url))
+    }
+    
+    return NextResponse.next()
+  }
+
+  // ── 5. API route authorization (manual rules for API paths) ───────────────
+  // API routes use manual rules since they're not in sidebar config
+  
+  // SUPERADMIN API routes
+  if (pathname.startsWith('/api/superadmin')) {
+    if (role !== 'SUPERADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     return NextResponse.next()
   }
 
-  // ── 5. ADMIN+ routes ──────────────────────────────────────────────────────
-  if (matchesAny(pathname, ADMIN_ROUTES)) {
-    if (rankOf(role) < rankOf('ADMIN')) {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
-      return NextResponse.redirect(new URL('/dashboard', req.url))
+  // ADMIN+ API routes
+  if (pathname.startsWith('/api/admin')) {
+    if (role !== 'ADMIN' && role !== 'SUPERADMIN') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     return NextResponse.next()
   }
 
-  // ── 6. EDITOR+ routes ─────────────────────────────────────────────────────
-  if (matchesAny(pathname, EDITOR_ROUTES)) {
-    if (rankOf(role) < rankOf('EDITOR')) {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
-      return NextResponse.redirect(new URL('/dashboard', req.url))
+  // FACULTY+ API routes
+  if (pathname.startsWith('/api/faculty-verification')) {
+    const ROLE_RANK = { STUDENT: 0, FACULTY: 1, EDITOR: 2, ADMIN: 3, SUPERADMIN: 4 }
+    if ((ROLE_RANK[role] ?? -1) < ROLE_RANK.FACULTY) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     return NextResponse.next()
   }
 
-  // ── 7. FACULTY+ routes ────────────────────────────────────────────────────
-  if (matchesAny(pathname, FACULTY_ROUTES)) {
-    if (rankOf(role) < rankOf('FACULTY')) {
-      if (pathname.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-      }
-      return NextResponse.redirect(new URL('/dashboard', req.url))
-    }
-    return NextResponse.next()
-  }
-
-  // ── 8. Auth-required routes (any authenticated user) ──────────────────────
-  // Already authenticated at step 2 — allow through
+  // ── 6. All other authenticated routes ─────────────────────────────────────
+  // API profile/notifications/user routes, etc. — already authenticated at step 2
   return NextResponse.next()
 })
 

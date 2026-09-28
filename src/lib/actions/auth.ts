@@ -209,9 +209,9 @@ export async function forgotPasswordAction(
 
     const user = await prisma.user.findUnique({
       where: { email: parsed.data.email },
-      select: { id: true, email: true, password: true },
+      select: { id: true, email: true, password: true, isActive: true, deletedAt: true },
     })
-    if (!user || !user.password) return { success: true, message: SAFE_MSG }
+    if (!user || !user.password || !user.isActive || user.deletedAt) return { success: true, message: SAFE_MSG }
 
     const { rawToken } = await generatePasswordResetToken(user.id, ip)
     await sendPasswordResetEmail(user.email, rawToken)

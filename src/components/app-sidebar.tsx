@@ -3,7 +3,7 @@
 import * as React from "react"
 import { IconInnerShadowTop } from "@tabler/icons-react"
 import Link from "next/link"
-import { Award, BookOpen, CircleDollarSign, Settings, User2, UserCog, Sparkles, ClipboardCheck } from "lucide-react"
+import { Award, BookOpen, CalendarDays, CircleDollarSign, Settings, User2, UserCog, Sparkles, ClipboardCheck } from "lucide-react"
 import { useSession } from "next-auth/react"
 
 import { NavUser } from "@/components/nav-user"
@@ -93,6 +93,16 @@ export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
             title: "Co-Author Requests",
             url: "/dashboard/faculty/verification-requests",
             icon: ClipboardCheck,
+          },
+        ]
+      : []),
+    // Editor+: show Events Management
+    ...(isEditorOrHigher(userRole)
+      ? [
+          {
+            title: "Events",
+            url: "/dashboard/events",
+            icon: CalendarDays,
           },
         ]
       : []),
