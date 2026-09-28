@@ -1,7 +1,6 @@
 "use client";
 
-import type { HomePageData } from "../../../sanity/lib/queries";
-import { urlFor } from "../../../sanity/lib/image";
+import type { HomePageData } from "@/types/content";
 
 // ─── Hardcoded hero values ─────────────────────────────────────────────────────
 const HERO_HEADING_LINE1 = "Innovation &";
@@ -40,9 +39,8 @@ interface HeroSectionProps {
 export default function HeroSection({ data }: HeroSectionProps) {
   const d = data ?? FALLBACK;
 
-  const bgUrl = d.heroBackground
-    ? urlFor(d.heroBackground).width(1920).quality(85).url()
-    : "";
+  // heroBackground is no longer a Sanity image ref — use a plain string URL or empty
+  const bgUrl = typeof d.heroBackground === "string" ? d.heroBackground : "";
 
   const [, ...deptRest] = HERO_DEPARTMENT.split(" of ");
   const deptSuffix = deptRest.join(" of ");

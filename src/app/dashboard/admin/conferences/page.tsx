@@ -52,7 +52,7 @@ export default function AdminConferencesPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-[1600px] p-6 space-y-6">
+    <div className="container mx-auto max-w-400 p-6 space-y-6">
       {/* Header */}
       <div>
         <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">

@@ -1,62 +1,88 @@
-import { v4 as uuidv4 } from "uuid";
-import prisma from "@/lib/prisma";
+/**
+ * @file tokens.ts
+ * Token generation for email verification and password reset.
+ *
+ * Schema facts:
+ *  - EmailVerificationToken: { id, userId, tokenHash (SHA-256), expires, usedAt }
+ *  - PasswordResetToken:     { id, userId, tokenHash (SHA-256), expires, usedAt, ipAddress }
+ *
+ * We generate a cryptographically random raw token, send it in the email,
+ * but only store its SHA-256 hash in the database.
+ */
 
-export const generateVerificationToken = async (email: string) => {
-  const token = uuidv4();
-  const expires = new Date(new Date().getTime() + 3600 * 1000); // 1 hour expiration
+import { randomBytes, createHash } from 'crypto'
+import prisma from '@/lib/prisma'
 
-  const existingToken = await prisma.verificationToken.findFirst({
-    where: { identifier: email }
-  });
+/** Validity windows */
+const EMAIL_VERIFY_TTL_MS = 60 * 60 * 1000       // 1 hour
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000     // 1 hour
 
-  if (existingToken) {
-    await prisma.verificationToken.delete({
-      where: {
-        identifier_token: {
-          identifier: existingToken.identifier,
-          token: existingToken.token,
-        }
-      }
-    });
-  }
+/** SHA-256 hex of a raw token string */
+function sha256(raw: string): string {
+  return createHash('sha256').update(raw).digest('hex')
+}
 
-  const verificationToken = await prisma.verificationToken.create({
-    data: {
-      identifier: email,
-      token,
-      expires,
-    }
-  });
+/** Generate a 48-byte (96-char hex) URL-safe token */
+function generateRawToken(): string {
+  return randomBytes(48).toString('hex')
+}
 
-  return verificationToken;
-};
+// ─── Email Verification ────────────────────────────────────────────────────────
 
-export const generatePasswordResetToken = async (email: string) => {
-  const token = uuidv4();
-  const expires = new Date(new Date().getTime() + 3600 * 1000); // 1 hour
+export interface VerificationTokenResult {
+  /** The raw token to embed in the verification link — NEVER stored in DB */
+  rawToken: string
+  expires: Date
+}
 
-  const existingToken = await prisma.passwordResetToken.findFirst({
-    where: { identifier: email }
-  });
+/**
+ * Creates (or replaces) an email-verification token for a given user.
+ * Returns the raw token so the caller can embed it in the link.
+ */
+export async function generateVerificationToken(
+  userId: string,
+  ipAddress?: string | null,
+): Promise<VerificationTokenResult> {
+  // Delete any existing tokens for this user
+  await prisma.emailVerificationToken.deleteMany({ where: { userId } })
 
-  if (existingToken) {
-    await prisma.passwordResetToken.delete({
-      where: {
-        identifier_token: {
-          identifier: existingToken.identifier,
-          token: existingToken.token,
-        }
-      }
-    });
-  }
+  const rawToken = generateRawToken()
+  const tokenHash = sha256(rawToken)
+  const expires = new Date(Date.now() + EMAIL_VERIFY_TTL_MS)
 
-  const passwordResetToken = await prisma.passwordResetToken.create({
-    data: {
-      identifier: email,
-      token,
-      expires,
-    }
-  });
+  await prisma.emailVerificationToken.create({
+    data: { userId, tokenHash, expires },
+  })
 
-  return passwordResetToken;
-};
+  return { rawToken, expires }
+}
+
+// ─── Password Reset ────────────────────────────────────────────────────────────
+
+export interface PasswordResetTokenResult {
+  /** The raw token to embed in the reset link — NEVER stored in DB */
+  rawToken: string
+  expires: Date
+}
+
+/**
+ * Creates (or replaces) a password-reset token for a given user.
+ * Returns the raw token so the caller can embed it in the link.
+ */
+export async function generatePasswordResetToken(
+  userId: string,
+  ipAddress?: string | null,
+): Promise<PasswordResetTokenResult> {
+  // Delete any existing tokens for this user
+  await prisma.passwordResetToken.deleteMany({ where: { userId } })
+
+  const rawToken = generateRawToken()
+  const tokenHash = sha256(rawToken)
+  const expires = new Date(Date.now() + PASSWORD_RESET_TTL_MS)
+
+  await prisma.passwordResetToken.create({
+    data: { userId, tokenHash, expires, ipAddress: ipAddress ?? null },
+  })
+
+  return { rawToken, expires }
+}

@@ -309,6 +309,7 @@ export async function POST(request: Request) {
 
         const crypto = await import('crypto')
         const verificationToken = crypto.randomBytes(48).toString('hex')
+        const tokenHash = crypto.createHash('sha256').update(verificationToken).digest('hex')
         const tokenExpiry = new Date(Date.now() + 72 * 60 * 60 * 1000)
 
         const verificationRequest = await prisma.facultyVerificationRequest.create({
@@ -319,7 +320,7 @@ export async function POST(request: Request) {
             facultyEmail: normEmail,
             affiliation: ext.affiliation ?? null,
             department: ext.department ?? null,
-            verificationToken,
+            tokenHash,
             tokenExpiry,
             status: autoAccept ? 'ACCEPTED' : 'PENDING',
             tokenUsed: autoAccept ? true : false,

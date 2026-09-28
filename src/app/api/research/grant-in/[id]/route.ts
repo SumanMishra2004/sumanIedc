@@ -27,7 +27,7 @@ import {
 } from '@/lib/auth/permissions'
 import { validateGrantStatusTransition } from '@/lib/auth/workflow'
 import { pickAllowedFields, GRANT_FACULTY_FIELDS, GRANT_ADMIN_FIELDS } from '@/lib/auth/field-allowlists'
-import { AuditActions, auditGrantFinancial, fromSession } from '@/lib/audit'
+
 import {
   notifyGrantApproved,
   notifyGrantRejected,
@@ -254,26 +254,8 @@ export async function PATCH(
       include: { facultyAuthors: true, studentAuthors: true },
     })
 
-    // ── 9. Audit log for status changes ─────────────────────────────────────
+    // ── 9. Status-change notifications ───────────────────────────────────────
     if (existingGrant.grantInStatus !== updatedGrant.grantInStatus) {
-      const actionMap: Record<string, (typeof AuditActions)[keyof typeof AuditActions]> = {
-        GRANTED:   AuditActions.GRANT_APPROVED,
-        REJECTED:  AuditActions.GRANT_REJECTED,
-        COMPLETED: AuditActions.GRANT_COMPLETED,
-      }
-      const action = actionMap[updatedGrant.grantInStatus] ?? AuditActions.GRANT_CREATED
-
-      await auditGrantFinancial({
-        session:      session as { user: { id: string; email: string; role: string } },
-        action,
-        resourceType: 'GrantIn',
-        resourceId:   id,
-        oldValue:     { status: existingGrant.grantInStatus, amountGranted: existingGrant.amountGranted },
-        newValue:     { status: updatedGrant.grantInStatus, amountGranted: updatedGrant.amountGranted },
-        ipAddress:    ip,
-      })
-
-      // ── 10. Status-change notifications ──────────────────────────────────
       const allAuthorIds = [
         ...updatedGrant.facultyAuthors.map((fa) => fa.userId).filter((uid): uid is string => uid !== null),
         ...updatedGrant.studentAuthors.map((sa) => sa.userId),

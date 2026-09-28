@@ -7,7 +7,7 @@ import {
   canAssignRole,
   type UserRoleString,
 } from "@/lib/auth/permissions";
-import { auditRoleChange, AuditActions, writeAuditLog, fromSession } from "@/lib/audit";
+
 import { getClientIp } from "@/lib/auth/guard";
 
 // Helper: require ADMIN or higher — returns 401 when unauthenticated, 403 when insufficient role
@@ -47,12 +47,7 @@ export async function GET(
         bio: true,
         profileCompleted: true,
         emailVerified: true,
-        accounts: {
-          select: {
-            provider: true,
-            type: true,
-          },
-        },
+        
       },
     });
 
@@ -141,17 +136,7 @@ export async function PATCH(
         select: { id: true, name: true, email: true, role: true },
       });
 
-      // Audit log — always awaited for role changes (security-critical)
-      await auditRoleChange({
-        actorId:      session.user.id,
-        actorEmail:   session.user.email,
-        actorRole:    session.user.role,
-        targetUserId: id,
-        targetEmail:  targetUser.email ?? "",
-        oldRole:      targetUser.role,
-        newRole:      targetRole,
-        ipAddress:    ip,
-      });
+
 
       // Keep SpecialUser table in sync (upsert so it covers both new and existing entries)
       if (targetUser.email) {
@@ -280,17 +265,7 @@ export async function DELETE(
 
     await prisma.user.delete({ where: { id } });
 
-    // Audit deleted user (fire-and-forget — deletion already succeeded)
-    writeAuditLog({
-      actorId:      session.user.id,
-      actorEmail:   session.user.email,
-      actorRole:    session.user.role,
-      action:       AuditActions.USER_DELETED,
-      resourceType: "User",
-      resourceId:   id,
-      oldValue:     { role: targetUser.role },
-      ipAddress:    ip,
-    }).catch(() => {});
+
 
     return NextResponse.json({
       success: true,

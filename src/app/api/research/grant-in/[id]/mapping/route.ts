@@ -20,7 +20,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { PublicationType, GrantInRole, UserRole } from '@prisma/client'
 import { isAdminOrHigher } from '@/lib/auth/permissions'
-import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+
 import { getClientIp } from '@/lib/auth/guard'
 import { createNotification, NotifType } from '@/lib/notifications'
 
@@ -274,16 +274,6 @@ export async function POST(
         },
       })
     })
-
-    // Audit log (fire-and-forget — mapping already created)
-    writeAuditLog({
-      ...fromSession(session as { user: { id: string; email: string; role: string } }),
-      action:       AuditActions.GRANT_MAPPING_CREATED,
-      resourceType: 'GrantInMapping',
-      resourceId:   mapping.id,
-      newValue:     { grantId, publicationType: pubType, publicationId },
-      ipAddress:    ip,
-    }).catch(() => {})
 
     // Notify PI/CoPI members
     const piMembers = await prisma.grantInTeacherAuthor.findMany({

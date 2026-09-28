@@ -1,27 +1,10 @@
-/**
- * POST /api/faculty-verification/[id]/admin-override
- *
- * Administrative override of a verification request.
- *
- * Per spec: "Every SUPERADMIN override must be auditable."
- * In practice every ADMIN override also records to the audit log.
- *
- * Security guarantees:
- *  - 401 if unauthenticated, 403 if not ADMIN+
- *  - overrideReason is REQUIRED (cannot be blank)
- *  - tokenUsed pre-checked to close replay race
- *  - DB update + author junction in a single transaction
- *  - Audit log always awaited (security-sensitive, must not be fire-and-forget)
- *  - verificationToken NEVER returned in response
- *  - Student notified via centralized notification service
- */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { FacultyVerificationStatus } from '@prisma/client'
 import { isAdminOrHigher } from '@/lib/auth/permissions'
-import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+
 import { getClientIp } from '@/lib/auth/guard'
 import {
   notifyFacultyVerificationAccepted,
@@ -98,7 +81,7 @@ export async function POST(
           status:          newStatus,
           tokenUsed:       true,
           verifiedAt:      new Date(),
-          overrideBy:      session.user.id,
+          overrideById:    session.user.id,
           overrideAt:      new Date(),
           overrideReason:  overrideReason.trim(),
           rejectionReason: action === 'reject' ? overrideReason.trim() : null,
@@ -115,17 +98,7 @@ export async function POST(
       return updated
     })
 
-    // ── Audit log — always awaited for admin overrides ──────────────────────
-    await writeAuditLog({
-      ...fromSession(session as { user: { id: string; email: string; role: string } }),
-      action:       AuditActions.FACULTY_VERIFICATION_OVERRIDE,
-      resourceType: 'FacultyVerificationRequest',
-      resourceId:   id,
-      oldValue:     { status: request.status, tokenUsed: request.tokenUsed },
-      newValue:     { status: newStatus, overrideBy: session.user.id },
-      reason:       overrideReason.trim(),
-      ipAddress:    ip,
-    })
+
 
     // ── Notifications ───────────────────────────────────────────────────────
     if (action === 'accept') {
@@ -143,7 +116,7 @@ export async function POST(
       })
     }
 
-    const { verificationToken: _token, ...safeRequest } = updated
+    const { tokenHash: _token, ...safeRequest } = updated
     return NextResponse.json({ success: true, request: safeRequest })
   } catch (error) {
     console.error('[POST /api/faculty-verification/[id]/admin-override]', error)

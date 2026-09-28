@@ -14,7 +14,6 @@
  *  - 409 if the request is already resolved (not PENDING) — idempotency guard
  *  - tokenUsed checked BEFORE update to prevent double-accept race condition
  *  - verificationToken is NEVER returned in any response
- *  - Audit log written for every accept action
  *  - Student and faculty both notified
  */
 
@@ -23,7 +22,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { FacultyVerificationStatus } from '@prisma/client'
 import { isFacultyOrHigher, isAdminOrHigher } from '@/lib/auth/permissions'
-import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+
 import { getClientIp } from '@/lib/auth/guard'
 import {
   notifyFacultyVerificationAccepted,
@@ -64,8 +63,10 @@ export async function PATCH(
     }
 
     // ── Replay prevention — single-use flag ────────────────────────────────
-    // tokenUsed should be false for PENDING — double-check to close race
-    if (request.tokenUsed) {
+    // tokenUsed should be false for PENDING — double-check to close race.
+    // Skip for ADMIN+ since they operate via authenticated session, not the email link.
+    const isAdmin = isAdminOrHigher(session.user.role)
+    if (!isAdmin && request.tokenUsed) {
       return NextResponse.json(
         { error: 'This verification request has already been processed' },
         { status: 409 },
@@ -73,7 +74,6 @@ export async function PATCH(
     }
 
     // ── Email ownership check — only ADMIN+ can accept on behalf ──────────
-    const isAdmin = isAdminOrHigher(session.user.role)
     if (!isAdmin && request.facultyEmail !== session.user.email) {
       return NextResponse.json(
         { error: 'You are not the faculty member associated with this request' },
@@ -86,26 +86,19 @@ export async function PATCH(
       const updated = await tx.facultyVerificationRequest.update({
         where: { id },
         data: {
-          status:         FacultyVerificationStatus.ACCEPTED,
-          verifiedAt:     new Date(),
-          tokenUsed:      true,
-          linkedFacultyId: session.user.id,
+          status:          FacultyVerificationStatus.ACCEPTED,
+          verifiedAt:      new Date(),
+          tokenUsed:       true,
+          // Link to the actual faculty user — only set when they accept themselves,
+          // not when an admin accepts on their behalf
+          linkedFacultyId: !isAdmin ? session.user.id : (request.linkedFacultyId ?? null),
         },
       })
-      await updateTeacherAuthorStatus(tx, request.researchType, request.researchId, id, 'ACCEPTED', session.user.id)
+      await updateTeacherAuthorStatus(tx, request.researchType, request.researchId, id, 'ACCEPTED', !isAdmin ? session.user.id : undefined)
       return updated
     })
 
-    // ── Audit log ──────────────────────────────────────────────────────────
-    await writeAuditLog({
-      ...fromSession(session as { user: { id: string; email: string; role: string } }),
-      action:       AuditActions.FACULTY_VERIFICATION_ACCEPTED,
-      resourceType: 'FacultyVerificationRequest',
-      resourceId:   id,
-      oldValue:     { status: FacultyVerificationStatus.PENDING },
-      newValue:     { status: FacultyVerificationStatus.ACCEPTED, linkedFacultyId: session.user.id },
-      ipAddress:    ip,
-    })
+
 
     // ── Notifications ──────────────────────────────────────────────────────
     await notifyFacultyVerificationAccepted({
@@ -114,7 +107,7 @@ export async function PATCH(
       researchType:  request.researchType,
     })
 
-    const { verificationToken: _token, ...safeRequest } = updated
+    const { tokenHash: _token, ...safeRequest } = updated
     return NextResponse.json({ request: safeRequest })
   } catch (error) {
     console.error('[PATCH /api/faculty-verification/[id]/accept]', error)

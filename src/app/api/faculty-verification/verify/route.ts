@@ -1,22 +1,12 @@
-/**
- * GET /api/faculty-verification/verify?token=<token>
- *
- * Secure token-based verification endpoint.
- * Faculty members who receive the verification email click a link that hits
- * this endpoint with their unique token.  The response is JSON so the
- * front-end page (/faculty-verification) can use it to show the correct UI.
- *
- * Security guarantees:
- *  - Token is cryptographically random (96 hex chars).
- *  - Token has an expiry (72 hours).
- *  - Token is single-use (tokenUsed flag).
- *  - Specific to one research record + one faculty-email pair.
- *  - Does NOT automatically accept — it only validates the token and returns
- *    the request metadata.  The faculty must explicitly POST to /accept.
- */
+
 import { NextRequest, NextResponse } from 'next/server'
+import { createHash } from 'crypto'
 import prisma from '@/lib/prisma'
 import { FacultyVerificationStatus } from '@prisma/client'
+
+function hashToken(token: string) {
+  return createHash('sha256').update(token).digest('hex')
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,7 +17,7 @@ export async function GET(req: NextRequest) {
     }
 
     const request = await prisma.facultyVerificationRequest.findUnique({
-      where: { verificationToken: token },
+      where: { tokenHash: hashToken(token) },
       select: {
         id: true,
         researchType: true,
@@ -121,7 +111,7 @@ export async function POST(req: NextRequest) {
     }
 
     const request = await prisma.facultyVerificationRequest.findUnique({
-      where: { verificationToken: token },
+      where: { tokenHash: hashToken(token) },
     })
 
     if (!request) {
@@ -220,7 +210,7 @@ export async function POST(req: NextRequest) {
       },
     }).catch((e) => console.error('[verify POST] Failed to notify student:', e))
 
-    const { verificationToken: _token, ...safeRequest } = updated
+    const { tokenHash: _token, ...safeRequest } = updated
     return NextResponse.json({
       success: true,
       action,

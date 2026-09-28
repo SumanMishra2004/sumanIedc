@@ -92,8 +92,20 @@ function ForgotPasswordContent() {
           )}
 
           {success && (
-            <div style={{ background: 'rgba(201,245,59,0.07)', border: '1px solid rgba(201,245,59,0.2)', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#c9f53b' }}>
-              {success}
+            <div>
+              <div style={{ background: 'rgba(201,245,59,0.07)', border: '1px solid rgba(201,245,59,0.2)', borderRadius: 8, padding: '14px', marginBottom: 16, fontSize: 13, color: '#c9f53b', lineHeight: 1.6 }}>
+                {success}
+              </div>
+              <p style={{ fontSize: 12, color: 'rgba(240,237,230,0.35)', textAlign: 'center', fontFamily: 'monospace' }}>
+                Didn&apos;t receive it?{' '}
+                <button
+                  type="button"
+                  onClick={() => { setSuccess(''); setEmail(''); setTurnstileToken('') }}
+                  style={{ background: 'none', border: 'none', color: '#c9f53b', cursor: 'pointer', fontSize: 12, fontFamily: 'monospace', padding: 0 }}
+                >
+                  Try again
+                </button>
+              </p>
             </div>
           )}
 

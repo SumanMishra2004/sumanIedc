@@ -2,8 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { gsap } from "gsap";
-import type { GallerySlideData } from "../../../sanity/lib/queries";
-import { urlFor } from "../../../sanity/lib/image";
+import type { GallerySlideData } from "@/types/content";
 
 // ─── Fallback slides (used when Sanity has no data yet) ───────────────────────
 const FALLBACK_SLIDES: GallerySlideData[] = [
@@ -15,7 +14,7 @@ const FALLBACK_SLIDES: GallerySlideData[] = [
       "High-resolution transmission electron microscopy revealing nanoscale crystalline structures at 2Å resolution.",
     year: "2024",
     accentColor: "#c9f53b",
-    image: null as never,
+    image: null,
     orderRank: 1,
   },
   {
@@ -26,7 +25,7 @@ const FALLBACK_SLIDES: GallerySlideData[] = [
       "X-ray diffraction patterns from engineered insulin analogs showing conformational shifts under physiological pH.",
     year: "2024",
     accentColor: "#a8d62a",
-    image: null as never,
+    image: null,
     orderRank: 2,
   },
   {
@@ -37,7 +36,7 @@ const FALLBACK_SLIDES: GallerySlideData[] = [
       "Droplet generation at 8,000 Hz enabling single-cell encapsulation for high-throughput genomic screening.",
     year: "2023",
     accentColor: "#c9f53b",
-    image: null as never,
+    image: null,
     orderRank: 3,
   },
   {
@@ -48,7 +47,7 @@ const FALLBACK_SLIDES: GallerySlideData[] = [
       "256-channel cortical recording array achieving simultaneous readout from prefrontal and hippocampal regions.",
     year: "2024",
     accentColor: "#a8d62a",
-    image: null as never,
+    image: null,
     orderRank: 4,
   },
   {
@@ -59,7 +58,7 @@ const FALLBACK_SLIDES: GallerySlideData[] = [
       "NV-center diamond magnetometer operating at 15mK detecting sub-femtotesla magnetic anomalies.",
     year: "2024",
     accentColor: "#c9f53b",
-    image: null as never,
+    image: null,
     orderRank: 5,
   },
 ];
@@ -74,8 +73,9 @@ const FALLBACK_URLS: string[] = [
 ];
 
 function getSlideImageUrl(slide: GallerySlideData, index: number): string {
-  if (slide.image) {
-    return urlFor(slide.image).width(1920).quality(85).url();
+  // image is now a plain string URL or null
+  if (typeof slide.image === "string" && slide.image) {
+    return slide.image;
   }
   return FALLBACK_URLS[index % FALLBACK_URLS.length];
 }

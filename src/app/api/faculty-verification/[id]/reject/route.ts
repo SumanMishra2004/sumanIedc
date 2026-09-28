@@ -1,27 +1,10 @@
-/**
- * PATCH /api/faculty-verification/[id]/reject
- *
- * The faculty member (or ADMIN+) rejects a co-author verification request
- * via their authenticated session.
- *
- * Security guarantees:
- *  - 401 if unauthenticated
- *  - 403 if not FACULTY or higher
- *  - 403 if caller's email doesn't match facultyEmail (unless ADMIN+)
- *  - 409 if already resolved (idempotency guard)
- *  - tokenUsed pre-checked to close race condition
- *  - DB update + author junction wrapped in transaction
- *  - verificationToken NEVER returned in response
- *  - Audit log written for every reject
- *  - Student notified via centralized notification service
- */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { FacultyVerificationStatus } from '@prisma/client'
 import { isFacultyOrHigher, isAdminOrHigher } from '@/lib/auth/permissions'
-import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+
 import { getClientIp } from '@/lib/auth/guard'
 import { notifyFacultyVerificationRejected } from '@/lib/notifications'
 
@@ -62,7 +45,9 @@ export async function PATCH(
     }
 
     // Replay prevention — single-use token flag
-    if (request.tokenUsed) {
+    // Skip for ADMIN+ since they operate via authenticated session, not the email link
+    const isAdmin = isAdminOrHigher(session.user.role)
+    if (!isAdmin && request.tokenUsed) {
       return NextResponse.json(
         { error: 'This verification request has already been processed' },
         { status: 409 },
@@ -70,7 +55,6 @@ export async function PATCH(
     }
 
     // Email ownership check — only ADMIN+ can reject on behalf
-    const isAdmin = isAdminOrHigher(session.user.role)
     if (!isAdmin && request.facultyEmail !== session.user.email) {
       return NextResponse.json(
         { error: 'You are not the faculty member associated with this request' },
@@ -93,16 +77,7 @@ export async function PATCH(
       return updated
     })
 
-    // Audit log — always awaited for verification events
-    await writeAuditLog({
-      ...fromSession(session as { user: { id: string; email: string; role: string } }),
-      action:       AuditActions.FACULTY_VERIFICATION_REJECTED,
-      resourceType: 'FacultyVerificationRequest',
-      resourceId:   id,
-      oldValue:     { status: FacultyVerificationStatus.PENDING },
-      newValue:     { status: FacultyVerificationStatus.REJECTED, rejectionReason },
-      ipAddress:    ip,
-    })
+
 
     // Notify the requesting student
     await notifyFacultyVerificationRejected({
@@ -112,7 +87,7 @@ export async function PATCH(
       reason:        rejectionReason ?? undefined,
     })
 
-    const { verificationToken: _token, ...safeRequest } = updated
+    const { tokenHash: _token, ...safeRequest } = updated
     return NextResponse.json({ request: safeRequest })
   } catch (error) {
     console.error('[PATCH /api/faculty-verification/[id]/reject]', error)

@@ -42,9 +42,11 @@ function ResetPasswordContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [countdown, setCountdown] = useState(5)
   const [showPass, setShowPass] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
 
+  const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -55,6 +57,21 @@ function ResetPasswordContent() {
     }, wrapRef)
     return () => ctx.revert()
   }, [])
+
+  // Auto-redirect after success
+  useEffect(() => {
+    if (!success) return
+    const interval = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(interval)
+          router.push('/auth/signin')
+        }
+        return c - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [success, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -142,11 +159,14 @@ function ResetPasswordContent() {
 
           {success ? (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ background: 'rgba(201,245,59,0.07)', border: '1px solid rgba(201,245,59,0.2)', borderRadius: 8, padding: '16px 14px', marginBottom: 24, fontSize: 14, color: '#c9f53b' }}>
+              <div style={{ background: 'rgba(201,245,59,0.07)', border: '1px solid rgba(201,245,59,0.2)', borderRadius: 8, padding: '16px 14px', marginBottom: 16, fontSize: 14, color: '#c9f53b' }}>
                 {success}
               </div>
+              <p style={{ fontSize: 12, color: 'rgba(240,237,230,0.35)', marginBottom: 16, fontFamily: 'monospace' }}>
+                Redirecting to sign in in {countdown}s…
+              </p>
               <Link href="/auth/signin">
-                <button className="sbtn">Go to Sign in</button>
+                <button className="sbtn">Go to Sign in now</button>
               </Link>
             </div>
           ) : (

@@ -9,11 +9,10 @@ import prisma from '@/lib/prisma'
 import { requireAuth, getClientIp } from '@/lib/auth/guard'
 import { canViewAllResearch, canPublishContent } from '@/lib/auth/permissions'
 import { pickAllowedFields, getResearchUpdateAllowlist } from '@/lib/auth/field-allowlists'
-import { AuditActions } from '@/lib/audit'
 import {
   canReadResearch, canWriteResearch, isLockedForStudent,
   validateResearchStatusChange, dispatchResearchStatusNotifications,
-  auditResearchChange, allAuthorUserIds,
+  allAuthorUserIds,
 } from '@/lib/research/researchRouteHelpers'
 import { TeacherStatus, ConferenceStatus, UserRole } from '@prisma/client'
 import { broadcastPublicationEmail } from '@/lib/mail'
@@ -138,19 +137,6 @@ export async function PATCH(
       },
     })
 
-    const rT = (updateData.teacherStatus ?? existing.teacherStatus) as TeacherStatus
-    const rM = (updateData.conferenceStatus ?? existing.conferenceStatus) as ConferenceStatus
-    if (rT !== existing.teacherStatus || rM !== existing.conferenceStatus) {
-      await auditResearchChange({
-        session: session as { user: { id: string; email: string; role: string } },
-        resourceType: 'Conference', resourceId: id,
-        oldStatus: `${existing.teacherStatus}/${existing.conferenceStatus}`,
-        newStatus: `${rT}/${rM}`,
-        action: rM === ConferenceStatus.PUBLISHED ? AuditActions.RESEARCH_PUBLISHED : AuditActions.RESEARCH_APPROVED,
-        ipAddress: ip,
-      })
-    }
-
     const authorIds = allAuthorUserIds(conference.studentAuthors, conference.facultyAuthors)
     await dispatchResearchStatusNotifications({
       resourceType: 'conference', resourceId: id, title: conference.conferenceName,
@@ -160,7 +146,7 @@ export async function PATCH(
       allAuthorIds: authorIds, sessionUserId: userId, sessionRole: role,
     })
 
-    if (rM === ConferenceStatus.PUBLISHED) {
+    if (resolvedStatus === ConferenceStatus.PUBLISHED) {
       broadcastPublicationEmail({
         resourceType: 'conference', resourceTitle: conference.conferenceName, resourceId: id,
         authors: [...conference.studentAuthors.map(sa => sa.user.name), ...conference.facultyAuthors.map(fa => fa.user?.name)].filter(Boolean) as string[],

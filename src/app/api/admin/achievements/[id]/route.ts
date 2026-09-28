@@ -6,7 +6,6 @@
  *  - Changed requireAdmin → requireEditor for review actions (EDITOR is primary reviewer)
  *  - Status transitions validated via workflow engine
  *  - Field allowlist applied (no arbitrary field injection)
- *  - Audit log on every status change
  *  - Centralized notifications
  */
 
@@ -16,7 +15,7 @@ import { requireEditor, requireAdmin, getClientIp } from '@/lib/auth/guard'
 import { canApproveAchievement, isAdminOrHigher } from '@/lib/auth/permissions'
 import { validateAchievementStatusTransition } from '@/lib/auth/workflow'
 import { pickAllowedFields, ACHIEVEMENT_EDITOR_FIELDS } from '@/lib/auth/field-allowlists'
-import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+
 import {
   notifyAchievementApproved,
   notifyAchievementRejected,
@@ -74,18 +73,6 @@ export async function PATCH(
     })
 
     if (newStatus && newStatus !== oldStatus) {
-      await writeAuditLog({
-        ...fromSession(session as { user: { id: string; email: string; role: string } }),
-        action:       newStatus === AchievementStatus.APPROVED
-          ? AuditActions.ACHIEVEMENT_APPROVED
-          : AuditActions.ACHIEVEMENT_REJECTED,
-        resourceType: 'Achievement',
-        resourceId:   id,
-        oldValue:     { status: oldStatus },
-        newValue:     { status: newStatus },
-        ipAddress:    ip,
-      })
-
       const updateComment = safeBody.updateComment as string | undefined
 
       if (newStatus === AchievementStatus.APPROVED) {

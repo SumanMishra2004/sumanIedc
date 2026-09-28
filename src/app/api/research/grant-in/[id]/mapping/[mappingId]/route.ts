@@ -12,7 +12,7 @@ import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { GrantInRole } from '@prisma/client'
 import { isAdminOrHigher } from '@/lib/auth/permissions'
-import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+
 import { getClientIp } from '@/lib/auth/guard'
 
 export async function DELETE(
@@ -58,23 +58,6 @@ export async function DELETE(
     }
 
     await prisma.grantInMapping.delete({ where: { id: mappingId } })
-
-    writeAuditLog({
-      ...fromSession(session as { user: { id: string; email: string; role: string } }),
-      action:       AuditActions.GRANT_MAPPING_DELETED,
-      resourceType: 'GrantInMapping',
-      resourceId:   mappingId,
-      oldValue:     {
-        grantId,
-        publicationType: mapping.publicationType,
-        journalId:       mapping.journalId,
-        conferenceId:    mapping.conferenceId,
-        bookChapterId:   mapping.bookChapterId,
-        patentId:        mapping.patentId,
-        copyrightId:     mapping.copyrightId,
-      },
-      ipAddress: ip,
-    }).catch(() => {})
 
     return NextResponse.json({ message: 'Mapping removed successfully' })
   } catch (error) {

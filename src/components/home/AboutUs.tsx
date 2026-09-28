@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import type { HomePageData } from "../../../sanity/lib/queries";
+import type { HomePageData } from "@/types/content";
 
 gsap.registerPlugin(ScrollTrigger);
 

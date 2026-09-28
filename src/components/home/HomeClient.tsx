@@ -13,7 +13,7 @@ import UpcomingEvents from "./UpcomingEvents";
 import Footer from "./Footer";
 import StatsStrip from "./StatsStrip";
 
-import type { HomePageData, MilestoneData, GallerySlideData, ContactPageData } from "../../../sanity/lib/queries";
+import type { HomePageData, MilestoneData, GallerySlideData, ContactPageData } from "@/types/content";
 
 const MIN_LOAD_MS = 2200;
 

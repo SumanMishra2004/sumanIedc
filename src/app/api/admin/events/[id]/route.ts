@@ -20,7 +20,7 @@ import {
   EVENT_EDITOR_FIELDS,
   EVENT_EDITOR_STATUS_FIELDS,
 } from '@/lib/auth/field-allowlists'
-import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
+
 import { EventStatus } from '@prisma/client'
 
 export async function GET(
@@ -94,25 +94,7 @@ export async function PATCH(
 
     const updated = await prisma.event.update({ where: { id }, data: safeBody })
 
-    // Audit status changes
-    if (newStatus && newStatus !== existing.eventStatus) {
-      const actionMap: Record<string, (typeof AuditActions)[keyof typeof AuditActions]> = {
-        PUBLISHED:  AuditActions.EVENT_PUBLISHED,
-        CANCELLED:  AuditActions.EVENT_CANCELLED,
-        ARCHIVED:   AuditActions.EVENT_ARCHIVED,
-      }
-      const action = actionMap[newStatus] ?? AuditActions.EVENT_CREATED
 
-      await writeAuditLog({
-        ...fromSession(session as { user: { id: string; email: string; role: string } }),
-        action,
-        resourceType: 'Event',
-        resourceId:   id,
-        oldValue:     { eventStatus: existing.eventStatus },
-        newValue:     { eventStatus: newStatus },
-        ipAddress:    ip,
-      })
-    }
 
     return NextResponse.json({ event: updated })
   } catch (error) {

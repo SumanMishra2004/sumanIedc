@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 import { Mail, Phone, MapPin, Clock, Send, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Footer from "@/components/home/Footer";
-import type { ContactPageData } from "../../../sanity/lib/queries";
+import type { ContactPageData } from "@/types/content";
 
 // ─── Fallback (shown when Sanity has no content yet) ─────────────────────────
 const FALLBACK: ContactPageData = {
@@ -26,7 +26,7 @@ interface ContactClientProps {
   contactInfo?: ContactPageData | null;
 }
 
-export default function ContactClient({ contactInfo }: ContactClientProps) {
+export default function ContactClient({ contactInfo }: ContactClientProps = {}) {
   const info = contactInfo ?? FALLBACK;
 
   const [loading, setLoading] = useState(false);

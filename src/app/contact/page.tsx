@@ -1,6 +1,5 @@
 import ContactClient from "./ContactClient";
 import { Metadata } from "next";
-import { getContactPageData } from "../../../sanity/lib/queries";
 
 export const metadata: Metadata = {
   title: "Contact Us | IEDC Research Lab",
@@ -8,7 +7,6 @@ export const metadata: Metadata = {
     "Get in touch with the Innovation and Entrepreneurship Development Cell. Inquire about research publications, patent filings, startups incubator space, or general support.",
 };
 
-export default async function ContactPage() {
-  const contactInfo = await getContactPageData();
-  return <ContactClient contactInfo={contactInfo} />;
+export default function ContactPage() {
+  return <ContactClient />;
 }

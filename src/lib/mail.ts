@@ -276,8 +276,8 @@ export const broadcastPublicationEmail = async (
     // Fetch all users with verified emails, excluding authors (they get a separate email)
     const users = await prisma.user.findMany({
       where: {
-        email: { not: null },
         emailVerified: { not: null },
+        deletedAt: null,
         ...(excludeUserIds.length > 0 && {
           id: { notIn: excludeUserIds },
         }),

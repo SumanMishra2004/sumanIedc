@@ -48,7 +48,6 @@ const PUBLIC_ROUTES = [
   '/auth/new-verification',
   '/auth/reset-password',
   '/auth/forgot-password',
-  '/studio',            // Sanity Studio
   '/api/auth*',         // NextAuth routes
   '/api/public*',       // Public data APIs
   '/api/faculty-verification/verify*', // Token-based verification

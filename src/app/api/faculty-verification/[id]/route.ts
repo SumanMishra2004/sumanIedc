@@ -42,7 +42,7 @@ export async function GET(
     }
 
     // Strip token from response
-    const { verificationToken: _token, ...safeRequest } = request
+    const { tokenHash: _token, ...safeRequest } = request
     return NextResponse.json({ request: safeRequest })
   } catch (error) {
     console.error('[GET /api/faculty-verification/[id]]', error)

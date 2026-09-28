@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { Sparkles, Rocket, Award, Cpu, Globe, Lightbulb, Star, Zap, type LucideIcon } from "lucide-react";
-import type { MilestoneData } from "../../../sanity/lib/queries";
+import type { MilestoneData } from "@/types/content";
 
 // Register GSAP ScrollTrigger plugin safely for SSR
 if (typeof window !== "undefined") {

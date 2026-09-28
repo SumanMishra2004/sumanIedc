@@ -6,7 +6,6 @@ import LenisProvider from "@/providers/lenis-provider";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import ConditionalNavbar from "@/components/home/ConditionalNavbar";
-import { getHomePageData } from "../../sanity/lib/queries";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -117,13 +116,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const homePageData = await getHomePageData();
-
   return (
     <html lang="en" suppressHydrationWarning>
       <body
@@ -138,7 +135,7 @@ export default async function RootLayout({
         >
           <AuthProvider>
             <LenisProvider>
-              <ConditionalNavbar homePageData={homePageData}>{children}</ConditionalNavbar>
+              <ConditionalNavbar homePageData={null}>{children}</ConditionalNavbar>
             </LenisProvider>
           </AuthProvider>
           <Toaster />

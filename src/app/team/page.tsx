@@ -1,9 +1,6 @@
 import prisma from "@/lib/prisma";
 import TeamClient from "./TeamClient";
 import { Metadata } from "next";
-import {  getSanityTeamMembers,
-  getTeamPageContent,
-} from "../../../sanity/lib/queries";
 
 export const dynamic = 'force-dynamic'
 
@@ -14,28 +11,23 @@ export const metadata: Metadata = {
 };
 
 export default async function TeamPage() {
-  // Fetch from Prisma DB (faculty) and Sanity (students + page content) in parallel
-  const [dbFaculty, sanityStudents, pageContent] = await Promise.all([
-    prisma.user.findMany({
-      where: {
-        role: { in: ["FACULTY", "ADMIN"] },
-        profileCompleted: true,
-      },
-      select: {
-        name: true,
-        email: true,
-        image: true,
-        role: true,
-        designation: true,
-        department: true,
-        areasOfExpertise: true,
-        linkedinLink: true,
-        githubLink: true,
-      },
-    }),
-    getSanityTeamMembers(),
-    getTeamPageContent(),
-  ]);
+  const dbFaculty = await prisma.user.findMany({
+    where: {
+      role: { in: ["FACULTY", "ADMIN"] },
+      profileCompleted: true,
+    },
+    select: {
+      name: true,
+      email: true,
+      image: true,
+      role: true,
+      designation: true,
+      department: true,
+      areasOfExpertise: true,
+      linkedinLink: true,
+      githubLink: true,
+    },
+  });
 
   const formattedFaculty = dbFaculty.map((f) => ({
     name: f.name || f.email || "Faculty Advisor",
@@ -52,8 +44,8 @@ export default async function TeamPage() {
   return (
     <TeamClient
       dbFaculty={formattedFaculty}
-      sanityStudents={sanityStudents}
-      pageContent={pageContent}
+      sanityStudents={null}
+      pageContent={null}
     />
   );
 }

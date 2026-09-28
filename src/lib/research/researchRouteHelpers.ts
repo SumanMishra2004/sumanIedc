@@ -7,7 +7,6 @@
  *  - Role-based access decisions
  *  - Workflow state transition validation (via workflow engine)
  *  - Field-level allowlists (via field-allowlists)
- *  - Audit log dispatch
  *  - Centralized notification dispatch
  */
 
@@ -41,12 +40,7 @@ import {
   pickAllowedFields,
   getResearchUpdateAllowlist,
 } from '@/lib/auth/field-allowlists'
-import {
-  writeAuditLog,
-  auditResearchStatusChange,
-  AuditActions,
-  fromSession,
-} from '@/lib/audit'
+
 import {
   notifyResearchUpdateRequested,
   notifyResearchApproved,
@@ -372,27 +366,7 @@ export async function dispatchResearchStatusNotifications(params: {
   }
 }
 
-// ─── Audit helper ─────────────────────────────────────────────────────────────
 
-export async function auditResearchChange(params: {
-  session:      { user: { id: string; email: string; role: string } }
-  resourceType: string
-  resourceId:   string
-  oldStatus:    string
-  newStatus:    string
-  action:       (typeof AuditActions)[keyof typeof AuditActions]
-  ipAddress?:   string | null
-}): Promise<void> {
-  await auditResearchStatusChange({
-    session:      params.session,
-    action:       params.action,
-    resourceType: params.resourceType,
-    resourceId:   params.resourceId,
-    oldStatus:    params.oldStatus,
-    newStatus:    params.newStatus,
-    ipAddress:    params.ipAddress ?? null,
-  })
-}
 
 // ─── Author ID helpers ────────────────────────────────────────────────────────
 

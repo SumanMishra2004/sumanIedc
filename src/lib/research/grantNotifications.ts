@@ -268,7 +268,7 @@ export async function notifyBillUploaded(grantId: string, billId: string) {
 
     const projectCode = bill.grantIn.projectCode || "N/A";
     const uploaderName = bill.user.name || "A team member";
-    const billAmountStr = `INR ${bill.amount ? bill.amount.toLocaleString("en-IN") : "0"}`;
+    const billAmountStr = `INR ${bill.amount ? Number(bill.amount).toLocaleString("en-IN") : "0"}`;
 
     const piCoPiEntries = bill.grantIn.facultyAuthors.filter(
       (fa) => fa.role === GrantInRole.FACULTY_PI || fa.role === GrantInRole.FACULTY_COPI
@@ -314,7 +314,7 @@ export async function notifyBillAccepted(grantId: string, billId: string) {
     if (!bill) return;
 
     const projectCode = bill.grantIn.projectCode || "N/A";
-    const billAmountStr = `INR ${bill.amount ? bill.amount.toLocaleString("en-IN") : "0"}`;
+    const billAmountStr = `INR ${bill.amount ? Number(bill.amount).toLocaleString("en-IN") : "0"}`;
 
     // A. Notify Uploader
     await sendNotification({
@@ -382,7 +382,7 @@ export async function notifyBillRejected(grantId: string, billId: string) {
     if (!bill) return;
 
     const projectCode = bill.grantIn.projectCode || "N/A";
-    const billAmountStr = `INR ${bill.amount ? bill.amount.toLocaleString("en-IN") : "0"}`;
+    const billAmountStr = `INR ${bill.amount ? Number(bill.amount).toLocaleString("en-IN") : "0"}`;
 
     await sendNotification({
       userId: bill.userId,

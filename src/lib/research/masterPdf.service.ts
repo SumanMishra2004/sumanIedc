@@ -149,7 +149,7 @@ export async function regenerateMasterPdf(grantId: string) {
     coverPage.drawText(`Generated Date: ${new Date().toLocaleDateString("en-IN")}`, {
         x: 50, y: height - 175, size: 11, font: helveticaFont, color: rgb(0.4, 0.4, 0.4)
     });
-    coverPage.drawText(`Total Sanctioned Budget: ${acceptedBills[0].grantIn.amountGranted ? fmt(acceptedBills[0].grantIn.amountGranted) : "N/A"}`, {
+    coverPage.drawText(`Total Sanctioned Budget: ${acceptedBills[0].grantIn.amountGranted ? fmt(Number(acceptedBills[0].grantIn.amountGranted)) : "N/A"}`, {
         x: 50, y: height - 200, size: 11, font: helveticaFont, color: rgb(0.4, 0.4, 0.4)
     });
     coverPage.drawText(`Total Claimed Amount: ${fmt(totalAmount)}`, {
