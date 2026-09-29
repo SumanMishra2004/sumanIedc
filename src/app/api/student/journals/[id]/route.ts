@@ -1,0 +1,209 @@
+import { NextRequest } from "next/server";
+import prisma from "@/lib/prisma";
+import {
+  withAuth,
+  successResponse,
+  updatedResponse,
+  deletedResponse,
+  notFoundResponse,
+  forbiddenResponse,
+  handleApiError,
+  updateJournalSchema,
+  userBasicSelect,
+  isUserAuthor,
+} from "@/lib/api";
+
+// ─────────────────────────────────────────────────────────────
+// GET /api/student/journals/[id] - Get single journal
+// ─────────────────────────────────────────────────────────────
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withAuth(async ({ user }) => {
+    try {
+      const journal = await prisma.journal.findUnique({
+        where: { id: params.id },
+        include: {
+          studentAuthors: {
+            include: { user: { select: userBasicSelect } },
+          },
+          facultyAuthors: {
+            include: { user: { select: userBasicSelect } },
+          },
+          grantMappings: {
+            include: {
+              grantIn: {
+                select: {
+                  id: true,
+                  projectCode: true,
+                  grantInStatus: true,
+                  amountGranted: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!journal) {
+        return notFoundResponse("Journal");
+      }
+
+      // Check ownership
+      const isAuthor = await isUserAuthor("journal", params.id, user.id);
+      if (!isAuthor) {
+        return forbiddenResponse("You can only view your own journals");
+      }
+
+      return successResponse(journal);
+    } catch (error) {
+      return handleApiError(error);
+    }
+  })(req);
+}
+
+// ─────────────────────────────────────────────────────────────
+// PATCH /api/student/journals/[id] - Update journal
+// ─────────────────────────────────────────────────────────────
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withAuth(async ({ user }) => {
+    try {
+      // Check ownership
+      const isAuthor = await isUserAuthor("journal", params.id, user.id);
+      if (!isAuthor) {
+        return forbiddenResponse("You can only update your own journals");
+      }
+
+      // Check if already approved/published (can't edit after approval)
+      const existing = await prisma.journal.findUnique({
+        where: { id: params.id },
+        select: { journalStatus: true, teacherStatus: true },
+      });
+
+      if (!existing) {
+        return notFoundResponse("Journal");
+      }
+
+      if (
+        existing.journalStatus !== "SUBMITTED" ||
+        existing.teacherStatus === "PUBLISHED"
+      ) {
+        return forbiddenResponse(
+          "Cannot update journal after it has been reviewed"
+        );
+      }
+
+      const body = await req.json();
+      const validated = updateJournalSchema.parse(body);
+
+      const journal = await prisma.journal.update({
+        where: { id: params.id },
+        data: {
+          ...(validated.title && { title: validated.title }),
+          ...(validated.journalName && { journalName: validated.journalName }),
+          ...(validated.abstract !== undefined && {
+            abstract: validated.abstract,
+          }),
+          ...(validated.scope && { scope: validated.scope }),
+          ...(validated.reviewType && { reviewType: validated.reviewType }),
+          ...(validated.accessType && { accessType: validated.accessType }),
+          ...(validated.indexing && { indexing: validated.indexing }),
+          ...(validated.quartile && { quartile: validated.quartile }),
+          ...(validated.impactFactor !== undefined && {
+            impactFactor: validated.impactFactor,
+          }),
+          ...(validated.impactFactorDate && {
+            impactFactorDate: new Date(validated.impactFactorDate),
+          }),
+          ...(validated.publisher !== undefined && {
+            publisher: validated.publisher,
+          }),
+          ...(validated.publicationMode && {
+            publicationMode: validated.publicationMode,
+          }),
+          ...(validated.publicationDate && {
+            publicationDate: new Date(validated.publicationDate),
+          }),
+          ...(validated.doi !== undefined && { doi: validated.doi }),
+          ...(validated.paperLink !== undefined && {
+            paperLink: validated.paperLink,
+          }),
+          ...(validated.keywords && { keywords: validated.keywords }),
+          ...(validated.registrationFees !== undefined && {
+            registrationFees: validated.registrationFees,
+          }),
+          ...(validated.reimbursement !== undefined && {
+            reimbursement: validated.reimbursement,
+          }),
+          ...(validated.imageUrl !== undefined && {
+            imageUrl: validated.imageUrl,
+          }),
+          ...(validated.documentUrl !== undefined && {
+            documentUrl: validated.documentUrl,
+          }),
+        },
+        include: {
+          studentAuthors: {
+            include: { user: { select: userBasicSelect } },
+          },
+          facultyAuthors: {
+            include: { user: { select: userBasicSelect } },
+          },
+        },
+      });
+
+      return updatedResponse(journal, "Journal updated successfully");
+    } catch (error) {
+      return handleApiError(error);
+    }
+  })(req);
+}
+
+// ─────────────────────────────────────────────────────────────
+// DELETE /api/student/journals/[id] - Delete journal
+// ─────────────────────────────────────────────────────────────
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  return withAuth(async ({ user }) => {
+    try {
+      // Check ownership
+      const isAuthor = await isUserAuthor("journal", params.id, user.id);
+      if (!isAuthor) {
+        return forbiddenResponse("You can only delete your own journals");
+      }
+
+      // Check if already approved/published (can't delete after approval)
+      const existing = await prisma.journal.findUnique({
+        where: { id: params.id },
+        select: { journalStatus: true },
+      });
+
+      if (!existing) {
+        return notFoundResponse("Journal");
+      }
+
+      if (existing.journalStatus !== "SUBMITTED") {
+        return forbiddenResponse(
+          "Cannot delete journal after it has been reviewed"
+        );
+      }
+
+      await prisma.journal.delete({
+        where: { id: params.id },
+      });
+
+      return deletedResponse("Journal deleted successfully");
+    } catch (error) {
+      return handleApiError(error);
+    }
+  })(req);
+}
