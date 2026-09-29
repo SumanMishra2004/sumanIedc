@@ -8,6 +8,8 @@ import {
   GrantStatsResponse,
 } from "@/types/grant-in";
 
+import { grantApi } from '@/lib/api-client'
+const _getBase = (role?: string | null) => grantApi(role)
 const API_BASE_URL = "/api/research/grant-in";
 
 const handleApiError = (error: unknown): { error: string } => {

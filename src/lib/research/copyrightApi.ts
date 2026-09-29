@@ -8,6 +8,8 @@ import {
   CopyrightStatsResponse
 } from '@/types/copyright'
 
+import { copyrightApi } from '@/lib/api-client'
+const _getBase = (role?: string | null) => copyrightApi(role)
 const API_BASE_URL = '/api/research/copyright'
 
 // Common types

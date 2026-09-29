@@ -10,6 +10,8 @@ import {
   ApiResponse
 } from '@/types/certificate'
 
+import { certificateApi } from '@/lib/api-client'
+const _getBase = (role?: string | null) => certificateApi(role)
 const API_BASE_URL = '/api/research/certificate'
 
 // Error handler

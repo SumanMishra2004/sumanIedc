@@ -1,0 +1,68 @@
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth/guard";
+import { GrantInStatus } from "@prisma/client";
+
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const guard = await requireAdmin(req);
+  if (!guard.ok) return guard.response;
+  try {
+    const grant = await prisma.grantIn.findUnique({
+      where: { id: params.id },
+      include: {
+        studentAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
+        facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
+        bills: {
+          include: { user: { select: { id: true, name: true } } },
+          orderBy: { billDate: "desc" },
+        },
+        publicationMappings: {
+          include: {
+            journal:      { select: { id: true, title: true } },
+            conference:   { select: { id: true, conferenceName: true } },
+            bookChapter:  { select: { id: true, title: true } },
+            patent:       { select: { id: true, title: true } },
+            copyright:    { select: { id: true, title: true } },
+          },
+        },
+      },
+    });
+    if (!grant) return NextResponse.json({ error: "Grant not found" }, { status: 404 });
+    return NextResponse.json({ success: true, data: grant });
+  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const guard = await requireAdmin(req);
+  if (!guard.ok) return guard.response;
+  try {
+    if (!await prisma.grantIn.findUnique({ where: { id: params.id } }))
+      return NextResponse.json({ error: "Grant not found" }, { status: 404 });
+
+    const body = await req.json();
+    if (body.grantInStatus && !Object.values(GrantInStatus).includes(body.grantInStatus))
+      return NextResponse.json({ error: "Invalid grantInStatus" }, { status: 400 });
+
+    const data: any = {};
+    for (const f of ["grantInStatus","isPublic","projectCode","durationOfProject","amountGranted","usedAmount","hideFromAdmin"]) {
+      if (body[f] !== undefined) data[f] = body[f];
+    }
+    for (const df of ["applicationDate","grantDate"]) {
+      if (body[df] !== undefined) data[df] = body[df] ? new Date(body[df]) : null;
+    }
+
+    const grant = await prisma.grantIn.update({ where: { id: params.id }, data });
+    return NextResponse.json({ success: true, data: grant });
+  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const guard = await requireAdmin(req);
+  if (!guard.ok) return guard.response;
+  try {
+    if (!await prisma.grantIn.findUnique({ where: { id: params.id } }))
+      return NextResponse.json({ error: "Grant not found" }, { status: 404 });
+    await prisma.grantIn.delete({ where: { id: params.id } });
+    return NextResponse.json({ success: true, message: "Grant deleted" });
+  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+}

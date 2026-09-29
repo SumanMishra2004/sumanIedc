@@ -6,6 +6,10 @@ import {
   CreateJournalInput,
 } from '@/types/journal'
 
+import { journalApi } from '@/lib/api-client'
+// Role is injected at call-time via getJournalBaseUrl(); default is legacy path.
+const _getBase = (role?: string | null) => journalApi(role)
+// ── Legacy constant kept for backwards compat with existing direct usages ──
 const API_BASE_URL = '/api/research/journal'
 
 // Common types

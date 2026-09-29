@@ -10,6 +10,8 @@ import {
   ApiResponse
 } from '@/types/patent'
 
+import { patentApi } from '@/lib/api-client'
+const _getBase = (role?: string | null) => patentApi(role)
 const API_BASE_URL = '/api/research/patent'
 
 // Error handler

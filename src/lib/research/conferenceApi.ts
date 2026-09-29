@@ -10,6 +10,8 @@ import {
 } from '@/types/conference'
 import { ConferenceStatus } from '@prisma/client'
 
+import { conferenceApi } from '@/lib/api-client'
+const _getBase = (role?: string | null) => conferenceApi(role)
 const API_BASE_URL = '/api/research/conference'
 
 // Error handler
