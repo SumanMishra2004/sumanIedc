@@ -10,8 +10,6 @@ import {
   ApiResponse
 } from '@/types/book-chapter'
 
-import { bookChapterApi } from '@/lib/api-client'
-const _getBase = (role?: string | null) => bookChapterApi(role)
 const API_BASE_URL = '/api/research/book-chapter'
 
 // Error handler

@@ -20,7 +20,7 @@ import { BillStatus, UserRole, GrantInRole } from '@prisma/client'
 import { regenerateMasterPdf } from '@/lib/research/masterPdf.service'
 import { validateBillStatusTransition } from '@/lib/auth/workflow'
 import { isAdminOrHigher } from '@/lib/auth/permissions'
-
+import { AuditActions, auditGrantFinancial } from '@/lib/audit'
 import { getClientIp } from '@/lib/auth/guard'
 import {
   notifyBillAccepted,
@@ -129,6 +129,16 @@ export async function PATCH(
 
       await regenerateMasterPdf(grantId).catch((e) => console.error('[MasterPDF] regeneration failed', e))
 
+      await auditGrantFinancial({
+        session:      session as { user: { id: string; email: string; role: string } },
+        action:       AuditActions.BILL_ACCEPTED,
+        resourceType: 'GrantInBill',
+        resourceId:   billId,
+        oldValue:     { status: bill.billStatus, usedAmount },
+        newValue:     { status: BillStatus.ACCEPTED, usedAmount: (usedAmount ?? 0) + (bill.amount ?? 0) },
+        ipAddress:    ip,
+      })
+
       await notifyBillAccepted({
         grantId,
         projectCode: projectCode ?? 'N/A',
@@ -154,11 +164,32 @@ export async function PATCH(
         reason:      body.reason ?? undefined,
       })
 
+      await auditGrantFinancial({
+        session:      session as { user: { id: string; email: string; role: string } },
+        action:       AuditActions.BILL_REJECTED,
+        resourceType: 'GrantInBill',
+        resourceId:   billId,
+        oldValue:     { status: bill.billStatus },
+        newValue:     { status: BillStatus.REJECTED },
+        reason:       body.reason ?? null,
+        ipAddress:    ip,
+      })
+
       await prisma.grantInBill.delete({ where: { id: billId } })
       return NextResponse.json({ message: 'Bill rejected and removed' })
 
     } else if (action === 'PAY') {
       await prisma.grantInBill.update({ where: { id: billId }, data: { billStatus: BillStatus.PAID } })
+
+      await auditGrantFinancial({
+        session:      session as { user: { id: string; email: string; role: string } },
+        action:       AuditActions.BILL_PAID,
+        resourceType: 'GrantInBill',
+        resourceId:   billId,
+        oldValue:     { status: BillStatus.ACCEPTED },
+        newValue:     { status: BillStatus.PAID },
+        ipAddress:    ip,
+      })
 
       await notifyBillPaid({
         grantId,

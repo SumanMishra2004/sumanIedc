@@ -21,6 +21,7 @@ import {
   ACHIEVEMENT_OWNER_FIELDS,
   ACHIEVEMENT_EDITOR_FIELDS,
 } from '@/lib/auth/field-allowlists'
+import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
 import {
   notifyAchievementApproved,
   notifyAchievementRejected,
@@ -135,8 +136,20 @@ export async function PATCH(
 
     const updated = await prisma.achievement.update({ where: { id }, data: safeBody })
 
-    // Notifications on status change
+    // Audit + notifications on status change
     if (newStatus && newStatus !== oldStatus) {
+      await writeAuditLog({
+        ...fromSession(session as { user: { id: string; email: string; role: string } }),
+        action:       newStatus === AchievementStatus.APPROVED
+          ? AuditActions.ACHIEVEMENT_APPROVED
+          : AuditActions.ACHIEVEMENT_REJECTED,
+        resourceType: 'Achievement',
+        resourceId:   id,
+        oldValue:     { status: oldStatus },
+        newValue:     { status: newStatus },
+        ipAddress:    ip,
+      })
+
       const updateComment = safeBody.updateComment as string | undefined
 
       if (newStatus === AchievementStatus.APPROVED) {

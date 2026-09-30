@@ -12,12 +12,14 @@ import prisma from '@/lib/prisma'
 import { requireAuth, getClientIp } from '@/lib/auth/guard'
 import { canViewAllResearch, canPublishContent } from '@/lib/auth/permissions'
 import { pickAllowedFields, getResearchUpdateAllowlist } from '@/lib/auth/field-allowlists'
+import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
 import {
   canReadResearch,
   canWriteResearch,
   isLockedForStudent,
   validateResearchStatusChange,
   dispatchResearchStatusNotifications,
+  auditResearchChange,
   allAuthorUserIds,
 } from '@/lib/research/researchRouteHelpers'
 import { TeacherStatus, BookchapterStatus, UserRole } from '@prisma/client'
@@ -178,6 +180,19 @@ export async function PATCH(
       },
     })
 
+    const resolvedTeacher = (updateData.teacherStatus ?? existing.teacherStatus) as TeacherStatus
+    const resolvedMain    = (updateData.bookChapterStatus ?? existing.bookChapterStatus) as BookchapterStatus
+    if (resolvedTeacher !== existing.teacherStatus || resolvedMain !== existing.bookChapterStatus) {
+      await auditResearchChange({
+        session: session as { user: { id: string; email: string; role: string } },
+        resourceType: 'BookChapter', resourceId: id,
+        oldStatus: `${existing.teacherStatus}/${existing.bookChapterStatus}`,
+        newStatus: `${resolvedTeacher}/${resolvedMain}`,
+        action: resolvedMain === BookchapterStatus.PUBLISHED ? AuditActions.RESEARCH_PUBLISHED : AuditActions.RESEARCH_APPROVED,
+        ipAddress: ip,
+      })
+    }
+
     const authorIds = allAuthorUserIds(chapter.studentAuthors, chapter.facultyAuthors)
     await dispatchResearchStatusNotifications({
       resourceType: 'book-chapter', resourceId: id, title: chapter.title,
@@ -187,7 +202,7 @@ export async function PATCH(
       allAuthorIds: authorIds, sessionUserId: userId, sessionRole: role,
     })
 
-    if (resolvedStatus === BookchapterStatus.PUBLISHED) {
+    if (resolvedMain === BookchapterStatus.PUBLISHED) {
       broadcastPublicationEmail({
         resourceType: 'book-chapter', resourceTitle: chapter.title, resourceId: id,
         authors: [...chapter.studentAuthors.map(sa => sa.user.name), ...chapter.facultyAuthors.map(fa => fa.user?.name)].filter(Boolean) as string[],

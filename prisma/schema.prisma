@@ -4,144 +4,118 @@ generator client {
 
 datasource db {
   provider = "cockroachdb"
+
 }
 
-// ─────────────────────────────────────────────────────────────
-// AUTH (NextAuth Credentials, JWT sessions, email + password only)
-// No Session / Account models: Credentials provider forces JWT sessions.
-// In the `jwt` callback re-check isActive / role / lockedUntil and compare
-// passwordChangedAt with the token's iat to invalidate old tokens.
-// ─────────────────────────────────────────────────────────────
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-/// Pre-register emails with a specific role so they receive it on first registration.
-/// Apply the role only AFTER the email has been verified.
-/// Always store and compare emails in lowercase.
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+/// Pre-register emails with a specific role so they receive it on first login.
 model SpecialUser {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  role      UserRole  @default(FACULTY)
-  createdAt DateTime  @default(now()) @map("created_at")
-  /// Set when the role was applied to a registered user
-  appliedAt DateTime? @map("applied_at")
+  id    String   @id @default(cuid())
+  email String   @unique
+  role  UserRole @default(FACULTY)
 
   @@map("special_users")
 }
 
-model EmailVerificationToken {
-  id        String    @id @default(cuid())
-  userId    String    @map("user_id")
-  /// SHA-256 of the token sent by email. Never store the raw token.
-  tokenHash String    @unique @map("token_hash")
-  expires   DateTime
-  usedAt    DateTime? @map("used_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
 
-  @@index([userId])
-  @@index([expires])
-  @@map("email_verification_tokens")
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }
 
 model PasswordResetToken {
-  id        String    @id @default(cuid())
-  userId    String    @map("user_id")
-  /// SHA-256 of the token sent by email. Never store the raw token.
-  tokenHash String    @unique @map("token_hash")
-  expires   DateTime
-  usedAt    DateTime? @map("used_at")
-  ipAddress String?   @map("ip_address")
-  createdAt DateTime  @default(now()) @map("created_at")
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identifier String
+  token      String
+  expires    DateTime
 
-  @@index([userId])
-  @@index([expires])
+  @@unique([identifier, token])
   @@map("password_reset_tokens")
 }
 
 model User {
-  id                  String    @id @default(cuid())
-  name                String?
-  /// Always lowercase before write and lookup
-  email               String    @unique
-  emailVerified       DateTime? @map("email_verified")
-  /// bcrypt/argon2 hash only
-  password            String
-  role                UserRole  @default(STUDENT)
-  profileCompleted    Boolean   @default(false)
+  id                   String                       @id @default(cuid())
+  name                 String?
+  email                String?                      @unique
+  emailVerified        DateTime?                    @map("email_verified")
+  image                String?
+  password             String?
+  role                 UserRole                     @default(STUDENT)
+  profileCompleted     Boolean                      @default(false)
+  bio                  String?
+  department           String?
+  phone                String?
+  coverImage           String?
+  institution          String?
+  linkedinLink         String?
+  skills               String[]
+  enrollmentNo         String?
+  degree               String?
+  currentYear          String?
+  currentSemester      String?
+  graduationYear       String?
+  resumeLink           String?
+  portfolioLink        String?
+  githubLink           String?
+  researchInterests    String[]
+  designation          String?
+  yearsOfExperience    String?
+  areasOfExpertise     String[]
+  orcidId              String?
+  accounts             Account[]
+  achievements         Achievement[]                @relation("userAchievements")
+  studentBookChapters  BookChapterStudentAuthor[]   @relation("studentAuthors")
+  facultyBookChapters  BookChapterTeacherAuthor[]   @relation("facultyAuthors")
+  certification        Certificate[]                @relation("userCertificates")
+  studentConferences   ConferenceStudentAuthor[]    @relation("studentConferenceAuthors")
+  facultyConferences   ConferenceTeacherAuthor[]    @relation("facultyConferenceAuthors")
+  studentCopyrights    CopyrightStudentAuthor[]     @relation("studentCopyrightAuthors")
+  facultyCopyrights    CopyrightTeacherAuthor[]     @relation("facultyCopyrightAuthors")
+  linkedVerifications  FacultyVerificationRequest[] @relation("linkedVerifications")
+  verificationRequests FacultyVerificationRequest[] @relation("verificationRequests")
+  fdp                  FDP[]                        @relation("userFDPs")
+  bills                GrantInBill[]
+  studentGrantIns      GrantInStudentAuthor[]       @relation("studentGrantInAuthors")
+  facultyGrantIns      GrantInTeacherAuthor[]       @relation("facultyGrantInAuthors")
+  studentJournals      JournalStudentAuthor[]       @relation("studentJournalAuthors")
+  facultyJournals      JournalTeacherAuthor[]       @relation("facultyJournalAuthors")
+  notifications        Notification[]
+  studentPatents       PatentStudentAuthor[]        @relation("studentPatentAuthors")
+  facultyPatents       PatentTeacherAuthor[]        @relation("facultyPatentAuthors")
+  sessions             Session[]
 
-  // Account security / lifecycle
-  isActive            Boolean   @default(true) @map("is_active")
-  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
-  lockedUntil         DateTime? @map("locked_until")
-  lastLoginAt         DateTime? @map("last_login_at")
-  passwordChangedAt   DateTime? @map("password_changed_at")
-  /// Soft delete. Author and bill relations use Restrict, so anonymize/soft-delete users instead of hard-deleting.
-  deletedAt           DateTime? @map("deleted_at")
-
-  // Profile
-  image               String?
-  coverImage          String?
-  bio                 String?
-  department          String?
-  phone               String?
-  institution         String?
-  linkedinLink        String?
-  githubLink          String?
-  portfolioLink       String?
-  resumeLink          String?
-  skills              String[]
-
-  // Student fields
-  enrollmentNo        String?
-  degree              String?
-  currentYear         Int?
-  currentSemester     Int?
-  graduationYear      Int?
-
-  // Faculty fields
-  designation         String?
-  yearsOfExperience   Int?
-  areasOfExpertise    String[]
-  researchInterests   String[]
-  orcidId             String?
-
-  createdAt           DateTime  @default(now()) @map("created_at")
-  updatedAt           DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  emailVerificationTokens EmailVerificationToken[]
-  passwordResetTokens     PasswordResetToken[]
-  achievements            Achievement[]                @relation("userAchievements")
-  studentBookChapters     BookChapterStudentAuthor[]   @relation("studentAuthors")
-  facultyBookChapters     BookChapterTeacherAuthor[]   @relation("facultyAuthors")
-  certification           Certificate[]                @relation("userCertificates")
-  studentConferences      ConferenceStudentAuthor[]    @relation("studentConferenceAuthors")
-  facultyConferences      ConferenceTeacherAuthor[]    @relation("facultyConferenceAuthors")
-  studentCopyrights       CopyrightStudentAuthor[]     @relation("studentCopyrightAuthors")
-  facultyCopyrights       CopyrightTeacherAuthor[]     @relation("facultyCopyrightAuthors")
-  linkedVerifications     FacultyVerificationRequest[] @relation("linkedVerifications")
-  verificationRequests    FacultyVerificationRequest[] @relation("verificationRequests")
-  overriddenVerifications FacultyVerificationRequest[] @relation("verificationOverrides")
-  fdp                     FDP[]                        @relation("userFDPs")
-  bills                   GrantInBill[]
-  studentGrantIns         GrantInStudentAuthor[]       @relation("studentGrantInAuthors")
-  facultyGrantIns         GrantInTeacherAuthor[]       @relation("facultyGrantInAuthors")
-  studentJournals         JournalStudentAuthor[]       @relation("studentJournalAuthors")
-  facultyJournals         JournalTeacherAuthor[]       @relation("facultyJournalAuthors")
-  notifications           Notification[]
-  studentPatents          PatentStudentAuthor[]        @relation("studentPatentAuthors")
-  facultyPatents          PatentTeacherAuthor[]        @relation("facultyPatentAuthors")
-
-  @@unique([institution, enrollmentNo])
-  @@index([role])
-  @@index([isActive])
-  @@index([deletedAt])
   @@map("users")
 }
-
-// ─────────────────────────────────────────────────────────────
-// BOOK CHAPTERS
-// ─────────────────────────────────────────────────────────────
 
 model BookChapter {
   id                String                     @id @default(cuid())
@@ -152,12 +126,12 @@ model BookChapter {
   bookChapterStatus BookchapterStatus          @default(SUBMITTED)
   teacherStatus     TeacherStatus              @default(UPLOADED)
   isbnIssn          String?
-  registrationFees  Decimal?                   @db.Decimal(12, 2)
-  reimbursement     Decimal?                   @db.Decimal(12, 2)
+  registrationFees  Float?
+  reimbursement     Float?
   isPublic          Boolean                    @default(false)
   updateComment     String?
   keywords          String[]
-  doi               String?                    @unique
+  doi               String?
   publicationDate   DateTime?
   publisher         String?
   createdAt         DateTime                   @default(now()) @map("created_at")
@@ -166,8 +140,6 @@ model BookChapter {
   facultyAuthors    BookChapterTeacherAuthor[] @relation("facultyAuthors")
   grantMappings     GrantInMapping[]
 
-  @@index([isPublic, bookChapterStatus])
-  @@index([teacherStatus])
   @@map("book_chapters")
 }
 
@@ -176,38 +148,28 @@ model BookChapterStudentAuthor {
   bookChapterId String      @map("book_chapter_id")
   userId        String      @map("user_id")
   bookChapter   BookChapter @relation("studentAuthors", fields: [bookChapterId], references: [id], onDelete: Cascade)
-  user          User        @relation("studentAuthors", fields: [userId], references: [id], onDelete: Restrict)
+  user          User        @relation("studentAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([bookChapterId, userId])
-  @@index([userId])
   @@map("book_chapter_student_authors")
 }
 
 model BookChapterTeacherAuthor {
-  id                    String                      @id @default(cuid())
-  bookChapterId         String                      @map("book_chapter_id")
+  id                    String                    @id @default(cuid())
+  bookChapterId         String                    @map("book_chapter_id")
   /// null when faculty is unlisted (not yet a platform user)
-  userId                String?                     @map("user_id")
+  userId                String?                   @map("user_id")
   /// ACCEPTED for registered faculty; PENDING/REJECTED for unlisted faculty
-  verificationStatus    FacultyVerificationStatus   @default(ACCEPTED)
-  verificationRequestId String?                     @map("verification_request_id")
-  bookChapter           BookChapter                 @relation("facultyAuthors", fields: [bookChapterId], references: [id], onDelete: Cascade)
-  user                  User?                       @relation("facultyAuthors", fields: [userId], references: [id], onDelete: Restrict)
-  verificationRequest   FacultyVerificationRequest? @relation("bookChapterVerification", fields: [verificationRequestId], references: [id], onDelete: SetNull)
+  verificationStatus    FacultyVerificationStatus @default(ACCEPTED)
+  verificationRequestId String?                   @map("verification_request_id")
+  bookChapter           BookChapter               @relation("facultyAuthors", fields: [bookChapterId], references: [id], onDelete: Cascade)
+  user                  User?                     @relation("facultyAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([bookChapterId, userId])
-  @@index([userId])
-  @@index([verificationRequestId])
   @@map("book_chapter_teacher_authors")
 }
 
-// ─────────────────────────────────────────────────────────────
-// COPYRIGHTS
-// ─────────────────────────────────────────────────────────────
-
 model Copyright {
   id               String                   @id @default(cuid())
-  regNo            String                   @unique @map("reg_no")
+  regNo            String
   title            String
   abstract         String?
   imageUrl         String?
@@ -216,8 +178,8 @@ model Copyright {
   dateOfSubmission DateTime?
   dateOfPublished  DateTime?
   dateOfGrant      DateTime?
-  registrationFees Decimal?                 @db.Decimal(12, 2)
-  reimbursement    Decimal?                 @db.Decimal(12, 2)
+  registrationFees Float?
+  reimbursement    Float?
   copyrightStatus  CopyrightStatus          @default(SUBMITTED)
   teacherStatus    TeacherStatus            @default(UPLOADED)
   isPublic         Boolean                  @default(false)
@@ -228,8 +190,6 @@ model Copyright {
   facultyAuthors   CopyrightTeacherAuthor[] @relation("facultyCopyrightAuthors")
   grantMappings    GrantInMapping[]
 
-  @@index([isPublic, copyrightStatus])
-  @@index([teacherStatus])
   @@map("copyrights")
 }
 
@@ -238,38 +198,28 @@ model CopyrightStudentAuthor {
   copyrightId String    @map("copyright_id")
   userId      String    @map("user_id")
   copyright   Copyright @relation("studentCopyrightAuthors", fields: [copyrightId], references: [id], onDelete: Cascade)
-  user        User      @relation("studentCopyrightAuthors", fields: [userId], references: [id], onDelete: Restrict)
+  user        User      @relation("studentCopyrightAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([copyrightId, userId])
-  @@index([userId])
   @@map("copyright_student_authors")
 }
 
 model CopyrightTeacherAuthor {
-  id                    String                      @id @default(cuid())
-  copyrightId           String                      @map("copyright_id")
-  userId                String?                     @map("user_id")
-  verificationStatus    FacultyVerificationStatus   @default(ACCEPTED)
-  verificationRequestId String?                     @map("verification_request_id")
-  copyright             Copyright                   @relation("facultyCopyrightAuthors", fields: [copyrightId], references: [id], onDelete: Cascade)
-  user                  User?                       @relation("facultyCopyrightAuthors", fields: [userId], references: [id], onDelete: Restrict)
-  verificationRequest   FacultyVerificationRequest? @relation("copyrightVerification", fields: [verificationRequestId], references: [id], onDelete: SetNull)
+  id                    String                    @id @default(cuid())
+  copyrightId           String                    @map("copyright_id")
+  userId                String?                   @map("user_id")
+  verificationStatus    FacultyVerificationStatus @default(ACCEPTED)
+  verificationRequestId String?                   @map("verification_request_id")
+  copyright             Copyright                 @relation("facultyCopyrightAuthors", fields: [copyrightId], references: [id], onDelete: Cascade)
+  user                  User?                     @relation("facultyCopyrightAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([copyrightId, userId])
-  @@index([userId])
-  @@index([verificationRequestId])
   @@map("copyright_teacher_authors")
 }
 
-// ─────────────────────────────────────────────────────────────
-// JOURNALS
-// ─────────────────────────────────────────────────────────────
-
 model Journal {
   id               String                 @id @default(cuid())
-  serialNo         String                 @unique @map("serial_no")
+  serialNo         String                 @unique
   title            String
-  journalName      String                 @map("journal_name")
+  journalName      String
   imageUrl         String?
   documentUrl      String?
   abstract         String?
@@ -283,23 +233,21 @@ model Journal {
   publisher        String?
   publicationMode  JournalPublicationMode
   publicationDate  DateTime?
-  doi              String?                @unique
+  doi              String?
   paperLink        String?
   keywords         String[]
-  registrationFees Decimal?               @db.Decimal(12, 2)
-  reimbursement    Decimal?               @db.Decimal(12, 2)
+  registrationFees Float?
+  reimbursement    Float?
   journalStatus    JournalStatus          @default(SUBMITTED)
   teacherStatus    TeacherStatus          @default(UPLOADED)
   isPublic         Boolean                @default(false)
   updateComment    String?
-  createdAt        DateTime               @default(now()) @map("created_at")
-  updatedAt        DateTime               @updatedAt @map("updated_at")
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
   grantMappings    GrantInMapping[]
   studentAuthors   JournalStudentAuthor[] @relation("studentJournalAuthors")
   facultyAuthors   JournalTeacherAuthor[] @relation("facultyJournalAuthors")
 
-  @@index([isPublic, journalStatus])
-  @@index([teacherStatus])
   @@map("journals")
 }
 
@@ -308,32 +256,22 @@ model JournalStudentAuthor {
   journalId String  @map("journal_id")
   userId    String  @map("user_id")
   journal   Journal @relation("studentJournalAuthors", fields: [journalId], references: [id], onDelete: Cascade)
-  user      User    @relation("studentJournalAuthors", fields: [userId], references: [id], onDelete: Restrict)
+  user      User    @relation("studentJournalAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([journalId, userId])
-  @@index([userId])
   @@map("journal_student_authors")
 }
 
 model JournalTeacherAuthor {
-  id                    String                      @id @default(cuid())
-  journalId             String                      @map("journal_id")
-  userId                String?                     @map("user_id")
-  verificationStatus    FacultyVerificationStatus   @default(ACCEPTED)
-  verificationRequestId String?                     @map("verification_request_id")
-  journal               Journal                     @relation("facultyJournalAuthors", fields: [journalId], references: [id], onDelete: Cascade)
-  user                  User?                       @relation("facultyJournalAuthors", fields: [userId], references: [id], onDelete: Restrict)
-  verificationRequest   FacultyVerificationRequest? @relation("journalVerification", fields: [verificationRequestId], references: [id], onDelete: SetNull)
+  id                    String                    @id @default(cuid())
+  journalId             String                    @map("journal_id")
+  userId                String?                   @map("user_id")
+  verificationStatus    FacultyVerificationStatus @default(ACCEPTED)
+  verificationRequestId String?                   @map("verification_request_id")
+  journal               Journal                   @relation("facultyJournalAuthors", fields: [journalId], references: [id], onDelete: Cascade)
+  user                  User?                     @relation("facultyJournalAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([journalId, userId])
-  @@index([userId])
-  @@index([verificationRequestId])
   @@map("journal_teacher_authors")
 }
-
-// ─────────────────────────────────────────────────────────────
-// PATENTS
-// ─────────────────────────────────────────────────────────────
 
 model Patent {
   id              String                @id @default(cuid())
@@ -347,7 +285,7 @@ model Patent {
   submissionDate  DateTime?
   publicationDate DateTime?
   grantDate       DateTime?
-  applicationNo   String?               @unique
+  applicationNo   String?
   isPublic        Boolean               @default(false)
   patentLink      String?
   teacherStatus   TeacherStatus         @default(UPLOADED)
@@ -359,8 +297,6 @@ model Patent {
   studentAuthors  PatentStudentAuthor[] @relation("studentPatentAuthors")
   facultyAuthors  PatentTeacherAuthor[] @relation("facultyPatentAuthors")
 
-  @@index([isPublic, patentStatus])
-  @@index([teacherStatus])
   @@map("patents")
 }
 
@@ -369,32 +305,22 @@ model PatentStudentAuthor {
   patentId String @map("patent_id")
   userId   String @map("user_id")
   patent   Patent @relation("studentPatentAuthors", fields: [patentId], references: [id], onDelete: Cascade)
-  user     User   @relation("studentPatentAuthors", fields: [userId], references: [id], onDelete: Restrict)
+  user     User   @relation("studentPatentAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([patentId, userId])
-  @@index([userId])
   @@map("patent_student_authors")
 }
 
 model PatentTeacherAuthor {
-  id                    String                      @id @default(cuid())
-  patentId              String                      @map("patent_id")
-  userId                String?                     @map("user_id")
-  verificationStatus    FacultyVerificationStatus   @default(ACCEPTED)
-  verificationRequestId String?                     @map("verification_request_id")
-  patent                Patent                      @relation("facultyPatentAuthors", fields: [patentId], references: [id], onDelete: Cascade)
-  user                  User?                       @relation("facultyPatentAuthors", fields: [userId], references: [id], onDelete: Restrict)
-  verificationRequest   FacultyVerificationRequest? @relation("patentVerification", fields: [verificationRequestId], references: [id], onDelete: SetNull)
+  id                    String                    @id @default(cuid())
+  patentId              String                    @map("patent_id")
+  userId                String?                   @map("user_id")
+  verificationStatus    FacultyVerificationStatus @default(ACCEPTED)
+  verificationRequestId String?                   @map("verification_request_id")
+  patent                Patent                    @relation("facultyPatentAuthors", fields: [patentId], references: [id], onDelete: Cascade)
+  user                  User?                     @relation("facultyPatentAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([patentId, userId])
-  @@index([userId])
-  @@index([verificationRequestId])
   @@map("patent_teacher_authors")
 }
-
-// ─────────────────────────────────────────────────────────────
-// CONFERENCES
-// ─────────────────────────────────────────────────────────────
 
 model Conference {
   id                  String                    @id @default(cuid())
@@ -404,15 +330,15 @@ model Conference {
   keywords            String[]
   imageUrl            String?
   documentUrl         String?
-  registrationFees    Decimal?                  @db.Decimal(12, 2)
-  reimbursement       Decimal?                  @db.Decimal(12, 2)
+  registrationFees    Float?
+  reimbursement       Float?
   isPublic            Boolean                   @default(false)
   teacherStatus       TeacherStatus             @default(UPLOADED)
   conferencePublisher String?
   conferenceDate      DateTime?
   conferenceStatus    ConferenceStatus          @default(SUBMITTED)
   statusDate          DateTime?
-  paperDoi            String?                   @unique
+  paperDoi            String?
   paperLink           String?
   paperName           String?
   createdAt           DateTime                  @default(now()) @map("created_at")
@@ -421,8 +347,6 @@ model Conference {
   facultyAuthors      ConferenceTeacherAuthor[] @relation("facultyConferenceAuthors")
   grantMappings       GrantInMapping[]
 
-  @@index([isPublic, conferenceStatus])
-  @@index([teacherStatus])
   @@map("conferences")
 }
 
@@ -431,32 +355,22 @@ model ConferenceStudentAuthor {
   conferenceId String     @map("conference_id")
   userId       String     @map("user_id")
   conference   Conference @relation("studentConferenceAuthors", fields: [conferenceId], references: [id], onDelete: Cascade)
-  user         User       @relation("studentConferenceAuthors", fields: [userId], references: [id], onDelete: Restrict)
+  user         User       @relation("studentConferenceAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([conferenceId, userId])
-  @@index([userId])
   @@map("conference_student_authors")
 }
 
 model ConferenceTeacherAuthor {
-  id                    String                      @id @default(cuid())
-  conferenceId          String                      @map("conference_id")
-  userId                String?                     @map("user_id")
-  verificationStatus    FacultyVerificationStatus   @default(ACCEPTED)
-  verificationRequestId String?                     @map("verification_request_id")
-  conference            Conference                  @relation("facultyConferenceAuthors", fields: [conferenceId], references: [id], onDelete: Cascade)
-  user                  User?                       @relation("facultyConferenceAuthors", fields: [userId], references: [id], onDelete: Restrict)
-  verificationRequest   FacultyVerificationRequest? @relation("conferenceVerification", fields: [verificationRequestId], references: [id], onDelete: SetNull)
+  id                    String                    @id @default(cuid())
+  conferenceId          String                    @map("conference_id")
+  userId                String?                   @map("user_id")
+  verificationStatus    FacultyVerificationStatus @default(ACCEPTED)
+  verificationRequestId String?                   @map("verification_request_id")
+  conference            Conference                @relation("facultyConferenceAuthors", fields: [conferenceId], references: [id], onDelete: Cascade)
+  user                  User?                     @relation("facultyConferenceAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([conferenceId, userId])
-  @@index([userId])
-  @@index([verificationRequestId])
   @@map("conference_teacher_authors")
 }
-
-// ─────────────────────────────────────────────────────────────
-// GRANTS
-// ─────────────────────────────────────────────────────────────
 
 model GrantIn {
   id                  String                 @id @default(cuid())
@@ -464,12 +378,9 @@ model GrantIn {
   grantInStatus       GrantInStatus          @default(APPLIED)
   applicationDate     DateTime?
   grantDate           DateTime?
-  /// Free text (e.g. "2 years"). Consider durationMonths Int? if you need to filter/sort.
   durationOfProject   String?
-  amountGranted       Decimal?               @db.Decimal(14, 2)
-  /// Denormalized total. Update inside the same transaction as bill status changes,
-  /// or compute from GrantInBill instead.
-  usedAmount          Decimal?               @db.Decimal(14, 2)
+  amountGranted       Float?
+  usedAmount          Float?
   isPublic            Boolean                @default(false)
   hideFromAdmin       Boolean                @default(false)
   createdAt           DateTime               @default(now()) @map("created_at")
@@ -479,44 +390,38 @@ model GrantIn {
   studentAuthors      GrantInStudentAuthor[] @relation("studentGrantInAuthors")
   facultyAuthors      GrantInTeacherAuthor[] @relation("facultyGrantInAuthors")
 
-  @@index([isPublic, grantInStatus])
   @@map("grant_ins")
 }
 
 model GrantInBill {
   id             String     @id @default(cuid())
-  fileId         String     @unique @map("file_id")
-  fileUrl        String?    @map("file_url")
-  billType       BillType   @default(OTHER) @map("bill_type")
-  customBillType String?    @map("custom_bill_type")
-  isMasterPdf    Boolean    @default(false) @map("is_master_pdf")
-  billStatus     BillStatus @default(PENDING) @map("bill_status")
-  billDate       DateTime   @default(now()) @map("bill_date")
-  amount         Decimal?   @db.Decimal(12, 2)
-  userId         String     @map("user_id")
-  grantInId      String     @map("grant_in_id")
-  createdAt      DateTime   @default(now()) @map("created_at")
-  updatedAt      DateTime   @updatedAt @map("updated_at")
+  fileId         String     @unique
+  fileUrl        String?
+  billType       BillType   @default(OTHER)
+  customBillType String?
+  isMasterPdf    Boolean    @default(false)
+  billStatus     BillStatus @default(PENDING)
+  billDate       DateTime   @default(now())
+  amount         Float?
+  userId         String
+  grantInId      String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
   grantIn        GrantIn    @relation(fields: [grantInId], references: [id], onDelete: Cascade)
-  /// Restrict: never cascade-delete financial records when a user is removed
-  user           User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([grantInId, billStatus])
-  @@index([userId])
   @@map("grant_in_bills")
 }
 
-/// Exactly one of the five target FKs must be set and must match publicationType.
-/// Prisma cannot express CHECK constraints: apply migration_extras.sql after migrating.
 model GrantInMapping {
   id              String          @id @default(cuid())
-  publicationType PublicationType @map("publication_type")
-  grantInId       String          @map("grant_in_id")
-  patentId        String?         @map("patent_id")
-  journalId       String?         @map("journal_id")
-  conferenceId    String?         @map("conference_id")
-  bookChapterId   String?         @map("book_chapter_id")
-  copyrightId     String?         @map("copyright_id")
+  publicationType PublicationType
+  grantInId       String
+  patentId        String?
+  journalId       String?
+  conferenceId    String?
+  bookChapterId   String?
+  copyrightId     String?
   createdAt       DateTime        @default(now()) @map("created_at")
   updatedAt       DateTime        @updatedAt @map("updated_at")
   bookChapter     BookChapter?    @relation(fields: [bookChapterId], references: [id], onDelete: Cascade)
@@ -526,16 +431,6 @@ model GrantInMapping {
   journal         Journal?        @relation(fields: [journalId], references: [id], onDelete: Cascade)
   patent          Patent?         @relation(fields: [patentId], references: [id], onDelete: Cascade)
 
-  @@unique([grantInId, patentId])
-  @@unique([grantInId, journalId])
-  @@unique([grantInId, conferenceId])
-  @@unique([grantInId, bookChapterId])
-  @@unique([grantInId, copyrightId])
-  @@index([patentId])
-  @@index([journalId])
-  @@index([conferenceId])
-  @@index([bookChapterId])
-  @@index([copyrightId])
   @@map("grant_in_mappings")
 }
 
@@ -544,89 +439,62 @@ model GrantInStudentAuthor {
   grantInId String  @map("grant_in_id")
   userId    String  @map("user_id")
   grantIn   GrantIn @relation("studentGrantInAuthors", fields: [grantInId], references: [id], onDelete: Cascade)
-  user      User    @relation("studentGrantInAuthors", fields: [userId], references: [id], onDelete: Restrict)
+  user      User    @relation("studentGrantInAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([grantInId, userId])
-  @@index([userId])
   @@map("grant_in_student_authors")
 }
 
 model GrantInTeacherAuthor {
-  id                    String                      @id @default(cuid())
-  grantInId             String                      @map("grant_in_id")
-  userId                String?                     @map("user_id")
+  id                    String                    @id @default(cuid())
+  grantInId             String                    @map("grant_in_id")
+  userId                String?                   @map("user_id")
   role                  GrantInRole
-  verificationStatus    FacultyVerificationStatus   @default(ACCEPTED)
-  verificationRequestId String?                     @map("verification_request_id")
-  grantIn               GrantIn                     @relation("facultyGrantInAuthors", fields: [grantInId], references: [id], onDelete: Cascade)
-  user                  User?                       @relation("facultyGrantInAuthors", fields: [userId], references: [id], onDelete: Restrict)
-  verificationRequest   FacultyVerificationRequest? @relation("grantInVerification", fields: [verificationRequestId], references: [id], onDelete: SetNull)
+  verificationStatus    FacultyVerificationStatus @default(ACCEPTED)
+  verificationRequestId String?                   @map("verification_request_id")
+  grantIn               GrantIn                   @relation("facultyGrantInAuthors", fields: [grantInId], references: [id], onDelete: Cascade)
+  user                  User?                     @relation("facultyGrantInAuthors", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([grantInId, userId])
-  @@index([userId])
-  @@index([verificationRequestId])
   @@map("grant_in_teacher_authors")
 }
 
-// ─────────────────────────────────────────────────────────────
-// FACULTY VERIFICATION
-// ─────────────────────────────────────────────────────────────
-
 /// Single reusable verification request model covering all research types.
 model FacultyVerificationRequest {
-  id              String                    @id @default(cuid())
-  researchType    ResearchType
-  /// ID of the related research record. Polymorphic, so there is no FK:
-  /// clean up requests when a research record is deleted.
-  researchId      String                    @map("research_id")
-  facultyName     String                    @map("faculty_name")
-  /// Lowercase before write and lookup
-  facultyEmail    String                    @map("faculty_email")
-  institution     String?
-  department      String?
-  designation     String?
-  orcidId         String?                   @map("orcid_id")
-  affiliation     String?
-  /// SHA-256 of the single-use token emailed to the faculty. Never store the raw token.
-  tokenHash       String                    @unique @map("token_hash")
-  tokenExpiry     DateTime                  @map("token_expiry")
+  id                String                    @id @default(cuid())
+  researchType      ResearchType
+  /// ID of the related research record (journal, patent, etc.)
+  researchId        String                    @map("research_id")
+  facultyName       String                    @map("faculty_name")
+  facultyEmail      String                    @map("faculty_email")
+  institution       String?
+  department        String?
+  designation       String?
+  orcidId           String?                   @map("orcid_id")
+  affiliation       String?
+  /// Cryptographically-secure single-use token emailed to the faculty
+  verificationToken String                    @unique @map("verification_token")
+  tokenExpiry       DateTime                  @map("token_expiry")
   /// true once the faculty has used the link (prevents replay)
-  tokenUsed       Boolean                   @default(false) @map("token_used")
-  status          FacultyVerificationStatus @default(PENDING)
-  rejectionReason String?                   @map("rejection_reason")
-  verifiedAt      DateTime?                 @map("verified_at")
-  overrideById    String?                   @map("override_by")
-  overrideAt      DateTime?                 @map("override_at")
-  overrideReason  String?                   @map("override_reason")
-  requestedById   String                    @map("requested_by_id")
+  tokenUsed         Boolean                   @default(false) @map("token_used")
+  status            FacultyVerificationStatus @default(PENDING)
+  rejectionReason   String?                   @map("rejection_reason")
+  verifiedAt        DateTime?                 @map("verified_at")
+  overrideBy        String?                   @map("override_by")
+  overrideAt        DateTime?                 @map("override_at")
+  overrideReason    String?                   @map("override_reason")
+  requestedById     String                    @map("requested_by_id")
   /// Populated when the faculty registers/links their account later
-  linkedFacultyId String?                   @map("linked_faculty_id")
-  createdAt       DateTime                  @default(now()) @map("created_at")
-  updatedAt       DateTime                  @updatedAt @map("updated_at")
-  linkedFaculty   User?                     @relation("linkedVerifications", fields: [linkedFacultyId], references: [id], onDelete: SetNull)
-  overriddenBy    User?                     @relation("verificationOverrides", fields: [overrideById], references: [id], onDelete: SetNull)
-  requestedBy     User                      @relation("verificationRequests", fields: [requestedById], references: [id], onDelete: Restrict)
-
-  bookChapterAuthors BookChapterTeacherAuthor[] @relation("bookChapterVerification")
-  copyrightAuthors   CopyrightTeacherAuthor[]   @relation("copyrightVerification")
-  journalAuthors     JournalTeacherAuthor[]     @relation("journalVerification")
-  patentAuthors      PatentTeacherAuthor[]      @relation("patentVerification")
-  conferenceAuthors  ConferenceTeacherAuthor[]  @relation("conferenceVerification")
-  grantInAuthors     GrantInTeacherAuthor[]     @relation("grantInVerification")
+  linkedFacultyId   String?                   @map("linked_faculty_id")
+  createdAt         DateTime                  @default(now()) @map("created_at")
+  updatedAt         DateTime                  @updatedAt @map("updated_at")
+  linkedFaculty     User?                     @relation("linkedVerifications", fields: [linkedFacultyId], references: [id])
+  requestedBy       User                      @relation("verificationRequests", fields: [requestedById], references: [id], onDelete: Cascade)
 
   @@index([researchType, researchId])
   @@index([facultyEmail])
   @@index([status])
   @@index([requestedById])
-  @@index([linkedFacultyId])
-  @@index([overrideById])
-  @@index([tokenExpiry])
   @@map("faculty_verification_requests")
 }
-
-// ─────────────────────────────────────────────────────────────
-// CERTIFICATES, FDP, ACHIEVEMENTS
-// ─────────────────────────────────────────────────────────────
 
 model Certificate {
   id                String            @id @default(cuid())
@@ -645,8 +513,6 @@ model Certificate {
   updateComment     String?
   user              User              @relation("userCertificates", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([isPublic, certificateStatus])
   @@map("certificates")
 }
 
@@ -669,8 +535,6 @@ model FDP {
   updateComment String?
   user          User      @relation("userFDPs", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([isPublic, fdpStatus])
   @@map("fdps")
 }
 
@@ -679,7 +543,7 @@ model Achievement {
   title             String
   description       String
   category          String?
-  year              Int
+  year              String
   imageUrl          String?
   documentUrl       String?
   achievementStatus AchievementStatus @default(SUBMITTED)
@@ -690,28 +554,20 @@ model Achievement {
   updatedAt         DateTime          @updatedAt @map("updated_at")
   user              User              @relation("userAchievements", fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([isPublic, achievementStatus])
   @@map("achievements")
 }
-
-// ─────────────────────────────────────────────────────────────
-// NOTIFICATIONS & EVENTS
-// ─────────────────────────────────────────────────────────────
 
 model Notification {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
   title     String
   message   String
-  /// Consider converting to an enum once the set of types is stable
   type      String
   link      String?
   read      Boolean  @default(false)
-  createdAt DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, read, createdAt])
   @@map("notifications")
 }
 
@@ -719,24 +575,52 @@ model Event {
   id               String      @id @default(cuid())
   name             String
   posterUrl        String?
-  registrationCost Decimal?    @db.Decimal(12, 2)
+  registrationCost Float?
   description      String
   registrationLink String
   contactName      String
   contactPhone     String
   eventDate        DateTime
-  /// Lifecycle status: DRAFT until an editor/admin publishes it
+  /// Lifecycle status — DRAFT until an editor/admin publishes it
   eventStatus      EventStatus @default(DRAFT)
   createdAt        DateTime    @default(now()) @map("created_at")
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
-  @@index([eventStatus, eventDate])
   @@map("events")
 }
 
-// ─────────────────────────────────────────────────────────────
-// ENUMS
-// ─────────────────────────────────────────────────────────────
+/// Append-only audit trail for every significant system action.
+/// Normal users must never be able to delete or modify audit records.
+model AuditLog {
+  id           String   @id @default(cuid())
+  /// The user who performed the action (null for anonymous/system actions)
+  actorId      String?  @map("actor_id")
+  actorEmail   String?  @map("actor_email")
+  actorRole    String?  @map("actor_role")
+  /// The action that was performed (e.g. RESEARCH_PUBLISHED, ROLE_CHANGED)
+  action       String
+  /// Resource type (e.g. Journal, Achievement, GrantIn, User)
+  resourceType String   @map("resource_type")
+  /// ID of the affected resource
+  resourceId   String   @map("resource_id")
+  /// JSON snapshot of old value (for updates/status changes)
+  oldValue     Json?    @map("old_value")
+  /// JSON snapshot of new value
+  newValue     Json?    @map("new_value")
+  /// Human-readable reason / override justification
+  reason       String?
+  /// Client IP (best-effort — populated from x-forwarded-for)
+  ipAddress    String?  @map("ip_address")
+  /// Any extra structured metadata
+  metadata     Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([actorId])
+  @@index([resourceType, resourceId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
 
 enum UserRole {
   STUDENT
@@ -924,8 +808,52 @@ enum EventStatus {
   ARCHIVED
 }
 
-/// Kept because it came from introspection of a multi-region cluster.
-/// Only remove if your cluster is NOT multi-region, otherwise Prisma may try to drop the type.
-enum crdb_internal_region {  
+/// Audit action constants — keep in sync with src/lib/audit.ts
+enum AuditAction {
+  // Auth
+  USER_REGISTERED
+  USER_ROLE_CHANGED
+  USER_DELETED
+  // Research
+  RESEARCH_SUBMITTED
+  RESEARCH_REVIEW_STARTED
+  RESEARCH_UPDATE_REQUESTED
+  RESEARCH_APPROVED
+  RESEARCH_REJECTED
+  RESEARCH_PUBLISHED
+  // Grant
+  GRANT_CREATED
+  GRANT_APPROVED
+  GRANT_REJECTED
+  GRANT_COMPLETED
+  GRANT_TEAM_UPDATED
+  // Bills
+  BILL_SUBMITTED
+  BILL_ACCEPTED
+  BILL_REJECTED
+  BILL_PAID
+  // Achievements
+  ACHIEVEMENT_SUBMITTED
+  ACHIEVEMENT_APPROVED
+  ACHIEVEMENT_REJECTED
+  // Events
+  EVENT_CREATED
+  EVENT_PUBLISHED
+  EVENT_CANCELLED
+  EVENT_ARCHIVED
+  // Faculty verification
+  FACULTY_VERIFICATION_CREATED
+  FACULTY_VERIFICATION_ACCEPTED
+  FACULTY_VERIFICATION_REJECTED
+  FACULTY_VERIFICATION_OVERRIDE
+  // Grant mapping
+  GRANT_MAPPING_CREATED
+  GRANT_MAPPING_DELETED
+  // Admin override
+  ADMIN_OVERRIDE
+  SUPERADMIN_OVERRIDE
+}
+
+enum crdb_internal_region {
   aws_ap_south_1 @map("aws-ap-south-1")
-  } 
+}

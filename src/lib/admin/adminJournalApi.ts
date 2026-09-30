@@ -148,7 +148,7 @@ export const deleteAdminJournal = async (
 ): Promise<ApiResponse<{ message: string }>> => {
   try {
     const response = await axios.delete<{ message: string }>(
-      `${API_BASE_URL}/${id}`
+      `/api/research/journal/${id}`
     )
     return { data: response.data }
   } catch (error) {
@@ -164,7 +164,7 @@ export const bulkDeleteAdminJournals = async (
 ): Promise<ApiResponse<{ message: string; count: number }>> => {
   try {
     const response = await axios.delete<{ message: string; count: number }>(
-      API_BASE_URL,
+      '/api/research/journal',
       { data: { ids } }
     )
     return { data: response.data }

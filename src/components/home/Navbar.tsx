@@ -13,6 +13,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { NotificationBell } from "@/components/journal/NotificationBell";
 import Image from "next/image";
+import { urlFor } from "../../../sanity/lib/image";
 
 const ALL_LINKS = [
   { label: "Home",         href: "/" },
@@ -287,9 +288,9 @@ export default function Navbar({ data }: { data?: any }) {
 
   const navLinks = data?.navbarLinks || localData?.links || ALL_LINKS;
 
-  const iemLogoSrc = localData?.iemLogoUrl || "/iem-logo.png";
-  const iedcLogoSrc = localData?.iedcLogoUrl || "/iedc-logo.png";
-  const uemLogoSrc = localData?.uemLogoUrl || "/uem.png";
+  const iemLogoSrc = data?.navbarIemLogo ? urlFor(data.navbarIemLogo).url() : (localData?.iemLogoUrl || "/iem-logo.png");
+  const iedcLogoSrc = data?.navbarIedcLogo ? urlFor(data.navbarIedcLogo).url() : (localData?.iedcLogoUrl || "/iedc-logo.png");
+  const uemLogoSrc = data?.navbarUemLogo ? urlFor(data.navbarUemLogo).url() : (localData?.uemLogoUrl || "/uem.png");
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 

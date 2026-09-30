@@ -26,6 +26,7 @@ import {
   pickAllowedFields,
   getResearchUpdateAllowlist,
 } from '@/lib/auth/field-allowlists'
+import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
 import { getClientIp } from '@/lib/auth/guard'
 import {
   canReadResearch,
@@ -33,6 +34,7 @@ import {
   isLockedForStudent,
   validateResearchStatusChange,
   dispatchResearchStatusNotifications,
+  auditResearchChange,
   allAuthorUserIds,
 } from '@/lib/research/researchRouteHelpers'
 import { TeacherStatus, JournalStatus, UserRole } from '@prisma/client'
@@ -277,6 +279,24 @@ export async function PATCH(
       },
     })
 
+    // ── 11. Audit log for status changes ────────────────────────────────────
+    const resolvedTeacher = (updateData.teacherStatus ?? existing.teacherStatus) as TeacherStatus
+    const resolvedMain    = (updateData.journalStatus ?? existing.journalStatus) as JournalStatus
+
+    if (resolvedTeacher !== existing.teacherStatus || resolvedMain !== existing.journalStatus) {
+      await auditResearchChange({
+        session:      session as { user: { id: string; email: string; role: string } },
+        resourceType: 'Journal',
+        resourceId:   id,
+        oldStatus:    `${existing.teacherStatus}/${existing.journalStatus}`,
+        newStatus:    `${resolvedTeacher}/${resolvedMain}`,
+        action:       resolvedMain === JournalStatus.PUBLISHED
+          ? AuditActions.RESEARCH_PUBLISHED
+          : AuditActions.RESEARCH_APPROVED,
+        ipAddress:    ip,
+      })
+    }
+
     // ── 12. Notifications ───────────────────────────────────────────────────
     const authorIds = allAuthorUserIds(journal.studentAuthors, journal.facultyAuthors)
     await dispatchResearchStatusNotifications({
@@ -294,7 +314,7 @@ export async function PATCH(
     })
 
     // Broadcast email on publication
-    if (resolvedJournalStatus === JournalStatus.PUBLISHED) {
+    if (resolvedMain === JournalStatus.PUBLISHED) {
       const authorNames = [
         ...journal.studentAuthors.map((sa) => sa.user.name).filter(Boolean),
         ...journal.facultyAuthors.map((fa) => fa.user?.name).filter(Boolean),
@@ -359,6 +379,14 @@ export async function DELETE(
     // ADMIN/SUPERADMIN can delete any
 
     await prisma.journal.delete({ where: { id } })
+
+    writeAuditLog({
+      ...fromSession(session as { user: { id: string; email: string; role: string } }),
+      action:       AuditActions.RESEARCH_PUBLISHED, // closest available — use RESEARCH_SUBMITTED as proxy
+      resourceType: 'Journal',
+      resourceId:   id,
+      reason:       'Journal deleted',
+    }).catch(() => {})
 
     return NextResponse.json({ message: 'Journal deleted successfully' })
   } catch (error) {

@@ -9,10 +9,11 @@ import prisma from '@/lib/prisma'
 import { requireAuth, getClientIp } from '@/lib/auth/guard'
 import { canViewAllResearch, canPublishContent } from '@/lib/auth/permissions'
 import { pickAllowedFields, getResearchUpdateAllowlist } from '@/lib/auth/field-allowlists'
+import { AuditActions } from '@/lib/audit'
 import {
   canReadResearch, canWriteResearch, isLockedForStudent,
   validateResearchStatusChange, dispatchResearchStatusNotifications,
-  allAuthorUserIds,
+  auditResearchChange, allAuthorUserIds,
 } from '@/lib/research/researchRouteHelpers'
 import { TeacherStatus, PatentStatus, UserRole } from '@prisma/client'
 import { broadcastPublicationEmail } from '@/lib/mail'
@@ -137,6 +138,19 @@ export async function PATCH(
       },
     })
 
+    const rT = (updateData.teacherStatus ?? existing.teacherStatus) as TeacherStatus
+    const rP = (updateData.patentStatus ?? existing.patentStatus) as PatentStatus
+    if (rT !== existing.teacherStatus || rP !== existing.patentStatus) {
+      await auditResearchChange({
+        session: session as { user: { id: string; email: string; role: string } },
+        resourceType: 'Patent', resourceId: id,
+        oldStatus: `${existing.teacherStatus}/${existing.patentStatus}`,
+        newStatus: `${rT}/${rP}`,
+        action: rP === PatentStatus.GRANTED ? AuditActions.RESEARCH_PUBLISHED : AuditActions.RESEARCH_APPROVED,
+        ipAddress: ip,
+      })
+    }
+
     const authorIds = allAuthorUserIds(patent.studentAuthors, patent.facultyAuthors)
     await dispatchResearchStatusNotifications({
       resourceType: 'patent', resourceId: id, title: patent.title,
@@ -146,7 +160,7 @@ export async function PATCH(
       allAuthorIds: authorIds, sessionUserId: userId, sessionRole: role,
     })
 
-    if (resolvedStatus === PatentStatus.GRANTED) {
+    if (rP === PatentStatus.GRANTED) {
       broadcastPublicationEmail({
         resourceType: 'patent', resourceTitle: patent.title, resourceId: id,
         authors: [...patent.studentAuthors.map(sa => sa.user.name), ...patent.facultyAuthors.map(fa => fa.user?.name)].filter(Boolean) as string[],

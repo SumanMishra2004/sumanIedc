@@ -7,7 +7,6 @@ import * as z from "zod";
 import axios from "axios";
 import { Loader2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
-import { useApiBase } from "@/hooks/use-api-base";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,7 +87,6 @@ export default function CopyrightDialog({
 }) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const copyrightBase = useApiBase("copyright");
   const { cropState, openCrop, closeCrop } = useImageCrop();
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -172,7 +170,7 @@ export default function CopyrightDialog({
     setIsSubmitting(true);
     try {
       console.log("Submitting copyright:", data);
-      await axios.post(copyrightBase, data);
+      await axios.post("/api/research/copyright", data);
       toast.success("Copyright created successfully!");
       form.reset();
       setImageFile(null);

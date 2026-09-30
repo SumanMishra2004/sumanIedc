@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { requireEditor } from '@/lib/auth/guard'
 import { EventStatus } from '@prisma/client'
-
+import { AuditActions, writeAuditLog, fromSession } from '@/lib/audit'
 import { getClientIp } from '@/lib/auth/guard'
 
 export async function GET(req: NextRequest) {
@@ -77,7 +77,14 @@ export async function POST(req: NextRequest) {
       },
     })
 
-
+    await writeAuditLog({
+      ...fromSession(session as { user: { id: string; email: string; role: string } }),
+      action:       AuditActions.EVENT_CREATED,
+      resourceType: 'Event',
+      resourceId:   event.id,
+      newValue:     { name, eventStatus: EventStatus.DRAFT },
+      ipAddress:    ip,
+    })
 
     return NextResponse.json({ event }, { status: 201 })
   } catch (error) {

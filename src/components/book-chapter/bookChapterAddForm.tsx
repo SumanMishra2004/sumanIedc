@@ -5,7 +5,6 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import axios from "axios";
-import { useApiBase } from "@/hooks/use-api-base";
 import {
   Loader2, Upload, X, BookOpen, FileText,
   Users, Tag, Building2, ChevronRight, CheckCircle2,
@@ -217,7 +216,6 @@ export default function BookChapterDialog({
   onClose?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const bookChapterBase = useApiBase("book-chapter");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [keywordInput, setKeywordInput] = useState("");
   const { cropState, openCrop, closeCrop } = useImageCrop();
@@ -372,7 +370,7 @@ export default function BookChapterDialog({
     async (data: BookChapterFormValues) => {
       setIsSubmitting(true);
       try {
-        await axios.post(bookChapterBase, data);
+        await axios.post("/api/research/book-chapter", data);
         toast.success("Book chapter created successfully!");
         resetForm();
         setOpen(false);

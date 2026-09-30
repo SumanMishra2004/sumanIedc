@@ -1,9 +1,19 @@
-
+/**
+ * POST /api/faculty-verification
+ *   Create a new faculty co-author verification request.
+ *   Only students can create these requests.
+ *
+ * GET /api/faculty-verification
+ *   - Faculty: returns requests where the supplied email matches their
+ *     own account email (i.e., requests directed at them).
+ *   - Admin/SuperAdmin: returns all requests (optionally filtered).
+ *   - Student: returns requests they created.
+ */
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/lib/auth'
 import prisma from '@/lib/prisma'
 import { FacultyVerificationStatus, ResearchType } from '@prisma/client'
-import { randomBytes, createHash } from 'crypto'
+import { randomBytes } from 'crypto'
 import {
   isAdminOrHigher,
   isFacultyOrHigher,
@@ -95,7 +105,6 @@ export async function POST(req: NextRequest) {
 
     // ── Generate secure token ────────────────────────────────────────────
     const verificationToken = generateSecureToken()
-    const tokenHash = createHash('sha256').update(verificationToken).digest('hex')
     const tokenExpiry = new Date(Date.now() + TOKEN_EXPIRY_HOURS * 60 * 60 * 1000)
 
     const request = await prisma.facultyVerificationRequest.create({
@@ -109,7 +118,7 @@ export async function POST(req: NextRequest) {
         designation: designation ?? null,
         orcidId: orcidId ?? null,
         affiliation: affiliation ?? null,
-        tokenHash,
+        verificationToken,
         tokenExpiry,
         status: autoAccept ? FacultyVerificationStatus.ACCEPTED : FacultyVerificationStatus.PENDING,
         tokenUsed: autoAccept ? true : false,
@@ -217,7 +226,7 @@ export async function GET(req: NextRequest) {
     })
 
     // Strip the verification token from the response for security
-    const safeRequests = requests.map(({ tokenHash: _token, ...r }) => r)
+    const safeRequests = requests.map(({ verificationToken: _token, ...r }) => r)
 
     return NextResponse.json({ requests: safeRequests })
   } catch (error) {

@@ -24,7 +24,12 @@ const nextConfig: NextConfig = {
         hostname: 'api.dicebear.com',
       },
       {
-        // Cloudinary (used in hardcoded gallery fallback slides)
+        // Sanity image CDN
+        protocol: 'https',
+        hostname: 'cdn.sanity.io',
+      },
+      {
+        // Cloudinary (used in existing hardcoded slides)
         protocol: 'https',
         hostname: 'res.cloudinary.com',
       },

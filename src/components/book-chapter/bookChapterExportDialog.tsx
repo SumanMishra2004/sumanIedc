@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { Download, FileDown, Loader2 } from "lucide-react"
-import { useApiBase } from "@/hooks/use-api-base"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -36,7 +35,6 @@ export function ExportDialog({ triggerButton }: ExportDialogProps) {
   const isMobile = useIsMobile()
   const [open, setOpen] = React.useState(false)
   const [isExporting, setIsExporting] = React.useState(false)
-  const bookChapterBase = useApiBase("book-chapter")
   const [filters, setFilters] = React.useState<BookChapterFilters>({})
 
   const handleExport = async () => {
@@ -63,7 +61,7 @@ export function ExportDialog({ triggerButton }: ExportDialogProps) {
       if (filters.studentAuthorIds?.length) params.append('studentAuthorIds', filters.studentAuthorIds.join(','))
 
       const queryString = params.toString()
-      const url = `${bookChapterBase}/export${queryString ? `?${queryString}` : ''}`
+      const url = `/api/research/book-chapter/export${queryString ? `?${queryString}` : ''}`
 
       // Fetch the CSV file
       const response = await fetch(url)

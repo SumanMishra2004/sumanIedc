@@ -4,7 +4,8 @@ import { useMemo } from "react";
 import { motion } from "motion/react";
 import { Linkedin, Github, Mail, Shield, GraduationCap } from "lucide-react";
 import Footer from "@/components/home/Footer";
-import type { SanityTeamMember, TeamPageContent } from "@/types/content";
+import { urlFor } from "../../../sanity/lib/image";
+import type { SanityTeamMember, TeamPageContent } from "../../../sanity/lib/queries";
 
 // ─── DB Faculty (from Prisma) ─────────────────────────────────────────────────
 interface DbFacultyMember {
@@ -92,10 +93,10 @@ const DEFAULT_PAGE_CONTENT: TeamPageContent = {
     "Bringing together specialized faculty mentorship and enthusiastic student innovators to bridge the gap between academic projects and industrial breakthroughs.",
 };
 
-// ─── Helper: Get image URL for a team member ─────────────────────────────────
+// ─── Helper: Get image URL for a Sanity member ────────────────────────────────
 function getSanityMemberImage(member: SanityTeamMember): string | null {
-  // photo is now a plain string URL or null — no Sanity image builder needed
-  return typeof member.photo === "string" ? member.photo : null;
+  if (!member.photo) return null;
+  return urlFor(member.photo).width(250).height(250).fit("crop").url();
 }
 
 interface TeamClientProps {

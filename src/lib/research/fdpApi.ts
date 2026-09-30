@@ -10,8 +10,6 @@ import {
   ApiResponse
 } from '@/types/fdp'
 
-import { fdpApi } from '@/lib/api-client'
-const _getBase = (role?: string | null) => fdpApi(role)
 const API_BASE_URL = '/api/research/fdp'
 
 // Error handler

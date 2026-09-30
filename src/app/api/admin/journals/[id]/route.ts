@@ -1,99 +1,233 @@
-import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth/guard";
-import { JournalStatus, Prisma, TeacherStatus } from "@prisma/client";
-import { safeUpdate, safeDelete } from "@/lib/api/security";
-import { pickAllowedFields, JOURNAL_ADMIN_FIELDS } from "@/lib/auth/field-allowlists";
-import { successResponse, updatedResponse, deletedResponse, notFoundResponse, badRequestResponse } from "@/lib/api/response";
-import { handleApiError } from "@/lib/api/error-handler";
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth'
+import prisma from '@/lib/prisma'
+import {
+  TeacherStatus,
+  JournalStatus,
+  JournalScope,
+  JournalReviewType,
+  JournalAccessType,
+  JournalIndexing,
+  JournalQuartile,
+  JournalPublicationMode
+} from '@prisma/client'
+import { isAdminOrHigher } from '@/lib/auth/permissions'
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin(req);
-  if (!guard.ok) return guard.response;
-  
+// Helper: admin guard
+async function requireAdmin() {
+  const session = await auth()
+  if (!session?.user || !isAdminOrHigher(session.user.role)) {
+    return null
+  }
+  return session
+}
+
+// Author include with department
+const authorInclude = {
+  studentAuthors: {
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          department: true
+        }
+      }
+    }
+  },
+  facultyAuthors: {
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          department: true
+        }
+      }
+    }
+  }
+}
+
+// GET /api/admin/journals/[id] — fetch single journal with authors
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { id } = await params;
-    
-    const resource = await prisma.journal.findUnique({
+    const session = await requireAdmin()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized — ADMIN access required' },
+        { status: 403 }
+      )
+    }
+
+    const { id } = await params
+
+    const journal = await prisma.journal.findUnique({
       where: { id },
-    });
-    
-    if (!resource) {
-      return notFoundResponse("Journal");
+      include: authorInclude
+    })
+
+    if (!journal) {
+      return NextResponse.json(
+        { error: 'Journal not found' },
+        { status: 404 }
+      )
     }
-    
-    return successResponse(resource);
+
+    return NextResponse.json({ journal })
   } catch (error) {
-    return handleApiError(error);
+    console.error('Error fetching admin journal:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin(req);
-  if (!guard.ok) return guard.response;
-  
-  try {
-    const { id } = await params;
-    const body = await req.json();
-    
-    // Validate status enums if provided
-    if (body.journalStatus && !Object.values(JournalStatus).includes(body.journalStatus)) {
-      return badRequestResponse("Invalid journalStatus");
-    }
-    if (body.teacherStatus && !Object.values(TeacherStatus).includes(body.teacherStatus)) {
-      return badRequestResponse("Invalid teacherStatus");
-    }
-
-    // Use field allowlist to prevent mass assignment
-    const allowedData = pickAllowedFields(body, JOURNAL_ADMIN_FIELDS);
-    
-    // Prepare update data with proper type conversions
-    const data: Prisma.JournalUpdateInput = {
-      ...allowedData,
-    };
-
-    // Parse date fields if provided
-    if (body.publicationDate !== undefined) {
-      data.publicationDate = body.publicationDate ? new Date(body.publicationDate) : null;
-    }
-    if (body.impactFactorDate !== undefined) {
-      data.impactFactorDate = body.impactFactorDate ? new Date(body.impactFactorDate) : null;
-    }
-  
-    // Use safe update to prevent race conditions
-    const result = await safeUpdate(
-      prisma.journal,
-      id,
-      data,
-      "Journal"
-    );
-    
-    if (!result.success) {
-      return result.response;
-    }
-    
-    return updatedResponse(result.data, "Journal updated successfully");
-  } catch (error) {
-    return handleApiError(error);
-  }
+// Enum validation map
+const enumValidators: Record<string, { values: string[]; label: string }> = {
+  teacherStatus: { values: Object.values(TeacherStatus), label: 'teacherStatus' },
+  journalStatus: { values: Object.values(JournalStatus), label: 'journalStatus' },
+  scope: { values: Object.values(JournalScope), label: 'scope' },
+  reviewType: { values: Object.values(JournalReviewType), label: 'reviewType' },
+  accessType: { values: Object.values(JournalAccessType), label: 'accessType' },
+  indexing: { values: Object.values(JournalIndexing), label: 'indexing' },
+  quartile: { values: Object.values(JournalQuartile), label: 'quartile' },
+  publicationMode: { values: Object.values(JournalPublicationMode), label: 'publicationMode' },
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const guard = await requireAdmin(req);
-  if (!guard.ok) return guard.response;
-  
+// PATCH /api/admin/journals/[id] — update journal fields
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { id } = await params;
-    
-    // Use safe delete to prevent race conditions
-    const result = await safeDelete(prisma.journal, id, "Journal");
-    
-    if (!result.success) {
-      return result.response;
+    const session = await requireAdmin()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized — ADMIN access required' },
+        { status: 403 }
+      )
     }
-    
-    return deletedResponse("Journal deleted successfully");
+
+    const { id } = await params
+    const body = await req.json()
+
+    // Check if journal exists
+    const existingJournal = await prisma.journal.findUnique({
+      where: { id }
+    })
+
+    if (!existingJournal) {
+      return NextResponse.json(
+        { error: 'Journal not found' },
+        { status: 404 }
+      )
+    }
+
+    const {
+      teacherStatus,
+      journalStatus,
+      isPublic,
+      doi,
+      publisher,
+      impactFactor,
+      quartile,
+      indexing,
+      publicationDate,
+      paperLink,
+      scope,
+      reviewType,
+      accessType,
+      publicationMode,
+      title,
+      journalName,
+      abstract,
+      serialNo,
+      imageUrl,
+      documentUrl,
+      impactFactorDate,
+      keywords,
+      registrationFees,
+      reimbursement,
+    } = body
+
+    // Validate enum fields
+    for (const [field, validator] of Object.entries(enumValidators)) {
+      const value = body[field]
+      if (value !== undefined && !validator.values.includes(value)) {
+        return NextResponse.json(
+          { error: `Invalid ${validator.label} value: ${value}` },
+          { status: 400 }
+        )
+      }
+    }
+
+    // If serialNo is being changed, check for duplicates
+    if (serialNo !== undefined && serialNo !== existingJournal.serialNo) {
+      const duplicate = await prisma.journal.findUnique({
+        where: { serialNo }
+      })
+      if (duplicate) {
+        return NextResponse.json(
+          { error: 'A journal with this serial number already exists' },
+          { status: 400 }
+        )
+      }
+    }
+
+    // Build update data — only include provided fields
+    const updateData: any = {}
+    if (teacherStatus !== undefined) updateData.teacherStatus = teacherStatus
+    if (journalStatus !== undefined) updateData.journalStatus = journalStatus
+    if (isPublic !== undefined) updateData.isPublic = Boolean(isPublic)
+    if (doi !== undefined) updateData.doi = doi
+    if (publisher !== undefined) updateData.publisher = publisher
+    if (impactFactor !== undefined) updateData.impactFactor = impactFactor !== null ? parseFloat(impactFactor) : null
+    if (quartile !== undefined) updateData.quartile = quartile
+    if (indexing !== undefined) updateData.indexing = indexing
+    if (publicationDate !== undefined) updateData.publicationDate = publicationDate ? new Date(publicationDate) : null
+    if (paperLink !== undefined) updateData.paperLink = paperLink
+    if (scope !== undefined) updateData.scope = scope
+    if (reviewType !== undefined) updateData.reviewType = reviewType
+    if (accessType !== undefined) updateData.accessType = accessType
+    if (publicationMode !== undefined) updateData.publicationMode = publicationMode
+    if (title !== undefined) updateData.title = title
+    if (journalName !== undefined) updateData.journalName = journalName
+    if (abstract !== undefined) updateData.abstract = abstract
+    if (serialNo !== undefined) updateData.serialNo = serialNo
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl
+    if (documentUrl !== undefined) updateData.documentUrl = documentUrl
+    if (impactFactorDate !== undefined) updateData.impactFactorDate = impactFactorDate ? new Date(impactFactorDate) : null
+    if (keywords !== undefined) updateData.keywords = keywords
+    if (registrationFees !== undefined) updateData.registrationFees = registrationFees !== null ? parseFloat(registrationFees) : null
+    if (reimbursement !== undefined) updateData.reimbursement = reimbursement !== null ? parseFloat(reimbursement) : null
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: 'No valid fields to update' },
+        { status: 400 }
+      )
+    }
+
+    const journal = await prisma.journal.update({
+      where: { id },
+      data: updateData,
+      include: authorInclude
+    })
+
+    return NextResponse.json({ journal })
   } catch (error) {
-    return handleApiError(error);
+    console.error('Error updating admin journal:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

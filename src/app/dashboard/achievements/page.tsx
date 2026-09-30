@@ -128,17 +128,10 @@ export default function UserAchievementsPage() {
   const [editImageFile, setEditImageFile] = React.useState<File | null>(null)
   const [editProofFile, setEditProofFile] = React.useState<File | null>(null)
 
-  const achievementBase = React.useMemo(
-    () => (session?.user?.role === "ADMIN" || session?.user?.role === "SUPERADMIN" || session?.user?.role === "EDITOR"
-      ? `/api/${session.user.role === "EDITOR" ? "editor" : "admin"}/achievements`
-      : "/api/student/achievements"),
-    [session?.user?.role]
-  )
-
   const fetchAchievements = async () => {
     setIsLoading(true)
     try {
-      const res = await fetch(achievementBase)
+      const res = await fetch("/api/research/achievement")
       const data = await res.json()
       if (res.ok) {
         setAchievements(data.achievements || [])
@@ -189,7 +182,7 @@ export default function UserAchievementsPage() {
         documentUrl = await uploadFile(proofFile)
       }
 
-      const res = await fetch(achievementBase, {
+      const res = await fetch("/api/research/achievement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -256,7 +249,7 @@ export default function UserAchievementsPage() {
         documentUrl = await uploadFile(editProofFile)
       }
 
-      const res = await fetch(`${achievementBase}/${selectedAchievement.id}`, {
+      const res = await fetch(`/api/research/achievement/${selectedAchievement.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -295,7 +288,7 @@ export default function UserAchievementsPage() {
     }
 
     try {
-      const res = await fetch(`${achievementBase}/${id}`, {
+      const res = await fetch(`/api/research/achievement/${id}`, {
         method: "DELETE",
       })
 
