@@ -1,52 +1,90 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
-import { FDPStatus } from "@prisma/client";
+import { FDPStatus, Prisma } from "@prisma/client";
+import { safeUpdate, safeDelete } from "@/lib/api/security";
+import { successResponse, updatedResponse, deletedResponse, notFoundResponse, badRequestResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
+  
   try {
-    const fdp = await prisma.fDP.findUnique({
-      where: { id: params.id },
-      include: { user: { select: { id: true, name: true, email: true, department: true, role: true } } },
+    const { id } = await params;
+    
+    const resource = await prisma.fDP.findUnique({
+      where: { id },
     });
-    if (!fdp) return NextResponse.json({ error: "FDP not found" }, { status: 404 });
-    return NextResponse.json({ success: true, data: fdp });
-  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+    
+    if (!resource) {
+      return notFoundResponse("FDP");
+    }
+    
+    return successResponse(resource);
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
+  
   try {
-    if (!await prisma.fDP.findUnique({ where: { id: params.id } }))
-      return NextResponse.json({ error: "FDP not found" }, { status: 404 });
-
+    const { id } = await params;
     const body = await req.json();
-    if (body.fdpStatus && !Object.values(FDPStatus).includes(body.fdpStatus))
-      return NextResponse.json({ error: "Invalid fdpStatus" }, { status: 400 });
-
-    const data: any = {};
-    for (const f of ["fdpStatus","isPublic","title","description","keywords","organizedBy","topic","duration","remark","updateComment"]) {
-      if (body[f] !== undefined) data[f] = body[f];
-    }
-    for (const df of ["startDate","endDate"]) {
-      if (body[df] !== undefined) data[df] = body[df] ? new Date(body[df]) : null;
+    
+    // Validate status enums if provided
+    if (body.fdpStatus && !Object.values(FDPStatus).includes(body.fdpStatus)) {
+      return badRequestResponse("Invalid fdpStatus");
     }
 
-    const fdp = await prisma.fDP.update({ where: { id: params.id }, data });
-    return NextResponse.json({ success: true, data: fdp });
-  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+    // Prepare update data (TODO: Add field allowlist for this resource)
+    const data: Prisma.FDPUpdateInput = body;
+
+    // Parse date fields if provided
+    if (body.startDate !== undefined) {
+      data.startDate = body.startDate ? new Date(body.startDate) : null;
+    }
+    if (body.endDate !== undefined) {
+      data.endDate = body.endDate ? new Date(body.endDate) : null;
+    }
+  
+    // Use safe update to prevent race conditions
+    const result = await safeUpdate(
+      prisma.fDP,
+      id,
+      data,
+      "FDP"
+    );
+    
+    if (!result.success) {
+      return result.response;
+    }
+    
+    return updatedResponse(result.data, "FDP updated successfully");
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
+  
   try {
-    if (!await prisma.fDP.findUnique({ where: { id: params.id } }))
-      return NextResponse.json({ error: "FDP not found" }, { status: 404 });
-    await prisma.fDP.delete({ where: { id: params.id } });
-    return NextResponse.json({ success: true, message: "FDP deleted" });
-  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+    const { id } = await params;
+    
+    // Use safe delete to prevent race conditions
+    const result = await safeDelete(prisma.fDP, id, "FDP");
+    
+    if (!result.success) {
+      return result.response;
+    }
+    
+    return deletedResponse("FDP deleted successfully");
+  } catch (error) {
+    return handleApiError(error);
+  }
 }

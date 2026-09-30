@@ -8,6 +8,7 @@ import * as z from "zod";
 import axios from "axios";
 import { Loader2, Upload, X } from "lucide-react";
 import { toast } from "sonner";
+import { useApiBase } from "@/hooks/use-api-base";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {

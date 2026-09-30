@@ -1,43 +1,51 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireEditor } from "@/lib/auth/guard";
-import { AchievementStatus } from "@prisma/client";
+import { AchievementStatus, Prisma } from "@prisma/client";
+import { safeUpdate } from "@/lib/api/security";
+import { pickAllowedFields, ACHIEVEMENT_EDITOR_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, notFoundResponse, badRequestResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireEditor(req);
   if (!guard.ok) return guard.response;
+
   try {
+    const { id } = await params;
+
     const achievement = await prisma.achievement.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: { user: { select: { id: true, name: true, email: true, department: true, role: true } } },
     });
-    if (!achievement) return NextResponse.json({ error: "Achievement not found" }, { status: 404 });
-    return NextResponse.json({ success: true, data: achievement });
-  } catch (e) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+
+    if (!achievement) return notFoundResponse("Achievement");
+    return successResponse(achievement);
+  } catch (error) {
+    return handleApiError(error);
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireEditor(req);
   if (!guard.ok) return guard.response;
-  try {
-    const existing = await prisma.achievement.findUnique({ where: { id: params.id } });
-    if (!existing) return NextResponse.json({ error: "Achievement not found" }, { status: 404 });
 
+  try {
+    const { id } = await params;
     const body = await req.json();
+
     if (body.achievementStatus && !Object.values(AchievementStatus).includes(body.achievementStatus)) {
-      return NextResponse.json({ error: "Invalid achievementStatus" }, { status: 400 });
+      return badRequestResponse("Invalid achievementStatus");
     }
 
-    const updateData: any = {};
-    const fields = ["achievementStatus", "isPublic", "title", "description", "category", "year",
-      "imageUrl", "documentUrl", "updateComment"];
-    for (const f of fields) { if (body[f] !== undefined) updateData[f] = body[f]; }
+    const allowedData = pickAllowedFields(body, ACHIEVEMENT_EDITOR_FIELDS);
+    const data: Prisma.AchievementUpdateInput = { ...allowedData };
 
-    const achievement = await prisma.achievement.update({ where: { id: params.id }, data: updateData });
-    return NextResponse.json({ success: true, data: achievement });
-  } catch (e) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const result = await safeUpdate(prisma.achievement, id, data, "Achievement");
+    if (!result.success) return result.response;
+
+    return updatedResponse(result.data, "Achievement updated successfully");
+  } catch (error) {
+    return handleApiError(error);
   }
 }

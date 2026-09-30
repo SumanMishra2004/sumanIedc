@@ -1,113 +1,117 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import {
-  withRole,
-  successResponse,
-  updatedResponse,
-  deletedResponse,
-  notFoundResponse,
-  forbiddenResponse,
-  handleApiError,
-  updateGrantInSchema,
-  userBasicSelect,
-  isUserAuthor,
-} from "@/lib/api";
+import { withRole } from "@/lib/api/middleware";
+import { GrantInStatus, Prisma } from "@prisma/client";
+import { safeFetchWithOwnership, safeUpdate, safeDelete, isAuthorOf } from "@/lib/api/security";
+import { pickAllowedFields, GRANT_FACULTY_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, deletedResponse, forbiddenResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+const grantInclude = {
+  studentAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
+  facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
+  bills: {
+    select: {
+      id: true, fileId: true, fileUrl: true, billType: true, customBillType: true,
+      isMasterPdf: true, billStatus: true, billDate: true, amount: true, createdAt: true,
+      user: { select: { id: true, name: true } },
+    },
+    orderBy: { billDate: "desc" as const },
+  },
+  publicationMappings: {
+    include: {
+      journal:     { select: { id: true, title: true } },
+      conference:  { select: { id: true, conferenceName: true } },
+      bookChapter: { select: { id: true, title: true } },
+      patent:      { select: { id: true, title: true } },
+      copyright:   { select: { id: true, title: true } },
+    },
+  },
+};
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("grantIn", params.id, user.id);
-      if (!isAuthor) return forbiddenResponse("You can only view your own grants");
+      const { id } = await params;
 
-      const grant = await prisma.grantIn.findUnique({
-        where: { id: params.id },
-        include: {
-          studentAuthors: { include: { user: { select: userBasicSelect } } },
-          facultyAuthors: { include: { user: { select: userBasicSelect } } },
-          bills: {
-            select: {
-              id: true,
-              fileId: true,
-              fileUrl: true,
-              billType: true,
-              customBillType: true,
-              isMasterPdf: true,
-              billStatus: true,
-              billDate: true,
-              amount: true,
-              createdAt: true,
-              user: { select: { id: true, name: true } },
-            },
-            orderBy: { billDate: "desc" },
-          },
-          publicationMappings: {
-            include: {
-              journal: { select: { id: true, title: true } },
-              conference: { select: { id: true, conferenceName: true } },
-              bookChapter: { select: { id: true, title: true } },
-              patent: { select: { id: true, title: true } },
-              copyright: { select: { id: true, title: true } },
-            },
-          },
-        },
+      // Returns 404 for both "not found" and "not authorized" — prevents IDOR
+      const result = await safeFetchWithOwnership(prisma.grantIn, id, user, {
+        resourceName: "Grant",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: ["EDITOR", "ADMIN", "SUPERADMIN"],
       });
+      if (!result.success) return result.response;
 
-      if (!grant) return notFoundResponse("Grant");
+      const grant = await prisma.grantIn.findUnique({ where: { id }, include: grantInclude });
       return successResponse(grant);
-    } catch (error) { return handleApiError(error); }
+    } catch (error) {
+      return handleApiError(error);
+    }
   })(req);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("grantIn", params.id, user.id);
-      if (!isAuthor) return forbiddenResponse("You can only update your own grants");
+      const { id } = await params;
 
-      const existing = await prisma.grantIn.findUnique({
-        where: { id: params.id },
-        select: { grantInStatus: true },
+      const fetchResult = await safeFetchWithOwnership(prisma.grantIn, id, user, {
+        resourceName: "Grant",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: [],
       });
-      if (!existing) return notFoundResponse("Grant");
+      if (!fetchResult.success) return fetchResult.response;
 
-      if (existing.grantInStatus === "COMPLETED" || existing.grantInStatus === "REJECTED") {
+      const existing = fetchResult.data;
+
+      if ([GrantInStatus.COMPLETED, GrantInStatus.REJECTED].includes(existing.grantInStatus)) {
         return forbiddenResponse("Cannot update a completed or rejected grant");
       }
 
       const body = await req.json();
-      const validated = updateGrantInSchema.parse(body);
 
-      const grant = await prisma.grantIn.update({
-        where: { id: params.id },
-        data: {
-          ...(validated.projectCode !== undefined && { projectCode: validated.projectCode }),
-          ...(validated.applicationDate && { applicationDate: new Date(validated.applicationDate) }),
-          ...(validated.grantDate && { grantDate: new Date(validated.grantDate) }),
-          ...(validated.durationOfProject !== undefined && { durationOfProject: validated.durationOfProject }),
-          ...(validated.amountGranted !== undefined && { amountGranted: validated.amountGranted }),
-        },
-      });
+      // Faculty only allowed to update non-financial, non-status fields
+      const allowedData = pickAllowedFields(body, GRANT_FACULTY_FIELDS);
+      const data: Prisma.GrantInUpdateInput = { ...allowedData };
+      if (body.applicationDate !== undefined) data.applicationDate = body.applicationDate ? new Date(body.applicationDate) : null;
+      if (body.grantDate       !== undefined) data.grantDate       = body.grantDate       ? new Date(body.grantDate)       : null;
 
-      return updatedResponse(grant, "Grant updated successfully");
-    } catch (error) { return handleApiError(error); }
+      const updateResult = await safeUpdate(prisma.grantIn, id, data, "Grant");
+      if (!updateResult.success) return updateResult.response;
+
+      return updatedResponse(updateResult.data, "Grant updated successfully");
+    } catch (error) {
+      return handleApiError(error);
+    }
   })(req);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("grantIn", params.id, user.id);
-      if (!isAuthor) return forbiddenResponse("You can only delete your own grants");
+      const { id } = await params;
 
-      const existing = await prisma.grantIn.findUnique({
-        where: { id: params.id },
-        select: { grantInStatus: true },
+      const fetchResult = await safeFetchWithOwnership(prisma.grantIn, id, user, {
+        resourceName: "Grant",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: [],
       });
-      if (!existing) return notFoundResponse("Grant");
-      if (existing.grantInStatus !== "APPLIED") return forbiddenResponse("Cannot delete grant after it has been processed");
+      if (!fetchResult.success) return fetchResult.response;
 
-      await prisma.grantIn.delete({ where: { id: params.id } });
+      // Only APPLIED grants can be deleted
+      if (fetchResult.data.grantInStatus !== GrantInStatus.APPLIED) {
+        return forbiddenResponse("Cannot delete grant after it has been processed");
+      }
+
+      const deleteResult = await safeDelete(prisma.grantIn, id, "Grant");
+      if (!deleteResult.success) return deleteResult.response;
+
       return deletedResponse("Grant deleted successfully");
-    } catch (error) { return handleApiError(error); }
+    } catch (error) {
+      return handleApiError(error);
+    }
   })(req);
 }

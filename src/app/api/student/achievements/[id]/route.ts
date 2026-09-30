@@ -1,109 +1,88 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import {
-  withAuth,
-  successResponse,
-  updatedResponse,
-  deletedResponse,
-  notFoundResponse,
-  forbiddenResponse,
-  handleApiError,
-  updateAchievementSchema,
-} from "@/lib/api";
+import { withAuth } from "@/lib/api/middleware";
+import { AchievementStatus, Prisma } from "@prisma/client";
+import { safeFetchWithOwnership, safeUpdate, safeDelete, isResourceOwner } from "@/lib/api/security";
+import { pickAllowedFields, ACHIEVEMENT_OWNER_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, deletedResponse, forbiddenResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(async ({ user }) => {
     try {
-      const achievement = await prisma.achievement.findUnique({
-        where: { id: params.id },
+      const { id } = await params;
+
+      // safeFetchWithOwnership returns 404 for both "not found" AND "not owned"
+      // preventing IDOR resource-existence leakage
+      const result = await safeFetchWithOwnership(prisma.achievement, id, user, {
+        resourceName: "Achievement",
+        ownershipCheck: (r, u) => isResourceOwner(r, u.id),
+        bypassRoles: ["EDITOR", "ADMIN", "SUPERADMIN"],
       });
+      if (!result.success) return result.response;
 
-      if (!achievement) return notFoundResponse("Achievement");
-      if (achievement.userId !== user.id) {
-        return forbiddenResponse("You can only view your own achievements");
-      }
-
-      return successResponse(achievement);
+      return successResponse(result.data);
     } catch (error) {
       return handleApiError(error);
     }
   })(req);
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(async ({ user }) => {
     try {
-      const existing = await prisma.achievement.findUnique({
-        where: { id: params.id },
-        select: { userId: true, achievementStatus: true },
+      const { id } = await params;
+
+      // Ownership check — returns 404 for unknown IDs (no existence leak)
+      const fetchResult = await safeFetchWithOwnership(prisma.achievement, id, user, {
+        resourceName: "Achievement",
+        ownershipCheck: (r, u) => isResourceOwner(r, u.id),
+        bypassRoles: [],
       });
+      if (!fetchResult.success) return fetchResult.response;
 
-      if (!existing) return notFoundResponse("Achievement");
-      if (existing.userId !== user.id) {
-        return forbiddenResponse("You can only update your own achievements");
-      }
+      const existing = fetchResult.data;
 
-      if (existing.achievementStatus !== "SUBMITTED") {
-        return forbiddenResponse(
-          "Cannot update achievement after it has been reviewed"
-        );
+      if (existing.achievementStatus !== AchievementStatus.SUBMITTED) {
+        return forbiddenResponse("Cannot update achievement after it has been reviewed");
       }
 
       const body = await req.json();
-      const validated = updateAchievementSchema.parse(body);
+      const allowedData = pickAllowedFields(body, ACHIEVEMENT_OWNER_FIELDS);
+      const data: Prisma.AchievementUpdateInput = { ...allowedData };
 
-      const achievement = await prisma.achievement.update({
-        where: { id: params.id },
-        data: {
-          ...(validated.title && { title: validated.title }),
-          ...(validated.description && { description: validated.description }),
-          ...(validated.category !== undefined && {
-            category: validated.category,
-          }),
-          ...(validated.year && { year: validated.year }),
-          ...(validated.imageUrl !== undefined && {
-            imageUrl: validated.imageUrl,
-          }),
-          ...(validated.documentUrl !== undefined && {
-            documentUrl: validated.documentUrl,
-          }),
-        },
-      });
+      // safeUpdate handles "record disappeared between fetch and update" atomically
+      const updateResult = await safeUpdate(prisma.achievement, id, data, "Achievement");
+      if (!updateResult.success) return updateResult.response;
 
-      return updatedResponse(achievement, "Achievement updated successfully");
+      return updatedResponse(updateResult.data, "Achievement updated successfully");
     } catch (error) {
       return handleApiError(error);
     }
   })(req);
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(async ({ user }) => {
     try {
-      const existing = await prisma.achievement.findUnique({
-        where: { id: params.id },
-        select: { userId: true, achievementStatus: true },
+      const { id } = await params;
+
+      const fetchResult = await safeFetchWithOwnership(prisma.achievement, id, user, {
+        resourceName: "Achievement",
+        ownershipCheck: (r, u) => isResourceOwner(r, u.id),
+        bypassRoles: [],
       });
+      if (!fetchResult.success) return fetchResult.response;
 
-      if (!existing) return notFoundResponse("Achievement");
-      if (existing.userId !== user.id) {
-        return forbiddenResponse("You can only delete your own achievements");
+      const existing = fetchResult.data;
+
+      // Allow delete only on SUBMITTED or REJECTED
+      if (![AchievementStatus.SUBMITTED, AchievementStatus.REJECTED].includes(existing.achievementStatus as AchievementStatus)) {
+        return forbiddenResponse("Cannot delete an approved achievement");
       }
 
-      if (existing.achievementStatus === "APPROVED") {
-        return forbiddenResponse("Cannot delete approved achievements");
-      }
-
-      await prisma.achievement.delete({ where: { id: params.id } });
+      const deleteResult = await safeDelete(prisma.achievement, id, "Achievement");
+      if (!deleteResult.success) return deleteResult.response;
 
       return deletedResponse("Achievement deleted successfully");
     } catch (error) {

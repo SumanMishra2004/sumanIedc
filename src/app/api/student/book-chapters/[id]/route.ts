@@ -1,157 +1,95 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import {
-  withAuth,
-  successResponse,
-  updatedResponse,
-  deletedResponse,
-  notFoundResponse,
-  forbiddenResponse,
-  handleApiError,
-  updateBookChapterSchema,
-  userBasicSelect,
-  isUserAuthor,
-} from "@/lib/api";
+import { withAuth } from "@/lib/api/middleware";
+import { BookchapterStatus, Prisma } from "@prisma/client";
+import { safeFetchWithOwnership, safeUpdate, safeDelete, isAuthorOf } from "@/lib/api/security";
+import { pickAllowedFields, BOOK_CHAPTER_STUDENT_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, deletedResponse, forbiddenResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+const authorInclude = {
+  studentAuthors: { include: { user: { select: { id: true, name: true, email: true } } } },
+  facultyAuthors: { include: { user: { select: { id: true, name: true, email: true } } } },
+  grantMappings:  { include: { grantIn: { select: { id: true, projectCode: true, grantInStatus: true } } } },
+};
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(async ({ user }) => {
     try {
-      const bookChapter = await prisma.bookChapter.findUnique({
-        where: { id: params.id },
-        include: {
-          studentAuthors: { include: { user: { select: userBasicSelect } } },
-          facultyAuthors: { include: { user: { select: userBasicSelect } } },
-          grantMappings: {
-            include: {
-              grantIn: {
-                select: {
-                  id: true,
-                  projectCode: true,
-                  grantInStatus: true,
-                  amountGranted: true,
-                },
-              },
-            },
-          },
-        },
+      const { id } = await params;
+
+      const result = await safeFetchWithOwnership(prisma.bookChapter, id, user, {
+        resourceName: "Book chapter",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: ["EDITOR", "ADMIN", "SUPERADMIN"],
       });
+      if (!result.success) return result.response;
 
-      if (!bookChapter) return notFoundResponse("Book chapter");
-
-      const isAuthor = await isUserAuthor("bookChapter", params.id, user.id);
-      if (!isAuthor) {
-        return forbiddenResponse("You can only view your own book chapters");
-      }
-
-      return successResponse(bookChapter);
+      // Re-fetch with full include once ownership is confirmed
+      const bc = await prisma.bookChapter.findUnique({ where: { id }, include: authorInclude });
+      return successResponse(bc);
     } catch (error) {
       return handleApiError(error);
     }
   })(req);
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("bookChapter", params.id, user.id);
-      if (!isAuthor) {
-        return forbiddenResponse("You can only update your own book chapters");
-      }
+      const { id } = await params;
 
-      const existing = await prisma.bookChapter.findUnique({
-        where: { id: params.id },
-        select: { bookChapterStatus: true, teacherStatus: true },
+      const fetchResult = await safeFetchWithOwnership(prisma.bookChapter, id, user, {
+        resourceName: "Book chapter",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: [],
       });
+      if (!fetchResult.success) return fetchResult.response;
 
-      if (!existing) return notFoundResponse("Book chapter");
+      const existing = fetchResult.data;
 
-      if (
-        existing.bookChapterStatus !== "SUBMITTED" ||
-        existing.teacherStatus === "PUBLISHED"
-      ) {
-        return forbiddenResponse(
-          "Cannot update book chapter after it has been reviewed"
-        );
+      if (existing.bookChapterStatus !== BookchapterStatus.SUBMITTED) {
+        return forbiddenResponse("Cannot update book chapter after it has been reviewed");
       }
 
       const body = await req.json();
-      const validated = updateBookChapterSchema.parse(body);
+      const allowedData = pickAllowedFields(body, BOOK_CHAPTER_STUDENT_FIELDS);
+      const data: Prisma.BookChapterUpdateInput = { ...allowedData };
+      if (body.publicationDate !== undefined) {
+        data.publicationDate = body.publicationDate ? new Date(body.publicationDate) : null;
+      }
 
-      const bookChapter = await prisma.bookChapter.update({
-        where: { id: params.id },
-        data: {
-          ...(validated.title && { title: validated.title }),
-          ...(validated.abstract !== undefined && {
-            abstract: validated.abstract,
-          }),
-          ...(validated.isbnIssn !== undefined && {
-            isbnIssn: validated.isbnIssn,
-          }),
-          ...(validated.publisher !== undefined && {
-            publisher: validated.publisher,
-          }),
-          ...(validated.publicationDate && {
-            publicationDate: new Date(validated.publicationDate),
-          }),
-          ...(validated.doi !== undefined && { doi: validated.doi }),
-          ...(validated.keywords && { keywords: validated.keywords }),
-          ...(validated.registrationFees !== undefined && {
-            registrationFees: validated.registrationFees,
-          }),
-          ...(validated.reimbursement !== undefined && {
-            reimbursement: validated.reimbursement,
-          }),
-          ...(validated.imageUrl !== undefined && {
-            imageUrl: validated.imageUrl,
-          }),
-          ...(validated.documentUrl !== undefined && {
-            documentUrl: validated.documentUrl,
-          }),
-        },
-        include: {
-          studentAuthors: { include: { user: { select: userBasicSelect } } },
-          facultyAuthors: { include: { user: { select: userBasicSelect } } },
-        },
-      });
+      const updateResult = await safeUpdate(prisma.bookChapter, id, data, "Book chapter");
+      if (!updateResult.success) return updateResult.response;
 
-      return updatedResponse(bookChapter, "Book chapter updated successfully");
+      return updatedResponse(updateResult.data, "Book chapter updated successfully");
     } catch (error) {
       return handleApiError(error);
     }
   })(req);
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("bookChapter", params.id, user.id);
-      if (!isAuthor) {
-        return forbiddenResponse("You can only delete your own book chapters");
-      }
+      const { id } = await params;
 
-      const existing = await prisma.bookChapter.findUnique({
-        where: { id: params.id },
-        select: { bookChapterStatus: true },
+      const fetchResult = await safeFetchWithOwnership(prisma.bookChapter, id, user, {
+        resourceName: "Book chapter",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: [],
       });
+      if (!fetchResult.success) return fetchResult.response;
 
-      if (!existing) return notFoundResponse("Book chapter");
-
-      if (existing.bookChapterStatus !== "SUBMITTED") {
-        return forbiddenResponse(
-          "Cannot delete book chapter after it has been reviewed"
-        );
+      if (fetchResult.data.bookChapterStatus !== BookchapterStatus.SUBMITTED) {
+        return forbiddenResponse("Cannot delete book chapter after it has been reviewed");
       }
 
-      await prisma.bookChapter.delete({ where: { id: params.id } });
+      const deleteResult = await safeDelete(prisma.bookChapter, id, "Book chapter");
+      if (!deleteResult.success) return deleteResult.response;
 
       return deletedResponse("Book chapter deleted successfully");
     } catch (error) {

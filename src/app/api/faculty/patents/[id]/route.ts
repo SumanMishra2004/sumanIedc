@@ -1,99 +1,102 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import {
-  withRole,
-  successResponse,
-  updatedResponse,
-  deletedResponse,
-  notFoundResponse,
-  forbiddenResponse,
-  handleApiError,
-  updatePatentSchema,
-  userBasicSelect,
-  isUserAuthor,
-} from "@/lib/api";
+import { withRole } from "@/lib/api/middleware";
+import { PatentStatus, TeacherStatus, Prisma } from "@prisma/client";
+import { safeFetchWithOwnership, safeUpdate, safeDelete, isAuthorOf } from "@/lib/api/security";
+import { pickAllowedFields, PATENT_FACULTY_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, deletedResponse, forbiddenResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+const authorInclude = {
+  studentAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
+  facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
+  grantMappings:  { include: { grantIn: { select: { id: true, projectCode: true, grantInStatus: true } } } },
+};
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("patent", params.id, user.id);
-      if (!isAuthor) return forbiddenResponse("You can only view your own patents");
+      const { id } = await params;
 
-      const patent = await prisma.patent.findUnique({
-        where: { id: params.id },
-        include: {
-          studentAuthors: { include: { user: { select: userBasicSelect } } },
-          facultyAuthors: { include: { user: { select: userBasicSelect } } },
-          grantMappings: { include: { grantIn: { select: { id: true, projectCode: true, grantInStatus: true } } } },
-        },
+      const result = await safeFetchWithOwnership(prisma.patent, id, user, {
+        resourceName: "Patent",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: ["EDITOR", "ADMIN", "SUPERADMIN"],
       });
-      if (!patent) return notFoundResponse("Patent");
+      if (!result.success) return result.response;
+
+      const patent = await prisma.patent.findUnique({ where: { id }, include: authorInclude });
       return successResponse(patent);
-    } catch (error) { return handleApiError(error); }
+    } catch (error) {
+      return handleApiError(error);
+    }
   })(req);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("patent", params.id, user.id);
-      if (!isAuthor) return forbiddenResponse("You can only update your own patents");
+      const { id } = await params;
 
-      const existing = await prisma.patent.findUnique({
-        where: { id: params.id },
-        select: { patentStatus: true, teacherStatus: true },
+      const fetchResult = await safeFetchWithOwnership(prisma.patent, id, user, {
+        resourceName: "Patent",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: [],
       });
-      if (!existing) return notFoundResponse("Patent");
+      if (!fetchResult.success) return fetchResult.response;
 
-      const canEdit = existing.patentStatus === "SUBMITTED" || existing.teacherStatus === "UPDATE";
+      const existing = fetchResult.data;
+
+      const canEdit = existing.patentStatus === PatentStatus.SUBMITTED
+        || existing.teacherStatus === TeacherStatus.UPDATE;
       if (!canEdit) return forbiddenResponse("Cannot update patent in its current state");
 
       const body = await req.json();
-      const validated = updatePatentSchema.parse(body);
+      const allowedData = pickAllowedFields(body, PATENT_FACULTY_FIELDS);
+      const data: Prisma.PatentUpdateInput = { ...allowedData };
+      for (const df of ["filingDate", "submissionDate", "publicationDate", "grantDate"] as const) {
+        if (body[df] !== undefined) data[df] = body[df] ? new Date(body[df]) : null;
+      }
+      if (existing.teacherStatus === TeacherStatus.UPDATE) {
+        data.teacherStatus = TeacherStatus.UPLOADED;
+      }
 
-      const patent = await prisma.patent.update({
-        where: { id: params.id },
-        data: {
-          ...(validated.title && { title: validated.title }),
-          ...(validated.keywords && { keywords: validated.keywords }),
-          ...(validated.abstract !== undefined && { abstract: validated.abstract }),
-          ...(validated.applicationNo !== undefined && { applicationNo: validated.applicationNo }),
-          ...(validated.grantedPatentNo !== undefined && { grantedPatentNo: validated.grantedPatentNo }),
-          ...(validated.filingDate && { filingDate: new Date(validated.filingDate) }),
-          ...(validated.submissionDate && { submissionDate: new Date(validated.submissionDate) }),
-          ...(validated.publicationDate && { publicationDate: new Date(validated.publicationDate) }),
-          ...(validated.grantDate && { grantDate: new Date(validated.grantDate) }),
-          ...(validated.patentLink !== undefined && { patentLink: validated.patentLink }),
-          ...(validated.imageUrl !== undefined && { imageUrl: validated.imageUrl }),
-          ...(validated.documentUrl !== undefined && { documentUrl: validated.documentUrl }),
-          ...(existing.teacherStatus === "UPDATE" && { teacherStatus: "UPLOADED" }),
-        },
-        include: {
-          studentAuthors: { include: { user: { select: userBasicSelect } } },
-          facultyAuthors: { include: { user: { select: userBasicSelect } } },
-        },
-      });
+      const updateResult = await safeUpdate(prisma.patent, id, data, "Patent");
+      if (!updateResult.success) return updateResult.response;
 
+      const patent = await prisma.patent.findUnique({ where: { id }, include: authorInclude });
       return updatedResponse(patent, "Patent updated successfully");
-    } catch (error) { return handleApiError(error); }
+    } catch (error) {
+      return handleApiError(error);
+    }
   })(req);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("patent", params.id, user.id);
-      if (!isAuthor) return forbiddenResponse("You can only delete your own patents");
+      const { id } = await params;
 
-      const existing = await prisma.patent.findUnique({
-        where: { id: params.id },
-        select: { patentStatus: true },
+      const fetchResult = await safeFetchWithOwnership(prisma.patent, id, user, {
+        resourceName: "Patent",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: [],
       });
-      if (!existing) return notFoundResponse("Patent");
-      if (existing.patentStatus !== "SUBMITTED") return forbiddenResponse("Cannot delete patent after review");
+      if (!fetchResult.success) return fetchResult.response;
 
-      await prisma.patent.delete({ where: { id: params.id } });
+      if (fetchResult.data.patentStatus !== PatentStatus.SUBMITTED) {
+        return forbiddenResponse("Cannot delete patent after it has been reviewed");
+      }
+
+      const deleteResult = await safeDelete(prisma.patent, id, "Patent");
+      if (!deleteResult.success) return deleteResult.response;
+
       return deletedResponse("Patent deleted successfully");
-    } catch (error) { return handleApiError(error); }
+    } catch (error) {
+      return handleApiError(error);
+    }
   })(req);
 }

@@ -1,100 +1,101 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import {
-  withRole,
-  successResponse,
-  updatedResponse,
-  deletedResponse,
-  notFoundResponse,
-  forbiddenResponse,
-  handleApiError,
-  updateConferenceSchema,
-  userBasicSelect,
-  isUserAuthor,
-} from "@/lib/api";
+import { withRole } from "@/lib/api/middleware";
+import { ConferenceStatus, TeacherStatus, Prisma } from "@prisma/client";
+import { safeFetchWithOwnership, safeUpdate, safeDelete, isAuthorOf } from "@/lib/api/security";
+import { pickAllowedFields, CONFERENCE_FACULTY_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, deletedResponse, forbiddenResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+const authorInclude = {
+  studentAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
+  facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
+  grantMappings:  { include: { grantIn: { select: { id: true, projectCode: true, grantInStatus: true } } } },
+};
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("conference", params.id, user.id);
-      if (!isAuthor) return forbiddenResponse("You can only view your own conferences");
+      const { id } = await params;
 
-      const conference = await prisma.conference.findUnique({
-        where: { id: params.id },
-        include: {
-          studentAuthors: { include: { user: { select: userBasicSelect } } },
-          facultyAuthors: { include: { user: { select: userBasicSelect } } },
-          grantMappings: { include: { grantIn: { select: { id: true, projectCode: true, grantInStatus: true } } } },
-        },
+      const result = await safeFetchWithOwnership(prisma.conference, id, user, {
+        resourceName: "Conference",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: ["EDITOR", "ADMIN", "SUPERADMIN"],
       });
-      if (!conference) return notFoundResponse("Conference");
-      return successResponse(conference);
-    } catch (error) { return handleApiError(error); }
+      if (!result.success) return result.response;
+
+      const conf = await prisma.conference.findUnique({ where: { id }, include: authorInclude });
+      return successResponse(conf);
+    } catch (error) {
+      return handleApiError(error);
+    }
   })(req);
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("conference", params.id, user.id);
-      if (!isAuthor) return forbiddenResponse("You can only update your own conferences");
+      const { id } = await params;
 
-      const existing = await prisma.conference.findUnique({
-        where: { id: params.id },
-        select: { conferenceStatus: true, teacherStatus: true },
+      const fetchResult = await safeFetchWithOwnership(prisma.conference, id, user, {
+        resourceName: "Conference",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: [],
       });
-      if (!existing) return notFoundResponse("Conference");
+      if (!fetchResult.success) return fetchResult.response;
 
-      const canEdit = existing.conferenceStatus === "SUBMITTED" || existing.teacherStatus === "UPDATE";
+      const existing = fetchResult.data;
+
+      const canEdit = existing.conferenceStatus === ConferenceStatus.SUBMITTED
+        || existing.teacherStatus === TeacherStatus.UPDATE;
       if (!canEdit) return forbiddenResponse("Cannot update conference in its current state");
 
       const body = await req.json();
-      const validated = updateConferenceSchema.parse(body);
+      const allowedData = pickAllowedFields(body, CONFERENCE_FACULTY_FIELDS);
+      const data: Prisma.ConferenceUpdateInput = { ...allowedData };
+      if (body.conferenceDate !== undefined) data.conferenceDate = body.conferenceDate ? new Date(body.conferenceDate) : null;
+      if (body.statusDate     !== undefined) data.statusDate     = body.statusDate     ? new Date(body.statusDate)     : null;
+      if (existing.teacherStatus === TeacherStatus.UPDATE) {
+        data.teacherStatus = TeacherStatus.UPLOADED;
+      }
 
-      const conference = await prisma.conference.update({
-        where: { id: params.id },
-        data: {
-          ...(validated.conferenceName && { conferenceName: validated.conferenceName }),
-          ...(validated.mode && { mode: validated.mode }),
-          ...(validated.abstract !== undefined && { abstract: validated.abstract }),
-          ...(validated.keywords && { keywords: validated.keywords }),
-          ...(validated.conferencePublisher !== undefined && { conferencePublisher: validated.conferencePublisher }),
-          ...(validated.conferenceDate && { conferenceDate: new Date(validated.conferenceDate) }),
-          ...(validated.paperDoi !== undefined && { paperDoi: validated.paperDoi }),
-          ...(validated.paperLink !== undefined && { paperLink: validated.paperLink }),
-          ...(validated.paperName !== undefined && { paperName: validated.paperName }),
-          ...(validated.registrationFees !== undefined && { registrationFees: validated.registrationFees }),
-          ...(validated.reimbursement !== undefined && { reimbursement: validated.reimbursement }),
-          ...(validated.imageUrl !== undefined && { imageUrl: validated.imageUrl }),
-          ...(validated.documentUrl !== undefined && { documentUrl: validated.documentUrl }),
-          ...(existing.teacherStatus === "UPDATE" && { teacherStatus: "UPLOADED" }),
-        },
-        include: {
-          studentAuthors: { include: { user: { select: userBasicSelect } } },
-          facultyAuthors: { include: { user: { select: userBasicSelect } } },
-        },
-      });
+      const updateResult = await safeUpdate(prisma.conference, id, data, "Conference");
+      if (!updateResult.success) return updateResult.response;
 
-      return updatedResponse(conference, "Conference updated successfully");
-    } catch (error) { return handleApiError(error); }
+      const conf = await prisma.conference.findUnique({ where: { id }, include: authorInclude });
+      return updatedResponse(conf, "Conference updated successfully");
+    } catch (error) {
+      return handleApiError(error);
+    }
   })(req);
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("conference", params.id, user.id);
-      if (!isAuthor) return forbiddenResponse("You can only delete your own conferences");
+      const { id } = await params;
 
-      const existing = await prisma.conference.findUnique({
-        where: { id: params.id },
-        select: { conferenceStatus: true },
+      const fetchResult = await safeFetchWithOwnership(prisma.conference, id, user, {
+        resourceName: "Conference",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: [],
       });
-      if (!existing) return notFoundResponse("Conference");
-      if (existing.conferenceStatus !== "SUBMITTED") return forbiddenResponse("Cannot delete conference after review");
+      if (!fetchResult.success) return fetchResult.response;
 
-      await prisma.conference.delete({ where: { id: params.id } });
+      if (fetchResult.data.conferenceStatus !== ConferenceStatus.SUBMITTED) {
+        return forbiddenResponse("Cannot delete conference after it has been reviewed");
+      }
+
+      const deleteResult = await safeDelete(prisma.conference, id, "Conference");
+      if (!deleteResult.success) return deleteResult.response;
+
       return deletedResponse("Conference deleted successfully");
-    } catch (error) { return handleApiError(error); }
+    } catch (error) {
+      return handleApiError(error);
+    }
   })(req);
 }

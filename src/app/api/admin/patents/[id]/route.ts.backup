@@ -1,0 +1,62 @@
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
+import { requireAdmin } from "@/lib/auth/guard";
+import { PatentStatus, TeacherStatus } from "@prisma/client";
+
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdmin(req);
+  if (!guard.ok) return guard.response;
+    const { id } = await params;
+  try {
+    const patent = await prisma.patent.findUnique({
+      where: { id },
+      include: {
+        studentAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
+        facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
+        grantMappings:  { include: { grantIn: { select: { id: true, projectCode: true, amountGranted: true } } } },
+      },
+    });
+    if (!patent) return NextResponse.json({ error: "Patent not found" }, { status: 404 });
+    return NextResponse.json({ success: true, data: patent });
+  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+}
+
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdmin(req);
+  if (!guard.ok) return guard.response;
+    const { id } = await params;
+  try {
+    if (!await prisma.patent.findUnique({ where: { id } }))
+      return NextResponse.json({ error: "Patent not found" }, { status: 404 });
+
+    const body = await req.json();
+    if (body.patentStatus   && !Object.values(PatentStatus).includes(body.patentStatus))
+      return NextResponse.json({ error: "Invalid patentStatus" }, { status: 400 });
+    if (body.teacherStatus  && !Object.values(TeacherStatus).includes(body.teacherStatus))
+      return NextResponse.json({ error: "Invalid teacherStatus" }, { status: 400 });
+
+    const data: any = {};
+    for (const f of ["patentStatus","teacherStatus","isPublic","title","keywords","abstract",
+      "applicationNo","grantedPatentNo","patentLink","imageUrl","documentUrl","updateComment"]) {
+      if (body[f] !== undefined) data[f] = body[f];
+    }
+    for (const df of ["filingDate","submissionDate","publicationDate","grantDate"]) {
+      if (body[df] !== undefined) data[df] = body[df] ? new Date(body[df]) : null;
+    }
+
+    const patent = await prisma.patent.update({ where: { id }, data });
+    return NextResponse.json({ success: true, data: patent });
+  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const guard = await requireAdmin(req);
+  if (!guard.ok) return guard.response;
+    const { id } = await params;
+  try {
+    if (!await prisma.patent.findUnique({ where: { id } }))
+      return NextResponse.json({ error: "Patent not found" }, { status: 404 });
+    await prisma.patent.delete({ where: { id } });
+    return NextResponse.json({ success: true, message: "Patent deleted" });
+  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+}

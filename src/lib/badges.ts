@@ -13,6 +13,7 @@
  */
 
 import prisma from '@/lib/prisma'
+import { TeacherStatus, CertificateStatus, FDPStatus, AchievementStatus } from '@prisma/client'
 import { type Role } from '@/lib/config/sidebar'
 
 export interface BadgeCounts {
@@ -111,11 +112,16 @@ async function getPendingVerificationCount(
  *  - Achievements (achievementStatus = SUBMITTED | UNDER_REVIEW)
  */
 async function getPendingReviewCount(): Promise<number> {
+  // Only models that have a teacherStatus field
   const teacherStatusFilter = {
     teacherStatus: {
-      in: ['UPLOADED', 'UPDATE'],
+      in: [TeacherStatus.UPLOADED, TeacherStatus.UPDATE],
     },
   }
+
+  // Separate filters for models without teacherStatus
+  const certificateFilter = { certificateStatus: CertificateStatus.SUBMITTED }
+  const fdpFilter          = { fdpStatus: FDPStatus.SUBMITTED }
 
   const [
     journalCount,
@@ -132,12 +138,12 @@ async function getPendingReviewCount(): Promise<number> {
     prisma.conference.count({ where: teacherStatusFilter }),
     prisma.patent.count({ where: teacherStatusFilter }),
     prisma.copyright.count({ where: teacherStatusFilter }),
-    prisma.certificate.count({ where: teacherStatusFilter }),
-    prisma.fDP.count({ where: teacherStatusFilter }),
+    prisma.certificate.count({ where: certificateFilter }),
+    prisma.fDP.count({ where: fdpFilter }),
     prisma.achievement.count({
       where: {
         achievementStatus: {
-          in: ['SUBMITTED', 'UNDER_REVIEW'],
+          in: [AchievementStatus.SUBMITTED, AchievementStatus.UNDER_REVIEW],
         },
       },
     }),

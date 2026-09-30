@@ -9,19 +9,20 @@ const overrideSchema = z.object({
 });
 
 // POST /api/admin/verifications/[id]/override
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
+    const { id } = await params;
 
   try {
-    const existing = await prisma.facultyVerificationRequest.findUnique({ where: { id: params.id } });
+    const existing = await prisma.facultyVerificationRequest.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "Verification request not found" }, { status: 404 });
 
     const body = await req.json();
     const { status, reason } = overrideSchema.parse(body);
 
     const updated = await prisma.facultyVerificationRequest.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status,
         overrideById:   guard.session.user.id,

@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
         where, skip, take: limit,
         include: {
           studentAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
-          facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } }, role: true, verificationStatus: true } },
+          facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
           bills: { select: { id: true, billStatus: true, amount: true, billType: true } },
         },
         orderBy: { createdAt: "desc" },

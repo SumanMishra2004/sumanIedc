@@ -24,10 +24,11 @@ const createBillSchema = z.object({
 });
 
 // GET /api/faculty/grants/[id]/bills
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("grantIn", params.id, user.id);
+    const { id } = await params;
+      const isAuthor = await isUserAuthor("grantIn", id, user.id);
       if (!isAuthor) return forbiddenResponse("Access denied");
 
       const { searchParams } = new URL(req.url);
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
       const [bills, total] = await Promise.all([
         prisma.grantInBill.findMany({
-          where: { grantInId: params.id },
+          where: { grantInId: id },
           select: {
             id: true,
             fileId: true,
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
           skip,
           take: limit,
         }),
-        prisma.grantInBill.count({ where: { grantInId: params.id } }),
+        prisma.grantInBill.count({ where: { grantInId: id } }),
       ]);
 
       return paginatedResponse(bills, page, limit, total);
@@ -62,14 +63,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // POST /api/faculty/grants/[id]/bills
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
-      const isAuthor = await isUserAuthor("grantIn", params.id, user.id);
+    const { id } = await params;
+      const isAuthor = await isUserAuthor("grantIn", id, user.id);
       if (!isAuthor) return forbiddenResponse("Access denied");
 
       const grant = await prisma.grantIn.findUnique({
-        where: { id: params.id },
+        where: { id },
         select: { grantInStatus: true },
       });
       if (!grant) return notFoundResponse("Grant");
@@ -80,7 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
       const bill = await prisma.grantInBill.create({
         data: {
-          grantInId: params.id,
+          grantInId: id,
           userId: user.id,
           fileId: validated.fileId,
           fileUrl: validated.fileUrl,

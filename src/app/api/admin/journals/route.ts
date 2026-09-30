@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/lib/auth'
+import { NextRequest } from 'next/server'
 import prisma from '@/lib/prisma'
+import { requireAdmin } from '@/lib/auth/guard'
 import {
   TeacherStatus,
   JournalStatus,
@@ -8,200 +8,107 @@ import {
   JournalIndexing,
   JournalQuartile,
 } from '@prisma/client'
-import { isAdminOrHigher } from '@/lib/auth/permissions'
+import { paginatedResponse, badRequestResponse } from '@/lib/api/response'
+import { handleApiError } from '@/lib/api/error-handler'
 
-// Helper: admin guard
-async function requireAdmin() {
-  const session = await auth()
-  if (!session?.user || !isAdminOrHigher(session.user.role)) {
-    return null
-  }
-  return session
-}
-
-// GET - List all journals (admin - no role-based filtering)
 export async function GET(req: NextRequest) {
+  const guard = await requireAdmin(req)
+  if (!guard.ok) return guard.response
+
   try {
-    const session = await requireAdmin()
-    if (!session) {
-      return NextResponse.json(
-        { error: 'Unauthorized — ADMIN access required' },
-        { status: 403 }
-      )
+    const sp = req.nextUrl.searchParams
+
+    const page  = Math.max(1, parseInt(sp.get('page')  || '1'))
+    const limit = Math.min(100, Math.max(1, parseInt(sp.get('limit') || '10')))
+    const skip  = (page - 1) * limit
+
+    const sortBy    = sp.get('sortBy')    || 'createdAt'
+    const sortOrder = (sp.get('sortOrder') || 'desc') as 'asc' | 'desc'
+
+    const teacherStatus  = sp.get('teacherStatus')
+    const journalStatus  = sp.get('journalStatus')
+    const indexing       = sp.get('indexing')
+    const quartile       = sp.get('quartile')
+    const scope          = sp.get('scope')
+    const search         = sp.get('search')
+    const department     = sp.get('department')
+
+    // Validate enum filters before hitting the DB
+    if (teacherStatus && !Object.values(TeacherStatus).includes(teacherStatus as TeacherStatus)) {
+      return badRequestResponse('Invalid teacherStatus value')
+    }
+    if (journalStatus && !Object.values(JournalStatus).includes(journalStatus as JournalStatus)) {
+      return badRequestResponse('Invalid journalStatus value')
+    }
+    if (indexing && !Object.values(JournalIndexing).includes(indexing as JournalIndexing)) {
+      return badRequestResponse('Invalid indexing value')
+    }
+    if (quartile && !Object.values(JournalQuartile).includes(quartile as JournalQuartile)) {
+      return badRequestResponse('Invalid quartile value')
+    }
+    if (scope && !Object.values(JournalScope).includes(scope as JournalScope)) {
+      return badRequestResponse('Invalid scope value')
     }
 
-    const searchParams = req.nextUrl.searchParams
+    const where: Record<string, unknown> = {}
+    if (teacherStatus) where.teacherStatus = teacherStatus as TeacherStatus
+    if (journalStatus) where.journalStatus = journalStatus as JournalStatus
+    if (indexing)      where.indexing      = indexing      as JournalIndexing
+    if (quartile)      where.quartile      = quartile      as JournalQuartile
+    if (scope)         where.scope         = scope         as JournalScope
 
-    // Pagination
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
-    const skip = (page - 1) * limit
-
-    // Sorting
-    const sortBy = searchParams.get('sortBy') || 'createdAt'
-    const sortOrder = searchParams.get('sortOrder') || 'desc'
-
-    // Filters
-    const teacherStatus = searchParams.get('teacherStatus')
-    const journalStatus = searchParams.get('journalStatus')
-    const indexing = searchParams.get('indexing')
-    const quartile = searchParams.get('quartile')
-    const scope = searchParams.get('scope')
-    const search = searchParams.get('search')
-    const department = searchParams.get('department')
-
-    // Build where clause — admin sees everything, no role filter
-    const where: any = {}
-
-    // Apply enum filters
-    if (teacherStatus) {
-      if (!Object.values(TeacherStatus).includes(teacherStatus as TeacherStatus)) {
-        return NextResponse.json(
-          { error: 'Invalid teacherStatus value' },
-          { status: 400 }
-        )
-      }
-      where.teacherStatus = teacherStatus as TeacherStatus
-    }
-
-    if (journalStatus) {
-      if (!Object.values(JournalStatus).includes(journalStatus as JournalStatus)) {
-        return NextResponse.json(
-          { error: 'Invalid journalStatus value' },
-          { status: 400 }
-        )
-      }
-      where.journalStatus = journalStatus as JournalStatus
-    }
-
-    if (indexing) {
-      if (!Object.values(JournalIndexing).includes(indexing as JournalIndexing)) {
-        return NextResponse.json(
-          { error: 'Invalid indexing value' },
-          { status: 400 }
-        )
-      }
-      where.indexing = indexing as JournalIndexing
-    }
-
-    if (quartile) {
-      if (!Object.values(JournalQuartile).includes(quartile as JournalQuartile)) {
-        return NextResponse.json(
-          { error: 'Invalid quartile value' },
-          { status: 400 }
-        )
-      }
-      where.quartile = quartile as JournalQuartile
-    }
-
-    if (scope) {
-      if (!Object.values(JournalScope).includes(scope as JournalScope)) {
-        return NextResponse.json(
-          { error: 'Invalid scope value' },
-          { status: 400 }
-        )
-      }
-      where.scope = scope as JournalScope
-    }
-
-    // Department filter — filter journals by author department
+    // Department filter via author relation
     if (department) {
       where.OR = [
-        {
-          studentAuthors: {
-            some: {
-              user: { department: { equals: department, mode: 'insensitive' } }
-            }
-          }
-        },
-        {
-          facultyAuthors: {
-            some: {
-              user: { department: { equals: department, mode: 'insensitive' } }
-            }
-          }
-        }
+        { studentAuthors: { some: { user: { department: { equals: department, mode: 'insensitive' } } } } },
+        { facultyAuthors: { some: { user: { department: { equals: department, mode: 'insensitive' } } } } },
       ]
     }
 
-    // Search across multiple fields
+    // Full-text search across key fields
     if (search) {
       const searchConditions = [
-        { title: { contains: search, mode: 'insensitive' } },
+        { title:       { contains: search, mode: 'insensitive' } },
         { journalName: { contains: search, mode: 'insensitive' } },
-        { abstract: { contains: search, mode: 'insensitive' } },
-        { publisher: { contains: search, mode: 'insensitive' } },
-        { doi: { contains: search, mode: 'insensitive' } },
-        { serialNo: { contains: search, mode: 'insensitive' } }
+        { abstract:    { contains: search, mode: 'insensitive' } },
+        { publisher:   { contains: search, mode: 'insensitive' } },
+        { doi:         { contains: search, mode: 'insensitive' } },
+        { serialNo:    { contains: search, mode: 'insensitive' } },
       ]
 
       if (where.OR) {
-        // If department filter already set OR, use AND to combine
-        where.AND = [
-          { OR: where.OR },
-          { OR: searchConditions }
-        ]
+        // Combine with existing department OR using AND
+        where.AND = [{ OR: where.OR }, { OR: searchConditions }]
         delete where.OR
       } else {
         where.OR = searchConditions
       }
     }
 
-    // Fetch data with pagination
+    // Validate sortBy to prevent injection via orderBy key
+    const allowedSortFields = ['createdAt', 'updatedAt', 'title', 'journalName', 'publicationDate']
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt'
+
     const [journals, total] = await Promise.all([
       prisma.journal.findMany({
         where,
         skip,
         take: limit,
-        orderBy: {
-          [sortBy]: sortOrder
-        },
+        orderBy: { [safeSortBy]: sortOrder },
         include: {
           studentAuthors: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  image: true,
-                  department: true
-                }
-              }
-            }
+            include: { user: { select: { id: true, name: true, email: true, image: true, department: true } } },
           },
           facultyAuthors: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  name: true,
-                  email: true,
-                  image: true,
-                  department: true
-                }
-              }
-            }
-          }
-        }
+            include: { user: { select: { id: true, name: true, email: true, image: true, department: true } } },
+          },
+        },
       }),
-      prisma.journal.count({ where })
+      prisma.journal.count({ where }),
     ])
 
-    return NextResponse.json({
-      journals,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit)
-      }
-    })
+    return paginatedResponse(journals, page, limit, total)
   } catch (error) {
-    console.error('Error fetching admin journals:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return handleApiError(error)
   }
 }

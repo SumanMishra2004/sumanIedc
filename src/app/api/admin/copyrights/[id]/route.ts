@@ -1,59 +1,105 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
-import { CopyrightStatus, TeacherStatus } from "@prisma/client";
+import { CopyrightStatus, Prisma, TeacherStatus } from "@prisma/client";
+import { safeUpdate, safeDelete } from "@/lib/api/security";
+import { pickAllowedFields, COPYRIGHT_ADMIN_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, deletedResponse, notFoundResponse, badRequestResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
+  
   try {
-    const copyright = await prisma.copyright.findUnique({
-      where: { id: params.id },
-      include: {
-        studentAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
-        facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
-        grantMappings:  { include: { grantIn: { select: { id: true, projectCode: true, amountGranted: true } } } },
-      },
+    const { id } = await params;
+    
+    const resource = await prisma.copyright.findUnique({
+      where: { id },
     });
-    if (!copyright) return NextResponse.json({ error: "Copyright not found" }, { status: 404 });
-    return NextResponse.json({ success: true, data: copyright });
-  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+    
+    if (!resource) {
+      return notFoundResponse("Copyright");
+    }
+    
+    return successResponse(resource);
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
+  
   try {
-    if (!await prisma.copyright.findUnique({ where: { id: params.id } }))
-      return NextResponse.json({ error: "Copyright not found" }, { status: 404 });
-
+    const { id } = await params;
     const body = await req.json();
-    if (body.copyrightStatus && !Object.values(CopyrightStatus).includes(body.copyrightStatus))
-      return NextResponse.json({ error: "Invalid copyrightStatus" }, { status: 400 });
-    if (body.teacherStatus   && !Object.values(TeacherStatus).includes(body.teacherStatus))
-      return NextResponse.json({ error: "Invalid teacherStatus" }, { status: 400 });
-
-    const data: any = {};
-    for (const f of ["copyrightStatus","teacherStatus","isPublic","regNo","title","abstract",
-      "registrationFees","reimbursement","imageUrl","documentUrl","updateComment"]) {
-      if (body[f] !== undefined) data[f] = body[f];
+    
+    // Validate status enums if provided
+    if (body.copyrightStatus && !Object.values(CopyrightStatus).includes(body.copyrightStatus)) {
+      return badRequestResponse("Invalid copyrightStatus");
     }
-    for (const df of ["dateOfFiling","dateOfSubmission","dateOfPublished","dateOfGrant"]) {
-      if (body[df] !== undefined) data[df] = body[df] ? new Date(body[df]) : null;
+    if (body.teacherStatus && !Object.values(TeacherStatus).includes(body.teacherStatus)) {
+      return badRequestResponse("Invalid teacherStatus");
     }
 
-    const copyright = await prisma.copyright.update({ where: { id: params.id }, data });
-    return NextResponse.json({ success: true, data: copyright });
-  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+    // Use field allowlist to prevent mass assignment
+    const allowedData = pickAllowedFields(body, COPYRIGHT_ADMIN_FIELDS);
+    
+    // Prepare update data with proper type conversions
+    const data: Prisma.CopyrightUpdateInput = {
+      ...allowedData,
+    };
+
+    // Parse date fields if provided
+    if (body.dateOfFiling !== undefined) {
+      data.dateOfFiling = body.dateOfFiling ? new Date(body.dateOfFiling) : null;
+    }
+    if (body.dateOfSubmission !== undefined) {
+      data.dateOfSubmission = body.dateOfSubmission ? new Date(body.dateOfSubmission) : null;
+    }
+    if (body.dateOfPublished !== undefined) {
+      data.dateOfPublished = body.dateOfPublished ? new Date(body.dateOfPublished) : null;
+    }
+    if (body.dateOfGrant !== undefined) {
+      data.dateOfGrant = body.dateOfGrant ? new Date(body.dateOfGrant) : null;
+    }
+  
+    // Use safe update to prevent race conditions
+    const result = await safeUpdate(
+      prisma.copyright,
+      id,
+      data,
+      "Copyright"
+    );
+    
+    if (!result.success) {
+      return result.response;
+    }
+    
+    return updatedResponse(result.data, "Copyright updated successfully");
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
+  
   try {
-    if (!await prisma.copyright.findUnique({ where: { id: params.id } }))
-      return NextResponse.json({ error: "Copyright not found" }, { status: 404 });
-    await prisma.copyright.delete({ where: { id: params.id } });
-    return NextResponse.json({ success: true, message: "Copyright deleted" });
-  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+    const { id } = await params;
+    
+    // Use safe delete to prevent race conditions
+    const result = await safeDelete(prisma.copyright, id, "Copyright");
+    
+    if (!result.success) {
+      return result.response;
+    }
+    
+    return deletedResponse("Copyright deleted successfully");
+  } catch (error) {
+    return handleApiError(error);
+  }
 }

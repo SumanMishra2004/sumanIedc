@@ -11,12 +11,13 @@ const patchSchema = z.object({
 }).strict();
 
 // GET /api/superadmin/users/[id]
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireSuperAdmin(req);
   if (!guard.ok) return guard.response;
+    const { id } = await params;
   try {
     const user = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: {
         id: true, name: true, email: true, role: true, image: true,
         department: true, institution: true, isActive: true,
@@ -32,15 +33,16 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // PATCH /api/superadmin/users/[id] — role change, activate/deactivate, restore soft-delete
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireSuperAdmin(req);
   if (!guard.ok) return guard.response;
+    const { id } = await params;
 
   try {
-    if (guard.session.user.id === params.id)
+    if (guard.session.user.id === id)
       return NextResponse.json({ error: "Cannot modify your own account via this endpoint" }, { status: 400 });
 
-    const existing = await prisma.user.findUnique({ where: { id: params.id } });
+    const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) return NextResponse.json({ error: "User not found" }, { status: 404 });
 
     const body = await req.json();
@@ -64,7 +66,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const user = await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data,
       select: { id: true, name: true, email: true, role: true, isActive: true, deletedAt: true },
     });
@@ -76,18 +78,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 // DELETE /api/superadmin/users/[id] — hard delete (permanent)
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireSuperAdmin(req);
   if (!guard.ok) return guard.response;
+    const { id } = await params;
 
   try {
-    if (guard.session.user.id === params.id)
+    if (guard.session.user.id === id)
       return NextResponse.json({ error: "Cannot delete your own account" }, { status: 400 });
 
-    if (!await prisma.user.findUnique({ where: { id: params.id } }))
+    if (!await prisma.user.findUnique({ where: { id } }))
       return NextResponse.json({ error: "User not found" }, { status: 404 });
 
-    await prisma.user.delete({ where: { id: params.id } });
+    await prisma.user.delete({ where: { id } });
     return NextResponse.json({ success: true, message: "User permanently deleted" });
   } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
 }

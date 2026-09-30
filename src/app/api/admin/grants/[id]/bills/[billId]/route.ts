@@ -4,12 +4,13 @@ import { requireAdmin } from "@/lib/auth/guard";
 import { BillStatus } from "@prisma/client";
 
 // PATCH /api/admin/grants/[id]/bills/[billId] — update bill status (ACCEPTED/REJECTED/PAID)
-export async function PATCH(req: NextRequest, { params }: { params: { id: string; billId: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string; billId: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
   try {
+    const { id, billId } = await params;
     const existing = await prisma.grantInBill.findFirst({
-      where: { id: params.billId, grantInId: params.id },
+      where: { id: billId, grantInId: id },
     });
     if (!existing) return NextResponse.json({ error: "Bill not found" }, { status: 404 });
 
@@ -21,20 +22,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.billStatus !== undefined) data.billStatus = body.billStatus;
     if (body.amount     !== undefined) data.amount     = body.amount;
 
-    const bill = await prisma.grantInBill.update({ where: { id: params.billId }, data });
+    const bill = await prisma.grantInBill.update({ where: { id: billId }, data });
     return NextResponse.json({ success: true, data: bill });
   } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string; billId: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string; billId: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
   try {
+    const { id, billId } = await params;
     const existing = await prisma.grantInBill.findFirst({
-      where: { id: params.billId, grantInId: params.id },
+      where: { id: billId, grantInId: id },
     });
     if (!existing) return NextResponse.json({ error: "Bill not found" }, { status: 404 });
-    await prisma.grantInBill.delete({ where: { id: params.billId } });
+    await prisma.grantInBill.delete({ where: { id: billId } });
     return NextResponse.json({ success: true, message: "Bill deleted" });
   } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
 }

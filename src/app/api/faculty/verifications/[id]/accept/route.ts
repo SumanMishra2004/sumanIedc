@@ -4,11 +4,12 @@ import { withRole, successResponse, notFoundResponse, forbiddenResponse, badRequ
 
 // POST /api/faculty/verifications/[id]/accept
 // Faculty accepts a verification request sent to them
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withRole("FACULTY", async ({ user }) => {
     try {
+    const { id } = await params;
       const verification = await prisma.facultyVerificationRequest.findUnique({
-        where: { id: params.id },
+        where: { id },
         select: {
           id: true,
           status: true,
@@ -42,7 +43,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
 
       const updated = await prisma.facultyVerificationRequest.update({
-        where: { id: params.id },
+        where: { id },
         data: {
           status: "ACCEPTED",
           tokenUsed: true,

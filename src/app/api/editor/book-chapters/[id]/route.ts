@@ -1,52 +1,61 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireEditor } from "@/lib/auth/guard";
-import { BookchapterStatus, TeacherStatus } from "@prisma/client";
+import { BookchapterStatus, TeacherStatus, Prisma } from "@prisma/client";
+import { safeUpdate } from "@/lib/api/security";
+import { pickAllowedFields, BOOK_CHAPTER_EDITOR_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, notFoundResponse, badRequestResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireEditor(req);
   if (!guard.ok) return guard.response;
+
   try {
+    const { id } = await params;
+
     const bc = await prisma.bookChapter.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         studentAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
         facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
-        grantMappings: { include: { grantIn: { select: { id: true, projectCode: true } } } },
+        grantMappings:  { include: { grantIn: { select: { id: true, projectCode: true } } } },
       },
     });
-    if (!bc) return NextResponse.json({ error: "Book chapter not found" }, { status: 404 });
-    return NextResponse.json({ success: true, data: bc });
-  } catch (e) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+
+    if (!bc) return notFoundResponse("Book chapter");
+    return successResponse(bc);
+  } catch (error) {
+    return handleApiError(error);
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireEditor(req);
   if (!guard.ok) return guard.response;
-  try {
-    const existing = await prisma.bookChapter.findUnique({ where: { id: params.id } });
-    if (!existing) return NextResponse.json({ error: "Book chapter not found" }, { status: 404 });
 
+  try {
+    const { id } = await params;
     const body = await req.json();
+
     if (body.bookChapterStatus && !Object.values(BookchapterStatus).includes(body.bookChapterStatus)) {
-      return NextResponse.json({ error: "Invalid bookChapterStatus" }, { status: 400 });
+      return badRequestResponse("Invalid bookChapterStatus");
     }
     if (body.teacherStatus && !Object.values(TeacherStatus).includes(body.teacherStatus)) {
-      return NextResponse.json({ error: "Invalid teacherStatus" }, { status: 400 });
+      return badRequestResponse("Invalid teacherStatus");
     }
 
-    const updateData: any = {};
-    const fields = ["bookChapterStatus", "teacherStatus", "isPublic", "title", "abstract",
-      "isbnIssn", "publisher", "doi", "keywords", "registrationFees", "reimbursement",
-      "imageUrl", "documentUrl", "updateComment"];
-    for (const f of fields) { if (body[f] !== undefined) updateData[f] = body[f]; }
-    if (body.publicationDate !== undefined) updateData.publicationDate = body.publicationDate ? new Date(body.publicationDate) : null;
+    const allowedData = pickAllowedFields(body, BOOK_CHAPTER_EDITOR_FIELDS);
+    const data: Prisma.BookChapterUpdateInput = { ...allowedData };
+    if (body.publicationDate !== undefined) {
+      data.publicationDate = body.publicationDate ? new Date(body.publicationDate) : null;
+    }
 
-    const bc = await prisma.bookChapter.update({ where: { id: params.id }, data: updateData });
-    return NextResponse.json({ success: true, data: bc });
-  } catch (e) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const result = await safeUpdate(prisma.bookChapter, id, data, "Book chapter");
+    if (!result.success) return result.response;
+
+    return updatedResponse(result.data, "Book chapter updated successfully");
+  } catch (error) {
+    return handleApiError(error);
   }
 }

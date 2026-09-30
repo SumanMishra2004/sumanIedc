@@ -1,62 +1,32 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-import {
-  withAuth,
-  successResponse,
-  updatedResponse,
-  deletedResponse,
-  notFoundResponse,
-  forbiddenResponse,
-  handleApiError,
-  updateJournalSchema,
-  userBasicSelect,
-  isUserAuthor,
-} from "@/lib/api";
+import { withAuth } from "@/lib/api/middleware";
+import { JournalStatus, Prisma } from "@prisma/client";
+import { safeFetchWithOwnership, safeUpdate, safeDelete, isAuthorOf } from "@/lib/api/security";
+import { pickAllowedFields, JOURNAL_STUDENT_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, deletedResponse, forbiddenResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-// ─────────────────────────────────────────────────────────────
-// GET /api/student/journals/[id] - Get single journal
-// ─────────────────────────────────────────────────────────────
+const authorInclude = {
+  studentAuthors: { include: { user: { select: { id: true, name: true, email: true } } } },
+  facultyAuthors: { include: { user: { select: { id: true, name: true, email: true } } } },
+  grantMappings:  { include: { grantIn: { select: { id: true, projectCode: true, grantInStatus: true, amountGranted: true } } } },
+};
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(async ({ user }) => {
     try {
-      const journal = await prisma.journal.findUnique({
-        where: { id: params.id },
-        include: {
-          studentAuthors: {
-            include: { user: { select: userBasicSelect } },
-          },
-          facultyAuthors: {
-            include: { user: { select: userBasicSelect } },
-          },
-          grantMappings: {
-            include: {
-              grantIn: {
-                select: {
-                  id: true,
-                  projectCode: true,
-                  grantInStatus: true,
-                  amountGranted: true,
-                },
-              },
-            },
-          },
-        },
+      const { id } = await params;
+
+      const result = await safeFetchWithOwnership(prisma.journal, id, user, {
+        resourceName: "Journal",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: ["EDITOR", "ADMIN", "SUPERADMIN"],
       });
+      if (!result.success) return result.response;
 
-      if (!journal) {
-        return notFoundResponse("Journal");
-      }
-
-      // Check ownership
-      const isAuthor = await isUserAuthor("journal", params.id, user.id);
-      if (!isAuthor) {
-        return forbiddenResponse("You can only view your own journals");
-      }
-
+      const journal = await prisma.journal.findUnique({ where: { id }, include: authorInclude });
       return successResponse(journal);
     } catch (error) {
       return handleApiError(error);
@@ -64,142 +34,60 @@ export async function GET(
   })(req);
 }
 
-// ─────────────────────────────────────────────────────────────
-// PATCH /api/student/journals/[id] - Update journal
-// ─────────────────────────────────────────────────────────────
-
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(async ({ user }) => {
     try {
-      // Check ownership
-      const isAuthor = await isUserAuthor("journal", params.id, user.id);
-      if (!isAuthor) {
-        return forbiddenResponse("You can only update your own journals");
-      }
+      const { id } = await params;
 
-      // Check if already approved/published (can't edit after approval)
-      const existing = await prisma.journal.findUnique({
-        where: { id: params.id },
-        select: { journalStatus: true, teacherStatus: true },
+      const fetchResult = await safeFetchWithOwnership(prisma.journal, id, user, {
+        resourceName: "Journal",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: [],
       });
+      if (!fetchResult.success) return fetchResult.response;
 
-      if (!existing) {
-        return notFoundResponse("Journal");
-      }
+      const existing = fetchResult.data;
 
-      if (
-        existing.journalStatus !== "SUBMITTED" ||
-        existing.teacherStatus === "PUBLISHED"
-      ) {
-        return forbiddenResponse(
-          "Cannot update journal after it has been reviewed"
-        );
+      if (existing.journalStatus !== JournalStatus.SUBMITTED) {
+        return forbiddenResponse("Cannot update journal after it has been reviewed");
       }
 
       const body = await req.json();
-      const validated = updateJournalSchema.parse(body);
+      const allowedData = pickAllowedFields(body, JOURNAL_STUDENT_FIELDS);
+      const data: Prisma.JournalUpdateInput = { ...allowedData };
+      if (body.publicationDate  !== undefined) data.publicationDate  = body.publicationDate  ? new Date(body.publicationDate)  : null;
+      if (body.impactFactorDate !== undefined) data.impactFactorDate = body.impactFactorDate ? new Date(body.impactFactorDate) : null;
 
-      const journal = await prisma.journal.update({
-        where: { id: params.id },
-        data: {
-          ...(validated.title && { title: validated.title }),
-          ...(validated.journalName && { journalName: validated.journalName }),
-          ...(validated.abstract !== undefined && {
-            abstract: validated.abstract,
-          }),
-          ...(validated.scope && { scope: validated.scope }),
-          ...(validated.reviewType && { reviewType: validated.reviewType }),
-          ...(validated.accessType && { accessType: validated.accessType }),
-          ...(validated.indexing && { indexing: validated.indexing }),
-          ...(validated.quartile && { quartile: validated.quartile }),
-          ...(validated.impactFactor !== undefined && {
-            impactFactor: validated.impactFactor,
-          }),
-          ...(validated.impactFactorDate && {
-            impactFactorDate: new Date(validated.impactFactorDate),
-          }),
-          ...(validated.publisher !== undefined && {
-            publisher: validated.publisher,
-          }),
-          ...(validated.publicationMode && {
-            publicationMode: validated.publicationMode,
-          }),
-          ...(validated.publicationDate && {
-            publicationDate: new Date(validated.publicationDate),
-          }),
-          ...(validated.doi !== undefined && { doi: validated.doi }),
-          ...(validated.paperLink !== undefined && {
-            paperLink: validated.paperLink,
-          }),
-          ...(validated.keywords && { keywords: validated.keywords }),
-          ...(validated.registrationFees !== undefined && {
-            registrationFees: validated.registrationFees,
-          }),
-          ...(validated.reimbursement !== undefined && {
-            reimbursement: validated.reimbursement,
-          }),
-          ...(validated.imageUrl !== undefined && {
-            imageUrl: validated.imageUrl,
-          }),
-          ...(validated.documentUrl !== undefined && {
-            documentUrl: validated.documentUrl,
-          }),
-        },
-        include: {
-          studentAuthors: {
-            include: { user: { select: userBasicSelect } },
-          },
-          facultyAuthors: {
-            include: { user: { select: userBasicSelect } },
-          },
-        },
-      });
+      const updateResult = await safeUpdate(prisma.journal, id, data, "Journal");
+      if (!updateResult.success) return updateResult.response;
 
-      return updatedResponse(journal, "Journal updated successfully");
+      return updatedResponse(updateResult.data, "Journal updated successfully");
     } catch (error) {
       return handleApiError(error);
     }
   })(req);
 }
 
-// ─────────────────────────────────────────────────────────────
-// DELETE /api/student/journals/[id] - Delete journal
-// ─────────────────────────────────────────────────────────────
-
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return withAuth(async ({ user }) => {
     try {
-      // Check ownership
-      const isAuthor = await isUserAuthor("journal", params.id, user.id);
-      if (!isAuthor) {
-        return forbiddenResponse("You can only delete your own journals");
-      }
+      const { id } = await params;
 
-      // Check if already approved/published (can't delete after approval)
-      const existing = await prisma.journal.findUnique({
-        where: { id: params.id },
-        select: { journalStatus: true },
+      const fetchResult = await safeFetchWithOwnership(prisma.journal, id, user, {
+        resourceName: "Journal",
+        include: { studentAuthors: true, facultyAuthors: true },
+        ownershipCheck: (r, u) => isAuthorOf(r, u.id),
+        bypassRoles: [],
       });
+      if (!fetchResult.success) return fetchResult.response;
 
-      if (!existing) {
-        return notFoundResponse("Journal");
+      if (fetchResult.data.journalStatus !== JournalStatus.SUBMITTED) {
+        return forbiddenResponse("Cannot delete journal after it has been reviewed");
       }
 
-      if (existing.journalStatus !== "SUBMITTED") {
-        return forbiddenResponse(
-          "Cannot delete journal after it has been reviewed"
-        );
-      }
-
-      await prisma.journal.delete({
-        where: { id: params.id },
-      });
+      const deleteResult = await safeDelete(prisma.journal, id, "Journal");
+      if (!deleteResult.success) return deleteResult.response;
 
       return deletedResponse("Journal deleted successfully");
     } catch (error) {

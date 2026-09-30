@@ -122,8 +122,8 @@ export default auth(async function middleware(req: NextRequest & { auth?: unknow
 
   // FACULTY+ API routes
   if (pathname.startsWith('/api/faculty-verification')) {
-    const ROLE_RANK = { STUDENT: 0, FACULTY: 1, EDITOR: 2, ADMIN: 3, SUPERADMIN: 4 }
-    if ((ROLE_RANK[role] ?? -1) < ROLE_RANK.FACULTY) {
+    const ROLE_RANK: Record<string, number> = { STUDENT: 0, FACULTY: 1, EDITOR: 2, ADMIN: 3, SUPERADMIN: 4 }
+    if ((ROLE_RANK[role] ?? -1) < ROLE_RANK['FACULTY']) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
     return NextResponse.next()

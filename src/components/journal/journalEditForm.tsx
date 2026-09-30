@@ -46,6 +46,7 @@ import type { Session } from "next-auth";
 import { ImageCropModal } from "@/components/ui/ImageCropModal";
 import { useImageCrop } from "@/hooks/useImageCrop";
 import { TeacherStatus } from "@prisma/client";
+import { apiBase } from "@/lib/api-client";
 
 // Use imported journalSchema from @/lib/validations/journal
 
@@ -173,10 +174,11 @@ export default function EditJournalDialog({
     return d.toISOString().split("T")[0];
   };
 
+  const _journalBase = apiBase("journal", session?.user?.role);
   const loadJournalData = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`/api/research/journal/${journalId}`);
+      const response = await axios.get(`${_journalBase}/${journalId}`);
       const journal = response.data.journal;
 
       // Populate form with existing data
@@ -331,7 +333,7 @@ export default function EditJournalDialog({
   const onSubmit = async (data: JournalFormValues) => {
     setIsSubmitting(true);
     try {
-      await axios.patch(`/api/research/journal/${journalId}`, data);
+      await axios.patch(`${_journalBase}/${journalId}`, data);
       toast.success("Journal updated successfully!");
       onOpenChange(false);
       onSuccess?.();

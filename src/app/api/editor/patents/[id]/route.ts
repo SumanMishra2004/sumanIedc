@@ -1,53 +1,62 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireEditor } from "@/lib/auth/guard";
-import { PatentStatus, TeacherStatus } from "@prisma/client";
+import { PatentStatus, TeacherStatus, Prisma } from "@prisma/client";
+import { safeUpdate } from "@/lib/api/security";
+import { pickAllowedFields, PATENT_EDITOR_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, notFoundResponse, badRequestResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireEditor(req);
   if (!guard.ok) return guard.response;
+
   try {
+    const { id } = await params;
+
     const patent = await prisma.patent.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         studentAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
         facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
-        grantMappings: { include: { grantIn: { select: { id: true, projectCode: true } } } },
+        grantMappings:  { include: { grantIn: { select: { id: true, projectCode: true } } } },
       },
     });
-    if (!patent) return NextResponse.json({ error: "Patent not found" }, { status: 404 });
-    return NextResponse.json({ success: true, data: patent });
-  } catch (e) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+
+    if (!patent) return notFoundResponse("Patent");
+    return successResponse(patent);
+  } catch (error) {
+    return handleApiError(error);
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireEditor(req);
   if (!guard.ok) return guard.response;
+
   try {
-    const existing = await prisma.patent.findUnique({ where: { id: params.id } });
-    if (!existing) return NextResponse.json({ error: "Patent not found" }, { status: 404 });
-
+    const { id } = await params;
     const body = await req.json();
-    if (body.patentStatus && !Object.values(PatentStatus).includes(body.patentStatus)) {
-      return NextResponse.json({ error: "Invalid patentStatus" }, { status: 400 });
+
+    if (body.patentStatus   && !Object.values(PatentStatus).includes(body.patentStatus)) {
+      return badRequestResponse("Invalid patentStatus");
     }
-    if (body.teacherStatus && !Object.values(TeacherStatus).includes(body.teacherStatus)) {
-      return NextResponse.json({ error: "Invalid teacherStatus" }, { status: 400 });
+    if (body.teacherStatus  && !Object.values(TeacherStatus).includes(body.teacherStatus)) {
+      return badRequestResponse("Invalid teacherStatus");
     }
 
-    const updateData: any = {};
-    const fields = ["patentStatus", "teacherStatus", "isPublic", "title", "keywords",
-      "abstract", "applicationNo", "grantedPatentNo", "patentLink", "imageUrl", "documentUrl", "updateComment"];
-    for (const f of fields) { if (body[f] !== undefined) updateData[f] = body[f]; }
-    for (const dateField of ["filingDate", "submissionDate", "publicationDate", "grantDate"]) {
-      if (body[dateField] !== undefined) updateData[dateField] = body[dateField] ? new Date(body[dateField]) : null;
+    const allowedData = pickAllowedFields(body, PATENT_EDITOR_FIELDS);
+    const data: Prisma.PatentUpdateInput = { ...allowedData };
+
+    for (const df of ["filingDate", "submissionDate", "publicationDate", "grantDate"] as const) {
+      if (body[df] !== undefined) data[df] = body[df] ? new Date(body[df]) : null;
     }
 
-    const patent = await prisma.patent.update({ where: { id: params.id }, data: updateData });
-    return NextResponse.json({ success: true, data: patent });
-  } catch (e) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const result = await safeUpdate(prisma.patent, id, data, "Patent");
+    if (!result.success) return result.response;
+
+    return updatedResponse(result.data, "Patent updated successfully");
+  } catch (error) {
+    return handleApiError(error);
   }
 }

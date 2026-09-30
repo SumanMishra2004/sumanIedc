@@ -1,60 +1,104 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/guard";
-import { ConferenceStatus, TeacherStatus } from "@prisma/client";
+import { ConferenceStatus, TeacherStatus, Prisma } from "@prisma/client";
+import { safeUpdate, safeDelete } from "@/lib/api/security";
+import { pickAllowedFields, CONFERENCE_ADMIN_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, deletedResponse, notFoundResponse, badRequestResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
+  
   try {
+    const { id } = await params;
+    
     const conf = await prisma.conference.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         studentAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
         facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
         grantMappings:  { include: { grantIn: { select: { id: true, projectCode: true, amountGranted: true } } } },
       },
     });
-    if (!conf) return NextResponse.json({ error: "Conference not found" }, { status: 404 });
-    return NextResponse.json({ success: true, data: conf });
-  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+    
+    if (!conf) {
+      return notFoundResponse("Conference");
+    }
+    
+    return successResponse(conf);
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
+  
   try {
-    if (!await prisma.conference.findUnique({ where: { id: params.id } }))
-      return NextResponse.json({ error: "Conference not found" }, { status: 404 });
-
+    const { id } = await params;
     const body = await req.json();
-    if (body.conferenceStatus && !Object.values(ConferenceStatus).includes(body.conferenceStatus))
-      return NextResponse.json({ error: "Invalid conferenceStatus" }, { status: 400 });
-    if (body.teacherStatus && !Object.values(TeacherStatus).includes(body.teacherStatus))
-      return NextResponse.json({ error: "Invalid teacherStatus" }, { status: 400 });
-
-    const data: any = {};
-    for (const f of ["conferenceStatus","teacherStatus","isPublic","conferenceName","mode","abstract",
-      "keywords","conferencePublisher","paperDoi","paperLink","paperName",
-      "registrationFees","reimbursement","imageUrl","documentUrl","updateComment"]) {
-      if (body[f] !== undefined) data[f] = body[f];
+    
+    // Validate status enums if provided
+    if (body.conferenceStatus && !Object.values(ConferenceStatus).includes(body.conferenceStatus)) {
+      return badRequestResponse("Invalid conferenceStatus");
     }
-    for (const df of ["conferenceDate","statusDate"]) {
-      if (body[df] !== undefined) data[df] = body[df] ? new Date(body[df]) : null;
+    if (body.teacherStatus && !Object.values(TeacherStatus).includes(body.teacherStatus)) {
+      return badRequestResponse("Invalid teacherStatus");
     }
-
-    const conf = await prisma.conference.update({ where: { id: params.id }, data });
-    return NextResponse.json({ success: true, data: conf });
-  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+    
+    // Use field allowlist to prevent mass assignment
+    const allowedData = pickAllowedFields(body, CONFERENCE_ADMIN_FIELDS);
+    
+    // Prepare update data with proper type conversions
+    const data: Prisma.ConferenceUpdateInput = {
+      ...allowedData,
+    };
+    
+    // Parse date fields if provided
+    if (body.conferenceDate !== undefined) {
+      data.conferenceDate = body.conferenceDate ? new Date(body.conferenceDate) : null;
+    }
+    if (body.statusDate !== undefined) {
+      data.statusDate = body.statusDate ? new Date(body.statusDate) : null;
+    }
+    
+    // Use safe update to prevent race conditions
+    const result = await safeUpdate(
+      prisma.conference,
+      id,
+      data,
+      "Conference"
+    );
+    
+    if (!result.success) {
+      return result.response;
+    }
+    
+    return updatedResponse(result.data, "Conference updated successfully");
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireAdmin(req);
   if (!guard.ok) return guard.response;
+  
   try {
-    if (!await prisma.conference.findUnique({ where: { id: params.id } }))
-      return NextResponse.json({ error: "Conference not found" }, { status: 404 });
-    await prisma.conference.delete({ where: { id: params.id } });
-    return NextResponse.json({ success: true, message: "Conference deleted" });
-  } catch { return NextResponse.json({ error: "Internal server error" }, { status: 500 }); }
+    const { id } = await params;
+    
+    // Use safe delete to prevent race conditions
+    const result = await safeDelete(prisma.conference, id, "Conference");
+    
+    if (!result.success) {
+      return result.response;
+    }
+    
+    return deletedResponse("Conference deleted successfully");
+  } catch (error) {
+    return handleApiError(error);
+  }
 }

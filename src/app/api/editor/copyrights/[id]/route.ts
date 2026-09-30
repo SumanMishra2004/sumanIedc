@@ -1,53 +1,62 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireEditor } from "@/lib/auth/guard";
-import { CopyrightStatus, TeacherStatus } from "@prisma/client";
+import { CopyrightStatus, TeacherStatus, Prisma } from "@prisma/client";
+import { safeUpdate } from "@/lib/api/security";
+import { pickAllowedFields, COPYRIGHT_EDITOR_FIELDS } from "@/lib/auth/field-allowlists";
+import { successResponse, updatedResponse, notFoundResponse, badRequestResponse } from "@/lib/api/response";
+import { handleApiError } from "@/lib/api/error-handler";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireEditor(req);
   if (!guard.ok) return guard.response;
+
   try {
+    const { id } = await params;
+
     const copyright = await prisma.copyright.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         studentAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
         facultyAuthors: { include: { user: { select: { id: true, name: true, email: true, department: true } } } },
-        grantMappings: { include: { grantIn: { select: { id: true, projectCode: true } } } },
+        grantMappings:  { include: { grantIn: { select: { id: true, projectCode: true } } } },
       },
     });
-    if (!copyright) return NextResponse.json({ error: "Copyright not found" }, { status: 404 });
-    return NextResponse.json({ success: true, data: copyright });
-  } catch (e) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+
+    if (!copyright) return notFoundResponse("Copyright");
+    return successResponse(copyright);
+  } catch (error) {
+    return handleApiError(error);
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireEditor(req);
   if (!guard.ok) return guard.response;
+
   try {
-    const existing = await prisma.copyright.findUnique({ where: { id: params.id } });
-    if (!existing) return NextResponse.json({ error: "Copyright not found" }, { status: 404 });
-
+    const { id } = await params;
     const body = await req.json();
+
     if (body.copyrightStatus && !Object.values(CopyrightStatus).includes(body.copyrightStatus)) {
-      return NextResponse.json({ error: "Invalid copyrightStatus" }, { status: 400 });
+      return badRequestResponse("Invalid copyrightStatus");
     }
-    if (body.teacherStatus && !Object.values(TeacherStatus).includes(body.teacherStatus)) {
-      return NextResponse.json({ error: "Invalid teacherStatus" }, { status: 400 });
-    }
-
-    const updateData: any = {};
-    const fields = ["copyrightStatus", "teacherStatus", "isPublic", "regNo", "title", "abstract",
-      "registrationFees", "reimbursement", "imageUrl", "documentUrl", "updateComment"];
-    for (const f of fields) { if (body[f] !== undefined) updateData[f] = body[f]; }
-    for (const df of ["dateOfFiling", "dateOfSubmission", "dateOfPublished", "dateOfGrant"]) {
-      if (body[df] !== undefined) updateData[df] = body[df] ? new Date(body[df]) : null;
+    if (body.teacherStatus   && !Object.values(TeacherStatus).includes(body.teacherStatus)) {
+      return badRequestResponse("Invalid teacherStatus");
     }
 
-    const copyright = await prisma.copyright.update({ where: { id: params.id }, data: updateData });
-    return NextResponse.json({ success: true, data: copyright });
-  } catch (e) {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const allowedData = pickAllowedFields(body, COPYRIGHT_EDITOR_FIELDS);
+    const data: Prisma.CopyrightUpdateInput = { ...allowedData };
+
+    for (const df of ["dateOfFiling", "dateOfSubmission", "dateOfPublished", "dateOfGrant"] as const) {
+      if (body[df] !== undefined) data[df] = body[df] ? new Date(body[df]) : null;
+    }
+
+    const result = await safeUpdate(prisma.copyright, id, data, "Copyright");
+    if (!result.success) return result.response;
+
+    return updatedResponse(result.data, "Copyright updated successfully");
+  } catch (error) {
+    return handleApiError(error);
   }
 }

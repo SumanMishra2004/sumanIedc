@@ -5,6 +5,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import axios from "axios";
+import { useApiBase } from "@/hooks/use-api-base";
 import {
   Loader2, Upload, X, BookOpen, FileText,
   Users, Tag, Building2, ChevronRight,
@@ -257,6 +258,7 @@ export default function EditBookChapterDialog({
 }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const bookChapterBase = useApiBase("book-chapter");
   const [bookChapter, setBookChapter] = useState<BookChapter | null>(null);
   const [keywordInput, setKeywordInput] = useState("");
   const { cropState, openCrop, closeCrop } = useImageCrop();
@@ -302,7 +304,7 @@ export default function EditBookChapterDialog({
   const loadBookChapterData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`/api/research/book-chapter/${bookChapterId}`);
+      const response = await axios.get(`${bookChapterBase}/${bookChapterId}`);
       const data: BookChapter = response.data.bookChapter;
       setBookChapter(data);
 
@@ -433,7 +435,7 @@ export default function EditBookChapterDialog({
   const onSubmit = async (data: BookChapterFormValues) => {
     setIsSubmitting(true);
     try {
-      await axios.patch(`/api/research/book-chapter/${bookChapterId}`, data);
+      await axios.patch(`${bookChapterBase}/${bookChapterId}`, data);
       toast.success("Book chapter updated successfully!");
       onOpenChange(false);
       onSuccess?.();
