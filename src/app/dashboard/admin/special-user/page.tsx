@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react"
 import { SpecialUserForm } from "@/components/admin/SpecialUserForm"
-import { SpecialUserChart } from "@/components/admin/SpecialUserChart"
+
 import { SpecialUserTable } from "@/components/admin/SpecialUserTable"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -47,20 +47,10 @@ export default function SpecialUserPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Top Section: Two cards side by side */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Card: Add Form */}
-        <SpecialUserForm onSuccess={fetchUsers} />
 
-        {/* Right Card: Chart */}
-        <SpecialUserChart data={users} />
-      </div>
-
-      {/* Bottom Section: Table spanning full width */}
-      <div className="w-full">
+      <div className="w-full p-3">
         <SpecialUserTable data={users} onRefresh={fetchUsers} />
       </div>
-    </div>
+    
   )
 }

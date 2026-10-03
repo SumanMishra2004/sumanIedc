@@ -264,6 +264,7 @@ model JournalTeacherAuthor {
   id                    String                    @id @default(cuid())
   journalId             String                    @map("journal_id")
   userId                String?                   @map("user_id")
+  role                  JournalFacultyRole        @default(CO_PI)
   verificationStatus    FacultyVerificationStatus @default(ACCEPTED)
   verificationRequestId String?                   @map("verification_request_id")
   journal               Journal                   @relation("facultyJournalAuthors", fields: [journalId], references: [id], onDelete: Cascade)
@@ -808,6 +809,11 @@ enum EventStatus {
 }
 
 /// Audit action constants — keep in sync with src/lib/audit.ts
+enum JournalFacultyRole {
+  PI
+  CO_PI
+}
+
 enum AuditAction {
   USER_REGISTERED
   USER_ROLE_CHANGED

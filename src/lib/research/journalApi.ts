@@ -319,6 +319,90 @@ export const getJournalsByScope = async (
 }
 
 /**
+ * Accept a journal (FACULTY_EDITOR / ADMIN / SUPERADMIN)
+ */
+export const acceptJournal = async (
+  id: string
+): Promise<ApiResponse<{ journal: Journal; message: string }>> => {
+  try {
+    const response = await axios.post<{ journal: Journal; message: string }>(
+      `${API_BASE_URL}/${id}/accept`
+    )
+    return { data: response.data }
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+/**
+ * Reject a journal with a reason
+ */
+export const rejectJournal = async (
+  id: string,
+  reason: string
+): Promise<ApiResponse<{ journal: Journal; message: string }>> => {
+  try {
+    const response = await axios.post<{ journal: Journal; message: string }>(
+      `${API_BASE_URL}/${id}/reject`,
+      { reason }
+    )
+    return { data: response.data }
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+/**
+ * Request an update on a journal with instructions
+ */
+export const requestJournalUpdate = async (
+  id: string,
+  updateComment: string
+): Promise<ApiResponse<{ journal: Journal; message: string }>> => {
+  try {
+    const response = await axios.post<{ journal: Journal; message: string }>(
+      `${API_BASE_URL}/${id}/request-update`,
+      { updateComment }
+    )
+    return { data: response.data }
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+/**
+ * Publish a journal
+ */
+export const publishJournal = async (
+  id: string
+): Promise<ApiResponse<{ journal: Journal; message: string }>> => {
+  try {
+    const response = await axios.post<{ journal: Journal; message: string }>(
+      `${API_BASE_URL}/${id}/publish`
+    )
+    return { data: response.data }
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+/**
+ * Resubmit a journal for review after update
+ */
+export const resubmitJournal = async (
+  id: string
+): Promise<ApiResponse<{ journal: Journal; message: string }>> => {
+  try {
+    const response = await axios.post<{ journal: Journal; message: string }>(
+      `${API_BASE_URL}/${id}/resubmit`
+    )
+    return { data: response.data }
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+/**
  * Toggle journal visibility
  */
 export const toggleJournalVisibility = async (

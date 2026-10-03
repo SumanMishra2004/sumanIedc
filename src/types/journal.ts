@@ -6,7 +6,8 @@ import {
   JournalAccessType,
   JournalIndexing,
   JournalQuartile,
-  JournalPublicationMode
+  JournalPublicationMode,
+  JournalFacultyRole
 } from "@prisma/client"
 
 export interface User {
@@ -21,6 +22,7 @@ export interface JournalAuthor {
   id: string
   userId: string
   journalId: string
+  role?: JournalFacultyRole
   user: User
 }
 
@@ -125,6 +127,7 @@ export interface CreateJournalInput {
   isPublic?: boolean
   studentAuthorIds?: string[]
   facultyAuthorIds?: string[]
+  principalInvestigatorId?: string
 }
 
 export type UpdateJournalInput = Partial<CreateJournalInput>

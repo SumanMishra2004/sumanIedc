@@ -8,9 +8,18 @@ import {
   JournalIndexing,
   JournalQuartile,
 } from '@prisma/client'
-import { isAdminOrHigher } from '@/lib/auth/permissions'
+import { isAdminOrHigher, isEditorOrHigher } from '@/lib/auth/permissions'
 
-// Helper: admin guard
+// Helper: EDITOR+ guard for list/read (GET)
+async function requireEditorOrHigher() {
+  const session = await auth()
+  if (!session?.user || !isEditorOrHigher(session.user.role)) {
+    return null
+  }
+  return session
+}
+
+// Helper: ADMIN+ guard for write operations (POST, PATCH, DELETE on collection)
 async function requireAdmin() {
   const session = await auth()
   if (!session?.user || !isAdminOrHigher(session.user.role)) {
@@ -19,13 +28,13 @@ async function requireAdmin() {
   return session
 }
 
-// GET - List all journals (admin - no role-based filtering)
+// GET - List all journals (EDITOR+ can read; no role-based record filtering)
 export async function GET(req: NextRequest) {
   try {
-    const session = await requireAdmin()
+    const session = await requireEditorOrHigher()
     if (!session) {
       return NextResponse.json(
-        { error: 'Unauthorized — ADMIN access required' },
+        { error: 'Unauthorized — EDITOR access required' },
         { status: 403 }
       )
     }

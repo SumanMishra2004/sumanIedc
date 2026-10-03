@@ -31,6 +31,11 @@ import {
   Calendar,
   DollarSign,
   Funnel,
+  CheckCircle,
+  XCircle,
+  Clock,
+  BookOpen,
+  RotateCcw,
 } from "lucide-react";
 import type { Session } from "next-auth";
 
@@ -93,6 +98,11 @@ import {
   searchJournals,
   getJournalsByTeacherStatus,
   updateJournalTeacherStatus,
+  acceptJournal,
+  rejectJournal,
+  requestJournalUpdate,
+  publishJournal,
+  resubmitJournal,
 } from "@/lib/research/journalApi";
 import {
   Card,
@@ -171,12 +181,15 @@ const getScopeConfig = (scope: JournalScope) => {
 };
 
 // --- Actions Component ---
+type WorkflowAction = "accept" | "reject" | "request-update" | "publish" | "resubmit";
+
 interface JournalActionsProps {
   journal: Journal;
   onDelete: (id: string) => void;
   onEdit?: (id: string) => void;
   onView?: (id: string) => void;
   onTeacherStatusChange?: (id: string, status: TeacherStatus) => void;
+  onWorkflowAction?: (id: string, action: WorkflowAction, title: string) => void;
   session?: Session | null;
 }
 
@@ -225,8 +238,30 @@ const JournalActions = ({
   onEdit,
   onView,
   onTeacherStatusChange,
+  onWorkflowAction,
   session,
-}: JournalActionsProps) => (
+}: JournalActionsProps) => {
+  const role = session?.user?.role;
+  const userId = session?.user?.id ?? "";
+  const status = journal.teacherStatus;
+  const isPrivileged = ["EDITOR", "ADMIN", "SUPERADMIN"].includes(role ?? "");
+  const isAdminLevel = ["ADMIN", "SUPERADMIN"].includes(role ?? "");
+
+  // Is the current user a PI or any author of this journal?
+  const userIsFacultyAuthor = journal.facultyAuthors?.some((fa: any) => fa.userId === userId || fa.user?.id === userId) ?? false;
+  const userIsStudentAuthor = journal.studentAuthors?.some((sa: any) => sa.userId === userId || sa.user?.id === userId) ?? false;
+  const userIsPI = journal.facultyAuthors?.some((fa: any) => (fa.userId === userId || fa.user?.id === userId) && fa.role === "PI") ?? false;
+  const userIsAuthor = userIsFacultyAuthor || userIsStudentAuthor;
+
+  // Workflow visibility rules (mirrors journalHelpers.ts canUpdateJournalStatus / canPublishJournal / canResubmitJournal)
+  const canAccept = (isPrivileged || userIsPI) && status === "UPLOADED";
+  const canReject = (isPrivileged || userIsPI) && status === "UPLOADED";
+  const canRequestUpdate = (isPrivileged || userIsPI) && status === "UPLOADED";
+  const canPublish = isPrivileged && status === "ACCEPTED";
+  // Only actual authors can resubmit (mirrors canResubmitJournal)
+  const canResubmit = status === "UPDATE" && userIsAuthor;
+
+  return (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
       <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted">
@@ -246,7 +281,8 @@ const JournalActions = ({
         <Eye className="mr-2 h-4 w-4 text-muted-foreground" />
         View details
       </DropdownMenuItem>
-      {journal.teacherStatus !== "PUBLISHED" && (
+      {/* Edit — shown only to authors (pre-published) or privileged roles */}
+      {journal.teacherStatus !== "PUBLISHED" && (userIsAuthor || isPrivileged) && (
         <>
           <DropdownMenuItem onClick={() => onEdit?.(journal.id)}>
             <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -256,7 +292,7 @@ const JournalActions = ({
         </>
       )}
       {journal.teacherStatus === "PUBLISHED" &&
-        session?.user.role === "ADMIN" && (
+        (session?.user.role === "ADMIN" || session?.user.role === "EDITOR" || session?.user.role === "SUPERADMIN") && (
           <>
             <DropdownMenuItem onClick={() => onEdit?.(journal.id)}>
               <Edit className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -304,26 +340,81 @@ const JournalActions = ({
         </>
       )}
 
-    {(
-      journal.teacherStatus === "UPLOADED"
-        ? session?.user.role !== "STUDENT"
-        : journal.teacherStatus === "ACCEPTED"
-        ? session?.user.role === "FACULTY" || session?.user.role === "ADMIN"
-        : journal.teacherStatus === "PUBLISHED"
-        ? session?.user.role === "ADMIN"
-        : session?.user.role === "FACULTY" || session?.user.role === "ADMIN"
-    ) && (
-    <DropdownMenuItem
-      className="text-red-600 focus:text-red-600 focus:bg-red-50"
-      onClick={() => onDelete(journal.id)}
-    >
-      <Trash className="mr-2 h-4 w-4" />
-      Delete
-    </DropdownMenuItem>
-  )}
+      {/* ── Workflow Actions ────────────────────────────────────────── */}
+      {(canAccept || canReject || canRequestUpdate || canPublish || canResubmit) && (
+        <>
+          <DropdownMenuSeparator />
+          <p className="px-2 py-1 text-xs text-muted-foreground font-medium">Workflow</p>
+          {canAccept && (
+            <DropdownMenuItem
+              onClick={() => onWorkflowAction?.(journal.id, "accept", journal.title)}
+              className="text-green-600 focus:text-green-700 focus:bg-green-50"
+            >
+              <CheckCircle className="mr-2 h-4 w-4" />
+              Accept
+            </DropdownMenuItem>
+          )}
+          {canReject && (
+            <DropdownMenuItem
+              onClick={() => onWorkflowAction?.(journal.id, "reject", journal.title)}
+              className="text-red-600 focus:text-red-700 focus:bg-red-50"
+            >
+              <XCircle className="mr-2 h-4 w-4" />
+              Reject
+            </DropdownMenuItem>
+          )}
+          {canRequestUpdate && (
+            <DropdownMenuItem
+              onClick={() => onWorkflowAction?.(journal.id, "request-update", journal.title)}
+              className="text-amber-600 focus:text-amber-700 focus:bg-amber-50"
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              Request Update
+            </DropdownMenuItem>
+          )}
+          {canPublish && (
+            <DropdownMenuItem
+              onClick={() => onWorkflowAction?.(journal.id, "publish", journal.title)}
+              className="text-blue-600 focus:text-blue-700 focus:bg-blue-50"
+            >
+              <BookOpen className="mr-2 h-4 w-4" />
+              Publish
+            </DropdownMenuItem>
+          )}
+          {canResubmit && (
+            <DropdownMenuItem
+              onClick={() => onWorkflowAction?.(journal.id, "resubmit", journal.title)}
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Resubmit
+            </DropdownMenuItem>
+          )}
+        </>
+      )}
+
+      {/* Delete — mirrors canDeleteJournal in journalHelpers.ts:
+          PUBLISHED → ADMIN/SUPERADMIN only
+          otherwise → PI of this journal OR ADMIN/SUPERADMIN */}
+      {(
+        status === "PUBLISHED"
+          ? isAdminLevel
+          : isAdminLevel || userIsPI
+      ) && (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-red-600 focus:text-red-600 focus:bg-red-50"
+            onClick={() => onDelete(journal.id)}
+          >
+            <Trash className="mr-2 h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        </>
+      )}
     </DropdownMenuContent>
   </DropdownMenu>
-);
+  );
+};
 
 // --- Table Columns ---
 
@@ -332,6 +423,7 @@ interface ColumnProps {
   onEdit?: (id: string) => void;
   onView?: (id: string) => void;
   onTeacherStatusChange?: (id: string, status: TeacherStatus) => void;
+  onWorkflowAction?: (id: string, action: WorkflowAction, title: string) => void;
   session?: Session | null;
 }
 
@@ -340,6 +432,7 @@ export const createColumns = ({
   onEdit,
   onView,
   onTeacherStatusChange,
+  onWorkflowAction,
   session,
 }: ColumnProps): ColumnDef<Journal>[] => [
   {
@@ -559,6 +652,7 @@ export const createColumns = ({
         onEdit={onEdit}
         onView={onView}
         onTeacherStatusChange={onTeacherStatusChange}
+        onWorkflowAction={onWorkflowAction}
         session={session}
       />
     ),
@@ -599,6 +693,16 @@ export default function JournalTable({
   const [updateCommentDialogOpen, setUpdateCommentDialogOpen] = useState(false);
   const [targetJournalId, setTargetJournalId] = useState<string | null>(null);
   const [updateComment, setUpdateComment] = useState("");
+
+  // Workflow modal state
+  const [workflowModal, setWorkflowModal] = useState<{
+    open: boolean;
+    action: WorkflowAction | null;
+    journalId: string | null;
+    journalTitle: string | null;
+  }>({ open: false, action: null, journalId: null, journalTitle: null });
+  const [workflowComment, setWorkflowComment] = useState("");
+  const [workflowLoading, setWorkflowLoading] = useState(false);
   const [filters, setFilters] = React.useState<JournalFilters>({
     page: 1,
     limit: 10,
@@ -761,6 +865,65 @@ export default function JournalTable({
     }
   };
 
+  // Open workflow modal
+  const handleWorkflowAction = (id: string, action: WorkflowAction, title: string) => {
+    setWorkflowComment("");
+    setWorkflowModal({ open: true, action, journalId: id, journalTitle: title });
+  };
+
+  // Execute the selected workflow action
+  const handleConfirmWorkflow = async () => {
+    const { action, journalId } = workflowModal;
+    if (!action || !journalId) return;
+
+    if ((action === "reject" || action === "request-update") && !workflowComment.trim()) {
+      toast.error(action === "reject" ? "Rejection reason is required" : "Update instructions are required");
+      return;
+    }
+
+    setWorkflowLoading(true);
+    try {
+      let result: { error?: string } = {};
+
+      switch (action) {
+        case "accept":
+          result = await acceptJournal(journalId);
+          if (!result.error) toast.success("Journal accepted");
+          break;
+        case "reject":
+          result = await rejectJournal(journalId, workflowComment);
+          if (!result.error) toast.success("Journal rejected");
+          break;
+        case "request-update":
+          result = await requestJournalUpdate(journalId, workflowComment);
+          if (!result.error) toast.success("Update request sent");
+          break;
+        case "publish":
+          result = await publishJournal(journalId);
+          if (!result.error) toast.success("Journal published");
+          break;
+        case "resubmit":
+          result = await resubmitJournal(journalId);
+          if (!result.error) toast.success("Journal resubmitted for review");
+          break;
+      }
+
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+
+      setWorkflowModal({ open: false, action: null, journalId: null, journalTitle: null });
+      setWorkflowComment("");
+      fetchData();
+      onRefresh?.();
+    } catch {
+      toast.error("Action failed");
+    } finally {
+      setWorkflowLoading(false);
+    }
+  };
+
   // Handle bulk delete
   const handleBulkDelete = async () => {
     const selectedIds = Object.keys(rowSelection);
@@ -808,6 +971,7 @@ export default function JournalTable({
           setViewDialogOpen(true);
         },
         onTeacherStatusChange: handleTeacherStatusChange,
+        onWorkflowAction: handleWorkflowAction,
         session
       }),
     [session],
@@ -871,7 +1035,8 @@ export default function JournalTable({
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              {Object.keys(rowSelection).length > 0 && (
+              {Object.keys(rowSelection).length > 0 &&
+                ["ADMIN", "SUPERADMIN"].includes(session?.user?.role ?? "") && (
                 <Button
                   variant="destructive"
                   size="sm"
@@ -894,10 +1059,13 @@ export default function JournalTable({
                   </Button>
                 }
               />
-              <JournalDialog
-                onSuccess={fetchData}
-                onClose={() => fetchData()}
-              />
+              {/* Only STUDENT and FACULTY can create journals (API enforces this too) */}
+              {["STUDENT", "FACULTY"].includes(session?.user?.role ?? "") && (
+                <JournalDialog
+                  onSuccess={fetchData}
+                  onClose={() => fetchData()}
+                />
+              )}
             </div>
           </div>
         </CardHeader>
@@ -1330,6 +1498,7 @@ export default function JournalTable({
                           setViewDialogOpen(true);
                         }}
                         onTeacherStatusChange={handleTeacherStatusChange}
+                        onWorkflowAction={handleWorkflowAction}
                         session={session}
                       />
                     </div>
@@ -1554,6 +1723,83 @@ export default function JournalTable({
             </Button>
             <Button onClick={handleConfirmUpdateComment}>
               Send Request
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Workflow Action Modal ─────────────────────────────────────── */}
+      <Dialog
+        open={workflowModal.open}
+        onOpenChange={(open) => {
+          if (!workflowLoading) {
+            setWorkflowModal({ open, action: null, journalId: null, journalTitle: null });
+            setWorkflowComment("");
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>
+              {workflowModal.action === "accept" && "Accept Journal"}
+              {workflowModal.action === "reject" && "Reject Journal"}
+              {workflowModal.action === "request-update" && "Request Update"}
+              {workflowModal.action === "publish" && "Publish Journal"}
+              {workflowModal.action === "resubmit" && "Resubmit Journal"}
+            </DialogTitle>
+            <DialogDescription className="line-clamp-2">
+              {workflowModal.journalTitle}
+            </DialogDescription>
+          </DialogHeader>
+
+          {(workflowModal.action === "reject" || workflowModal.action === "request-update") && (
+            <div className="space-y-2 py-2">
+              <label className="text-sm font-medium">
+                {workflowModal.action === "reject" ? "Rejection Reason" : "Update Instructions"}
+                <span className="text-destructive ml-1">*</span>
+              </label>
+              <Textarea
+                placeholder={
+                  workflowModal.action === "reject"
+                    ? "Provide the reason for rejection…"
+                    : "Describe what needs to be corrected or updated…"
+                }
+                value={workflowComment}
+                onChange={(e) => setWorkflowComment(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
+          )}
+
+          {workflowModal.action === "accept" && (
+            <p className="text-sm text-muted-foreground py-2">
+              This journal will be marked as <strong>Accepted</strong> and queued for publishing by an editor.
+            </p>
+          )}
+          {workflowModal.action === "publish" && (
+            <p className="text-sm text-muted-foreground py-2">
+              This journal will be <strong>Published</strong> and visible on the public page.
+            </p>
+          )}
+          {workflowModal.action === "resubmit" && (
+            <p className="text-sm text-muted-foreground py-2">
+              This journal will be <strong>resubmitted</strong> to the PI for review.
+            </p>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              disabled={workflowLoading}
+              onClick={() => {
+                setWorkflowModal({ open: false, action: null, journalId: null, journalTitle: null });
+                setWorkflowComment("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmWorkflow} disabled={workflowLoading}>
+              {workflowLoading ? "Processing…" : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>

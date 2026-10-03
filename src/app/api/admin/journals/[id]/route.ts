@@ -11,12 +11,21 @@ import {
   JournalQuartile,
   JournalPublicationMode
 } from '@prisma/client'
-import { isAdminOrHigher } from '@/lib/auth/permissions'
+import { isAdminOrHigher, isEditorOrHigher } from '@/lib/auth/permissions'
 
-// Helper: admin guard
+// ADMIN+ guard — used for mutations (PATCH, DELETE)
 async function requireAdmin() {
   const session = await auth()
   if (!session?.user || !isAdminOrHigher(session.user.role)) {
+    return null
+  }
+  return session
+}
+
+// EDITOR+ guard — used for read-only access
+async function requireEditorOrHigher() {
+  const session = await auth()
+  if (!session?.user || !isEditorOrHigher(session.user.role)) {
     return null
   }
   return session
@@ -52,16 +61,16 @@ const authorInclude = {
   }
 }
 
-// GET /api/admin/journals/[id] — fetch single journal with authors
+// GET /api/admin/journals/[id] — fetch single journal with authors (EDITOR+)
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await requireAdmin()
+    const session = await requireEditorOrHigher()
     if (!session) {
       return NextResponse.json(
-        { error: 'Unauthorized — ADMIN access required' },
+        { error: 'Unauthorized — EDITOR access required' },
         { status: 403 }
       )
     }
@@ -225,6 +234,53 @@ export async function PATCH(
     return NextResponse.json({ journal })
   } catch (error) {
     console.error('Error updating admin journal:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+// DELETE /api/admin/journals/[id] — hard-delete a journal (ADMIN+)
+// Published journals can only be deleted by ADMIN/SUPERADMIN (enforced here via requireAdmin).
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await requireAdmin()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized — ADMIN access required' },
+        { status: 403 }
+      )
+    }
+
+    const { id } = await params
+
+    const existing = await prisma.journal.findUnique({ where: { id } })
+    if (!existing) {
+      return NextResponse.json({ error: 'Journal not found' }, { status: 404 })
+    }
+
+    // Extra guard: SUPERADMIN can delete published journals; plain ADMIN cannot
+    if (
+      existing.teacherStatus === 'PUBLISHED' &&
+      session.user.role !== 'SUPERADMIN'
+    ) {
+      return NextResponse.json(
+        { error: 'Only SUPERADMIN can delete published journals' },
+        { status: 403 }
+      )
+    }
+
+    // Cascade deletes for JournalStudentAuthor and JournalTeacherAuthor are
+    // handled by onDelete: Cascade in the schema — no manual cleanup needed.
+    await prisma.journal.delete({ where: { id } })
+
+    return NextResponse.json({ message: 'Journal deleted successfully' })
+  } catch (error) {
+    console.error('Error deleting admin journal:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

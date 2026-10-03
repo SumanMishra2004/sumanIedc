@@ -257,10 +257,13 @@ export function canManageUser(actorRole: string, targetRole: string): boolean {
  * SUPERADMIN → all five roles
  * everyone else → nobody
  */
-export function canAssignRole(actorRole: string, targetRole: UserRoleString): boolean {
+export function canAssignRole(
+  actorRole: string,
+  targetRole?: string,
+): boolean {
   if (!isAdminOrHigher(actorRole)) return false
-  if (isSuperAdmin(actorRole)) return true
-  if (targetRole === 'SUPERADMIN') return false
+  // If a specific target role is supplied, ADMIN cannot assign SUPERADMIN
+  if (targetRole && isSuperAdmin(targetRole) && !isSuperAdmin(actorRole)) return false
   return true
 }
 

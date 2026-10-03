@@ -19,7 +19,8 @@ export const journalSchema = z.object({
     .string({ message: "Serial number is required" })
     .trim()
     .min(3, "Serial number must be at least 3 characters")
-    .max(50, "Serial number cannot exceed 50 characters"),
+    .max(50, "Serial number cannot exceed 50 characters")
+    .optional(),
   title: z
     .string({ message: "Paper title is required" })
     .trim()
@@ -132,11 +133,12 @@ export const journalSchema = z.object({
     .refine((val) => val !== null && val.trim() !== "", {
       message: "Document is required",
     }),
-  journalStatus: z.nativeEnum(JournalStatus),
-  teacherStatus: z.nativeEnum(TeacherStatus),
-  isPublic: z.boolean(),
+  journalStatus: z.nativeEnum(JournalStatus).optional().default(JournalStatus.SUBMITTED),
+  teacherStatus: z.nativeEnum(TeacherStatus).optional().default(TeacherStatus.UPLOADED),
+  isPublic: z.boolean().optional().default(false),
   studentAuthorIds: z.array(z.string()).default([]),
-  facultyAuthorIds: z.array(z.string()).min(1, "At least one faculty author must be selected from the platform"),
+  facultyAuthorIds: z.array(z.string()).default([]),
+  principalInvestigatorId: z.string().optional(),
   /** External (unlisted) faculty co-authors */
   externalFacultyAuthors: z.array(externalAuthorSchema).default([]),
   /** External (unlisted) student co-authors */
@@ -237,7 +239,32 @@ export const journalSchema = z.object({
     })
   }
 
-  // 9. No duplicate external faculty emails
+  // 9. At least one faculty author (platform OR external) OR principalInvestigatorId
+  const hasFacultyAuthor =
+    (data.facultyAuthorIds && data.facultyAuthorIds.length > 0) ||
+    (data.externalFacultyAuthors && data.externalFacultyAuthors.length > 0) ||
+    data.principalInvestigatorId
+  
+  if (!hasFacultyAuthor) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "At least one faculty author or Principal Investigator is required",
+      path: ["facultyAuthorIds"],
+    })
+  }
+
+  // 10. If principalInvestigatorId is provided, it must be in facultyAuthorIds
+  if (data.principalInvestigatorId && data.facultyAuthorIds && data.facultyAuthorIds.length > 0) {
+    if (!data.facultyAuthorIds.includes(data.principalInvestigatorId)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Principal Investigator must be included in faculty authors list",
+        path: ["principalInvestigatorId"],
+      })
+    }
+  }
+
+  // 11. No duplicate external faculty emails
   if (data.externalFacultyAuthors && data.externalFacultyAuthors.length > 0) {
     const emails = data.externalFacultyAuthors.map((a) => a.email.toLowerCase())
     if (new Set(emails).size !== emails.length) {
@@ -249,7 +276,7 @@ export const journalSchema = z.object({
     }
   }
 
-  // 10. No duplicate external student emails
+  // 12. No duplicate external student emails
   if (data.externalStudentAuthors && data.externalStudentAuthors.length > 0) {
     const emails = data.externalStudentAuthors.map((a) => a.email.toLowerCase())
     if (new Set(emails).size !== emails.length) {

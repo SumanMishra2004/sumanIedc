@@ -1,133 +1,124 @@
 import { NextRequest, NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
-import { UserRole } from '@prisma/client'
 import { auth } from '@/lib/auth'
+import prisma from '@/lib/prisma'
+import { getJournalQueryFilter } from '@/lib/research/journalHelpers'
+import { TeacherStatus, JournalStatus, JournalScope, JournalIndexing } from '@prisma/client'
 
-// GET - Get statistics for journals
+/**
+ * GET /api/research/journal/stats
+ * Get journal statistics based on user role
+ */
 export async function GET(req: NextRequest) {
   try {
-    // Check authentication
     const session = await auth()
-
-    if (!session?.user?.email) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-    
-    // Get user with role
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true, role: true }
-    })
-
-    if (!user) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Build filter based on user role
-    const roleFilter = user.role === UserRole.ADMIN 
-      ? {} // Admin sees all
-      : user.role === UserRole.FACULTY
-      ? {
-          OR: [
-            { isPublic: true },
-            { facultyAuthors: { some: { userId: user.id } } }
-          ]
-        }
-      : { // STUDENT
-          OR: [
-            { isPublic: true },
-            { studentAuthors: { some: { userId: user.id } } }
-          ]
-        }
-   
-    // Get counts by teacher status
-    const statusCounts = await prisma.journal.groupBy({
-      by: ['teacherStatus'],
-      where: roleFilter,
-      _count: {
-        id: true
-      }
-    })
+    const { user } = session
+    const searchParams = req.nextUrl.searchParams
+    const userId = searchParams.get('userId') // Optional: get stats for specific user
 
-    // Get counts by journal status
-    const journalStatusCounts = await prisma.journal.groupBy({
-      by: ['journalStatus'],
-      where: roleFilter,
-      _count: {
-        id: true
-      }
-    })
+    // Build where clause based on user role
+    let baseFilter = getJournalQueryFilter(user.id, user.role)
 
-    // Get counts by scope
-    const scopeCounts = await prisma.journal.groupBy({
-      by: ['scope'],
-      where: roleFilter,
-      _count: {
-        id: true
-      }
-    })
+    // If requesting stats for specific user (and have permission)
+    if (userId) {
+      // ADMIN/SUPERADMIN can view anyone's stats
+      // EDITOR can view anyone's stats
+      // FACULTY can view their own and their students' stats
+      // STUDENT can only view their own stats
+      const canViewUserStats =
+        ['ADMIN', 'SUPERADMIN', 'EDITOR'].includes(user.role) ||
+        userId === user.id
 
-    // Get counts by indexing
-    const indexingCounts = await prisma.journal.groupBy({
-      by: ['indexing'],
-      where: roleFilter,
-      _count: {
-        id: true
+      if (!canViewUserStats) {
+        return NextResponse.json(
+          { error: 'You do not have permission to view these statistics' },
+          { status: 403 }
+        )
       }
-    })
+
+      // Filter journals for specific user
+      baseFilter = {
+        OR: [
+          { studentAuthors: { some: { userId } } },
+          { facultyAuthors: { some: { userId } } },
+        ],
+      }
+    }
 
     // Get total counts
-    const [total, publicCount, privateCount] = await Promise.all([
-      prisma.journal.count({ where: roleFilter }),
-      prisma.journal.count({ 
-        where: user.role === UserRole.ADMIN 
-          ? { isPublic: true }
-          : { 
-              AND: [
-                roleFilter,
-                { isPublic: true }
-              ]
-            }
-      }),
-      prisma.journal.count({ 
-        where: user.role === UserRole.ADMIN 
-          ? { isPublic: false }
-          : { 
-              AND: [
-                roleFilter,
-                { isPublic: false }
-              ]
-            }
-      })
+    const [
+      total,
+      publicCount,
+      privateCount,
+      statusCounts,
+      journalStatusCounts,
+      scopeCounts,
+      indexingCounts,
+    ] = await Promise.all([
+      prisma.journal.count({ where: baseFilter }),
+      prisma.journal.count({ where: { ...baseFilter, isPublic: true } }),
+      prisma.journal.count({ where: { ...baseFilter, isPublic: false } }),
+      // Teacher status counts
+      Promise.all(
+        Object.values(TeacherStatus).map(async (status) => ({
+          status,
+          count: await prisma.journal.count({
+            where: { ...baseFilter, teacherStatus: status },
+          }),
+        }))
+      ),
+      // Journal status counts
+      Promise.all(
+        Object.values(JournalStatus).map(async (status) => ({
+          status,
+          count: await prisma.journal.count({
+            where: { ...baseFilter, journalStatus: status },
+          }),
+        }))
+      ),
+      // Scope counts
+      Promise.all(
+        Object.values(JournalScope).map(async (scope) => ({
+          scope,
+          count: await prisma.journal.count({
+            where: { ...baseFilter, scope },
+          }),
+        }))
+      ),
+      // Indexing counts
+      Promise.all(
+        Object.values(JournalIndexing).map(async (indexing) => ({
+          indexing,
+          count: await prisma.journal.count({
+            where: { ...baseFilter, indexing },
+          }),
+        }))
+      ),
     ])
 
-    // Get total fees, reimbursements, and impact factors
-    const financials = await prisma.journal.aggregate({
-      where: roleFilter,
+    // Get financial aggregates
+    const financialAggregates = await prisma.journal.aggregate({
+      where: baseFilter,
       _sum: {
         registrationFees: true,
-        reimbursement: true
+        reimbursement: true,
+        impactFactor: true,
       },
       _avg: {
         registrationFees: true,
         reimbursement: true,
-        impactFactor: true
-      }
+        impactFactor: true,
+      },
     })
 
     // Get recent journals
     const recentJournals = await prisma.journal.findMany({
-      where: roleFilter,
+      where: baseFilter,
       take: 5,
-      orderBy: {
-        createdAt: 'desc'
-      },
+      orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         title: true,
@@ -136,146 +127,124 @@ export async function GET(req: NextRequest) {
         indexing: true,
         teacherStatus: true,
         impactFactor: true,
-        createdAt: true
-      }
+        createdAt: true,
+      },
     })
 
-    // Get publication trend (by month for last 12 months)
-    const oneYearAgo = new Date()
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
+    // Get monthly trend (last 12 months)
+    const twelveMonthsAgo = new Date()
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
 
-    const journalsForTrend = await prisma.journal.findMany({
+    const monthlyJournals = await prisma.journal.findMany({
       where: {
-        ...roleFilter,
+        ...baseFilter,
         createdAt: {
-          gte: oneYearAgo
-        }
+          gte: twelveMonthsAgo,
+        },
       },
       select: {
-        createdAt: true
-      }
+        createdAt: true,
+      },
     })
 
-    // Group by month manually
-    const monthlyTrend = journalsForTrend.reduce((acc: { month: string, count: number }[], journal) => {
-      const monthYear = `${journal.createdAt.getFullYear()}-${String(journal.createdAt.getMonth() + 1).padStart(2, '0')}`
-      const existing = acc.find(item => item.month === monthYear)
-      if (existing) {
-        existing.count++
-      } else {
-        acc.push({ month: monthYear, count: 1 })
-      }
-      return acc
-    }, [])
+    // Group by month
+    const monthlyTrend: { [key: string]: number } = {}
+    monthlyJournals.forEach((journal) => {
+      const month = journal.createdAt.toISOString().slice(0, 7) // YYYY-MM
+      monthlyTrend[month] = (monthlyTrend[month] || 0) + 1
+    })
 
-    // Sort by month
-    monthlyTrend.sort((a, b) => a.month.localeCompare(b.month))
+    const monthlyTrendArray = Object.entries(monthlyTrend)
+      .map(([month, count]) => ({ month, count }))
+      .sort((a, b) => a.month.localeCompare(b.month))
 
-    // Get publication trend by day (last 30 days)
+    // Get daily trend (last 30 days)
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-    const journalsForDailyTrend = await prisma.journal.findMany({
+    const dailyJournals = await prisma.journal.findMany({
       where: {
-        ...roleFilter,
+        ...baseFilter,
         createdAt: {
-          gte: thirtyDaysAgo
-        }
+          gte: thirtyDaysAgo,
+        },
       },
       select: {
-        createdAt: true
-      }
+        createdAt: true,
+      },
     })
 
-    // Group by day manually
-    const dailyTrend = journalsForDailyTrend.reduce((acc: { date: string, count: number }[], journal) => {
-      const dateStr = `${journal.createdAt.getFullYear()}-${String(journal.createdAt.getMonth() + 1).padStart(2, '0')}-${String(journal.createdAt.getDate()).padStart(2, '0')}`
-      const existing = acc.find(item => item.date === dateStr)
-      if (existing) {
-        existing.count++
-      } else {
-        acc.push({ date: dateStr, count: 1 })
-      }
-      return acc
-    }, [])
+    // Group by day
+    const dailyTrend: { [key: string]: number } = {}
+    dailyJournals.forEach((journal) => {
+      const date = journal.createdAt.toISOString().slice(0, 10) // YYYY-MM-DD
+      dailyTrend[date] = (dailyTrend[date] || 0) + 1
+    })
 
-    // Sort by date
-    dailyTrend.sort((a, b) => a.date.localeCompare(b.date))
+    const dailyTrendArray = Object.entries(dailyTrend)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date))
 
-    // Get publication trend by week (last 12 weeks)
+    // Get weekly trend (last 12 weeks)
     const twelveWeeksAgo = new Date()
-    twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84) // 12 weeks = 84 days
+    twelveWeeksAgo.setDate(twelveWeeksAgo.getDate() - 84)
 
-    const journalsForWeeklyTrend = await prisma.journal.findMany({
+    const weeklyJournals = await prisma.journal.findMany({
       where: {
-        ...roleFilter,
+        ...baseFilter,
         createdAt: {
-          gte: twelveWeeksAgo
-        }
+          gte: twelveWeeksAgo,
+        },
       },
       select: {
-        createdAt: true
-      }
+        createdAt: true,
+      },
     })
 
-    // Group by week manually
-    const weeklyTrend = journalsForWeeklyTrend.reduce((acc: { week: string, count: number }[], journal) => {
-      const date = journal.createdAt
-      const firstDayOfYear = new Date(date.getFullYear(), 0, 1)
-      const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000
-      const weekNumber = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7)
-      const weekStr = `${date.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`
-      
-      const existing = acc.find(item => item.week === weekStr)
-      if (existing) {
-        existing.count++
-      } else {
-        acc.push({ week: weekStr, count: 1 })
-      }
-      return acc
-    }, [])
+    // Group by week
+    const weeklyTrend: { [key: string]: number } = {}
+    weeklyJournals.forEach((journal) => {
+      const week = getWeekKey(journal.createdAt)
+      weeklyTrend[week] = (weeklyTrend[week] || 0) + 1
+    })
 
-    // Sort by week
-    weeklyTrend.sort((a, b) => a.week.localeCompare(b.week))
+    const weeklyTrendArray = Object.entries(weeklyTrend)
+      .map(([week, count]) => ({ week, count }))
+      .sort((a, b) => a.week.localeCompare(b.week))
 
     return NextResponse.json({
       userRole: user.role,
+      userId: userId || user.id,
       total,
       publicCount,
       privateCount,
-      statusCounts: statusCounts.map(s => ({
-        status: s.teacherStatus,
-        count: s._count.id
-      })),
-      journalStatusCounts: journalStatusCounts.map(j => ({
-        status: j.journalStatus,
-        count: j._count.id
-      })),
-      scopeCounts: scopeCounts.map(s => ({
-        scope: s.scope,
-        count: s._count.id
-      })),
-      indexingCounts: indexingCounts.map(i => ({
-        indexing: i.indexing,
-        count: i._count.id
-      })),
+      statusCounts: statusCounts.filter((s) => s.count > 0),
+      journalStatusCounts: journalStatusCounts.filter((s) => s.count > 0),
+      scopeCounts: scopeCounts.filter((s) => s.count > 0),
+      indexingCounts: indexingCounts.filter((s) => s.count > 0),
       financials: {
-        totalRegistrationFees: financials._sum.registrationFees || 0,
-        totalReimbursement: financials._sum.reimbursement || 0,
-        avgRegistrationFees: financials._avg.registrationFees || 0,
-        avgReimbursement: financials._avg.reimbursement || 0,
-        avgImpactFactor: financials._avg.impactFactor || 0
+        totalRegistrationFees: financialAggregates._sum.registrationFees || 0,
+        totalReimbursement: financialAggregates._sum.reimbursement || 0,
+        avgRegistrationFees: financialAggregates._avg.registrationFees || 0,
+        avgReimbursement: financialAggregates._avg.reimbursement || 0,
+        avgImpactFactor: financialAggregates._avg.impactFactor || 0,
       },
       recentJournals,
-      monthlyTrend,
-      dailyTrend,
-      weeklyTrend
+      monthlyTrend: monthlyTrendArray,
+      dailyTrend: dailyTrendArray,
+      weeklyTrend: weeklyTrendArray,
     })
   } catch (error) {
-    console.error('Error fetching journal stats:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    console.error('Error fetching journal statistics:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
+}
+
+// Helper function to get week key (YYYY-WW)
+function getWeekKey(date: Date): string {
+  const year = date.getFullYear()
+  const firstDayOfYear = new Date(year, 0, 1)
+  const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / 86400000
+  const week = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7)
+  return `${year}-W${week.toString().padStart(2, '0')}`
 }

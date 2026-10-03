@@ -20,17 +20,12 @@ import Link from "next/link"
 import { IconProps, type Icon } from "@tabler/icons-react"
 import { IconType } from "react-icons"
 import { usePathname } from "next/navigation"
+import type { SidebarNavItem } from "@/lib/auth/sidebar-config"
 
 export function NavMain({
   items,
 }: {
-  items: {
-    title: string
-    url: string
-    icon?: LucideIcon | React.ForwardRefExoticComponent<IconProps & React.RefAttributes<Icon>> | IconType
-    isActive?: boolean
-    items?: { title: string; url: string }[]
-  }[]
+  items: SidebarNavItem[]
 }) {
   const pathname = usePathname()
 
@@ -41,9 +36,15 @@ export function NavMain({
       </SidebarGroupLabel>
       <SidebarMenu className="gap-0.5">
         {items.map((item) => {
-          const isActive =
-            item.url !== "#" && pathname === item.url
-          const hasActiveChild = item.items?.some((sub) => pathname === sub.url)
+          // Exclude anchor URLs from active state check
+          const isAnchorUrl = item.url.startsWith("#")
+          const isActive = !isAnchorUrl && pathname === item.url
+          
+          // Check if any child is active (including nested routes)
+          const hasActiveChild = item.items?.some((sub) => {
+            if (sub.url.startsWith("#")) return false
+            return pathname === sub.url || pathname.startsWith(sub.url + "/")
+          })
 
           if (!item.items || item.items.length === 0) {
             return (
@@ -108,7 +109,7 @@ export function NavMain({
                       />
                     )}
                     <span className="flex-1">{item.title}</span>
-                    {item.items && (
+                    {item.showCount && item.items && (
                       <span className="ml-auto mr-0.5 rounded-md bg-sidebar-foreground/8 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-sidebar-foreground/40">
                         {item.items.length}
                       </span>
@@ -120,7 +121,7 @@ export function NavMain({
                 <CollapsibleContent className="data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down overflow-hidden">
                   <SidebarMenuSub className="ml-4 border-l border-sidebar-border/30 pl-0">
                     {item.items?.map((subItem) => {
-                      const isSubActive = pathname === subItem.url
+                      const isSubActive = pathname === subItem.url || pathname.startsWith(subItem.url + "/")
                       return (
                         <SidebarMenuSubItem key={subItem.title}>
                           <SidebarMenuSubButton

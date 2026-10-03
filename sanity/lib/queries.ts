@@ -60,50 +60,55 @@ export interface HomePageData {
 }
 
 export async function getHomePageData(): Promise<HomePageData | null> {
-  return sanityClient.fetch<HomePageData | null>(
-    `*[_type == "homePage" && _id == "homePage"][0]{
-      heroBackground,
-      heroTagline,
-      heroMissionBlurb,
-      aboutEyebrow,
-      aboutHeading,
-      aboutBody,
-      aboutCtaLabel,
-      stats[] {
-        value,
-        suffix,
-        prefix,
-        label,
-        sub
-      },
-      marqueeSubtitle,
-      marqueeTitle,
-      marqueeStats[] {
-        value,
-        label,
-        icon
-      },
-      footerWordmark,
-      footerAbout,
-      footerSocials[] {
-        platform,
-        url
-      },
-      footerLinks[] {
-        label,
-        href
-      },
-      navbarIemLogo,
-      navbarIedcLogo,
-      navbarUemLogo,
-      navbarLinks[] {
-        label,
-        href
-      }
-    }`,
-    {},
-    { next: { revalidate: 60 } }
-  );
+  try {
+    return await sanityClient.fetch<HomePageData | null>(
+      `*[_type == "homePage" && _id == "homePage"][0]{
+        heroBackground,
+        heroTagline,
+        heroMissionBlurb,
+        aboutEyebrow,
+        aboutHeading,
+        aboutBody,
+        aboutCtaLabel,
+        stats[] {
+          value,
+          suffix,
+          prefix,
+          label,
+          sub
+        },
+        marqueeSubtitle,
+        marqueeTitle,
+        marqueeStats[] {
+          value,
+          label,
+          icon
+        },
+        footerWordmark,
+        footerAbout,
+        footerSocials[] {
+          platform,
+          url
+        },
+        footerLinks[] {
+          label,
+          href
+        },
+        navbarIemLogo,
+        navbarIedcLogo,
+        navbarUemLogo,
+        navbarLinks[] {
+          label,
+          href
+        }
+      }`,
+      {},
+      { next: { revalidate: 60 } }
+    );
+  } catch (err) {
+    console.warn("[Sanity] getHomePageData failed:", (err as Error).message);
+    return null;
+  }
 }
 
 // ── Journey Milestones ─────────────────────────────────────────────────────────
@@ -119,20 +124,25 @@ export interface MilestoneData {
 }
 
 export async function getMilestones(): Promise<MilestoneData[]> {
-  return sanityClient.fetch<MilestoneData[]>(
-    `*[_type == "milestone"] | order(orderRank asc){
-      _id,
-      year,
-      tag,
-      title,
-      description,
-      details,
-      iconName,
-      orderRank
-    }`,
-    {},
-    { next: { revalidate: 60 } }
-  );
+  try {
+    return await sanityClient.fetch<MilestoneData[]>(
+      `*[_type == "milestone"] | order(orderRank asc){
+        _id,
+        year,
+        tag,
+        title,
+        description,
+        details,
+        iconName,
+        orderRank
+      }`,
+      {},
+      { next: { revalidate: 60 } }
+    );
+  } catch (err) {
+    console.warn("[Sanity] getMilestones failed:", (err as Error).message);
+    return [];
+  }
 }
 
 // ── Research Gallery Slides ────────────────────────────────────────────────────
@@ -148,20 +158,25 @@ export interface GallerySlideData {
 }
 
 export async function getGallerySlides(): Promise<GallerySlideData[]> {
-  return sanityClient.fetch<GallerySlideData[]>(
-    `*[_type == "gallerySlide"] | order(orderRank asc){
-      _id,
-      label,
-      category,
-      description,
-      year,
-      accentColor,
-      image,
-      orderRank
-    }`,
-    {},
-    { next: { revalidate: 60 } }
-  );
+  try {
+    return await sanityClient.fetch<GallerySlideData[]>(
+      `*[_type == "gallerySlide"] | order(orderRank asc){
+        _id,
+        label,
+        category,
+        description,
+        year,
+        accentColor,
+        image,
+        orderRank
+      }`,
+      {},
+      { next: { revalidate: 60 } }
+    );
+  } catch (err) {
+    console.warn("[Sanity] getGallerySlides failed:", (err as Error).message);
+    return [];
+  }
 }
 
 // ── Contact Page ───────────────────────────────────────────────────────────────
@@ -180,21 +195,26 @@ export interface ContactPageData {
 }
 
 export async function getContactPageData(): Promise<ContactPageData | null> {
-  return sanityClient.fetch<ContactPageData | null>(
-    `*[_type == "contactPage" && _id == "contactPage"][0]{
-      pageDescription,
-      connectDescription,
-      location,
-      emails,
-      phones[] {
-        label,
-        number
-      },
-      workingHours
-    }`,
-    {},
-    { next: { revalidate: 60 } }
-  );
+  try {
+    return await sanityClient.fetch<ContactPageData | null>(
+      `*[_type == "contactPage" && _id == "contactPage"][0]{
+        pageDescription,
+        connectDescription,
+        location,
+        emails,
+        phones[] {
+          label,
+          number
+        },
+        workingHours
+      }`,
+      {},
+      { next: { revalidate: 60 } }
+    );
+  } catch (err) {
+    console.warn("[Sanity] getContactPageData failed:", (err as Error).message);
+    return null;
+  }
 }
 
 // ── Team Page Content ──────────────────────────────────────────────────────────
@@ -205,15 +225,20 @@ export interface TeamPageContent {
 }
 
 export async function getTeamPageContent(): Promise<TeamPageContent | null> {
-  return sanityClient.fetch<TeamPageContent | null>(
-    `*[_type == "teamPage" && _id == "teamPage"][0]{
-      eyebrow,
-      heading,
-      description
-    }`,
-    {},
-    { next: { revalidate: 60 } }
-  );
+  try {
+    return await sanityClient.fetch<TeamPageContent | null>(
+      `*[_type == "teamPage" && _id == "teamPage"][0]{
+        eyebrow,
+        heading,
+        description
+      }`,
+      {},
+      { next: { revalidate: 60 } }
+    );
+  } catch (err) {
+    console.warn("[Sanity] getTeamPageContent failed:", (err as Error).message);
+    return null;
+  }
 }
 
 // ── Team Members (Students) ────────────────────────────────────────────────────
@@ -231,20 +256,25 @@ export interface SanityTeamMember {
 }
 
 export async function getSanityTeamMembers(): Promise<SanityTeamMember[]> {
-  return sanityClient.fetch<SanityTeamMember[]>(
-    `*[_type == "teamMember"] | order(orderRank asc){
-      _id,
-      name,
-      designation,
-      department,
-      areasOfExpertise,
-      photo,
-      email,
-      linkedinUrl,
-      githubUrl,
-      orderRank
-    }`,
-    {},
-    { next: { revalidate: 60 } }
-  );
+  try {
+    return await sanityClient.fetch<SanityTeamMember[]>(
+      `*[_type == "teamMember"] | order(orderRank asc){
+        _id,
+        name,
+        designation,
+        department,
+        areasOfExpertise,
+        photo,
+        email,
+        linkedinUrl,
+        githubUrl,
+        orderRank
+      }`,
+      {},
+      { next: { revalidate: 60 } }
+    );
+  } catch (err) {
+    console.warn("[Sanity] getSanityTeamMembers failed:", (err as Error).message);
+    return [];
+  }
 }

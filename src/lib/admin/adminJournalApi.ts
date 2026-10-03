@@ -11,12 +11,15 @@ export interface AdminJournalStatsResponse {
   total: number
   publicCount: number
   privateCount: number
+  avgImpactFactor: number | null
+  maxImpactFactor: number | null
   teacherStatusCounts: Array<{ status: string; count: number }>
   journalStatusCounts: Array<{ status: string; count: number }>
   indexingCounts: Array<{ indexing: string; count: number }>
   quartileCounts: Array<{ quartile: string; count: number }>
+  scopeCounts: Array<{ scope: string; count: number }>
   departmentCounts: Array<{ department: string; count: number }>
-  monthlyTrend: Array<{ month: string; count: number }>
+  monthlyTrend: Array<{ month: string; count: number; published: number }>
 }
 
 export interface AdminUpdateJournalInput {
@@ -141,14 +144,14 @@ export const updateAdminJournal = async (
 }
 
 /**
- * Delete a single journal (admin)
+ * Delete a single journal (admin) — uses the admin-only DELETE route
  */
 export const deleteAdminJournal = async (
   id: string
 ): Promise<ApiResponse<{ message: string }>> => {
   try {
     const response = await axios.delete<{ message: string }>(
-      `/api/research/journal/${id}`
+      `${API_BASE_URL}/${id}`
     )
     return { data: response.data }
   } catch (error) {

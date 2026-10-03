@@ -1,6 +1,9 @@
+
 "use client"
 
-import { useState } from "react"
+import * as React from "react"
+import { UserPlus } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,40 +14,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
-import { UserPlus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { clearFacultyCache } from "@/lib/faculty-cache"
-import { useSession } from "next-auth/react"
-import { canAssignRole, type UserRoleString } from "@/lib/auth/permissions"
 
-export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
-  const { data: session } = useSession()
-  const actorRole = session?.user?.role ?? 'STUDENT'
+interface SpecialUserFormProps {
+  onSuccess: () => void
+}
 
-  const [email, setEmail] = useState("")
-  const [role, setRole] = useState<string>("")
-  const [isLoading, setIsLoading] = useState(false)
+export function SpecialUserForm({
+  onSuccess,
+}: SpecialUserFormProps) {
   const { toast } = useToast()
 
-  // Only show roles that the current actor can assign
-  const allRoles: { value: UserRoleString; label: string }[] = [
-    { value: 'STUDENT', label: 'Student' },
-    { value: 'FACULTY', label: 'Faculty' },
-    { value: 'EDITOR', label: 'Editor' },
-    { value: 'ADMIN', label: 'Admin' },
-    { value: 'SUPERADMIN', label: 'SuperAdmin' },
-  ]
-  const assignableRoles = allRoles.filter(r => canAssignRole(actorRole, r.value))
+  const [open, setOpen] = React.useState(false)
+  const [email, setEmail] = React.useState("")
+  const [role, setRole] = React.useState("")
+  const [isLoading, setIsLoading] = React.useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const resetForm = () => {
+    setEmail("")
+    setRole("")
+  }
+
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
     e.preventDefault()
-    
-    if (!email || !role) {
+
+    if (!email.trim() || !role) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all fields",
+        description: "Please enter an email and select a role.",
         variant: "destructive",
       })
       return
@@ -53,32 +63,45 @@ export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
     setIsLoading(true)
 
     try {
-      const response = await fetch("/api/admin/special-users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role }),
-      })
+      const response = await fetch(
+        "/api/admin/special-users",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: email.trim(),
+            role,
+          }),
+        }
+      )
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to add special user")
+        throw new Error(
+          data.error || "Failed to add special user"
+        )
       }
 
       toast({
         title: "Success",
-        description: "Special user added successfully",
+        description: "Special user added successfully.",
       })
 
-      setEmail("")
-      setRole("")
-      // Invalidate the faculty list cookie so forms pick up the change
       clearFacultyCache()
+
+      resetForm()
+      setOpen(false)
       onSuccess()
     } catch (error) {
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Something went wrong",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Something went wrong.",
         variant: "destructive",
       })
     } finally {
@@ -86,64 +109,121 @@ export function SpecialUserForm({ onSuccess }: { onSuccess: () => void }) {
     }
   }
 
+  const handleOpenChange = (value: boolean) => {
+    if (isLoading) return
+
+    setOpen(value)
+
+    if (!value) {
+      resetForm()
+    }
+  }
+
   return (
-    <Card className="h-full">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <UserPlus className="h-5 w-5" />
+    <Dialog
+      open={open}
+      onOpenChange={handleOpenChange}
+    >
+      <DialogTrigger asChild>
+        <Button>
+          <UserPlus className="mr-2 h-4 w-4" />
           Add Special User
-        </CardTitle>
-        <CardDescription>
-          Pre-assign a role to an email address. When the user registers, they will receive this role automatically.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="sm:max-w-[500px]">
+        <DialogHeader>
+          <DialogTitle>
+            Add Special User
+          </DialogTitle>
+
+          <DialogDescription>
+            Enter the user's email and select their role.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-5"
+        >
           <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
+            <Label htmlFor="special-user-email">
+              Email Address
+            </Label>
+
             <Input
-              id="email"
+              id="special-user-email"
               type="email"
               placeholder="user@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) =>
+                setEmail(e.target.value)
+              }
               disabled={isLoading}
+              autoComplete="email"
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
-            <Select value={role} onValueChange={setRole} disabled={isLoading}>
-              <SelectTrigger id="role">
+            <Label htmlFor="special-user-role">
+              Role
+            </Label>
+
+            <Select
+              value={role}
+              onValueChange={setRole}
+              disabled={isLoading}
+            >
+              <SelectTrigger id="special-user-role">
                 <SelectValue placeholder="Select a role" />
               </SelectTrigger>
+
               <SelectContent>
-                {assignableRoles.map(r => (
-                  <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                ))}
+                <SelectItem value="FACULTY">
+                  Faculty
+                </SelectItem>
+
+                <SelectItem value="EDITOR">
+                  Editor
+                </SelectItem>
+
+                <SelectItem value="ADMIN">
+                  Admin
+                </SelectItem>
+
+                <SelectItem value="SUPERADMIN">
+                  SuperAdmin
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Adding..." : "Add Special User"}
-          </Button>
-        </form>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
 
-        <div className="mt-6 space-y-2">
-          <h3 className="text-sm font-semibold">Role Descriptions:</h3>
-          <div className="space-y-2 text-sm text-muted-foreground">
-            <p><span className="font-medium">Student:</span> Default role — can submit research and manage own profile</p>
-            <p><span className="font-medium">Faculty:</span> Can review submissions, participate as co-author, verify co-authorship requests</p>
-            <p><span className="font-medium">Editor:</span> Can review and approve/reject research submissions</p>
-            <p><span className="font-medium">Admin:</span> Full system access — user management, access control, statistics</p>
-            {canAssignRole(actorRole, 'SUPERADMIN') && (
-              <p><span className="font-medium">SuperAdmin:</span> Highest authority — can manage admins and all system settings</p>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+            <Button
+              type="submit"
+              disabled={
+                isLoading ||
+                !email.trim() ||
+                !role
+              }
+            >
+              {isLoading
+                ? "Adding..."
+                : "Add Special User"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

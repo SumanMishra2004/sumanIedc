@@ -5,6 +5,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import axios from "axios";
+import { createJournal } from "@/lib/research/journalApi";
 import {
   Loader2, Upload, X, BookOpen, FileText,
   Users, Tag, Building2, ChevronRight, CheckCircle2,
@@ -384,18 +385,18 @@ export default function JournalDialog({
     async (data: JournalFormValues) => {
       setIsSubmitting(true);
       try {
-        await axios.post("/api/research/journal", data);
+        const result = await createJournal(data as any);
+        if (result.error) {
+          toast.error(result.error);
+          return;
+        }
         toast.success("Journal created successfully!");
         resetForm();
         setOpen(false);
         onClose?.();
         onSuccess?.();
       } catch (error: any) {
-        const msg =
-          error.response?.data?.error ||
-          error.response?.data?.message ||
-          "Failed to create journal";
-        toast.error(msg);
+        toast.error(error?.message || "Failed to create journal");
       } finally {
         setIsSubmitting(false);
       }

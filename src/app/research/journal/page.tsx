@@ -9,8 +9,12 @@ export const metadata: Metadata = {
 };
 
 export default async function JournalPage() {
+  // Only fetch journals that are explicitly public AND published
   const dbJournals = await prisma.journal.findMany({
-    where: { isPublic: true },
+    where: {
+      isPublic: true,
+      teacherStatus: 'PUBLISHED',
+    },
     include: {
       studentAuthors: { include: { user: true } },
       facultyAuthors: { include: { user: true } },
@@ -20,10 +24,12 @@ export default async function JournalPage() {
 
   const formattedJournals = dbJournals.map((j) => {
     const authors = [
-      ...j.facultyAuthors.map((fa) => ({
-        name: fa.user?.name || fa.user?.email || "Faculty Author",
-        role: "Faculty",
-      })),
+      ...j.facultyAuthors
+        .filter((fa) => fa.user) // Only include faculty with registered accounts
+        .map((fa) => ({
+          name: fa.user!.name || fa.user!.email || "Faculty Author",
+          role: fa.role === 'PI' ? 'Faculty (PI)' : 'Faculty',
+        })),
       ...j.studentAuthors.map((sa) => ({
         name: sa.user.name || sa.user.email || "Student Author",
         role: "Student",

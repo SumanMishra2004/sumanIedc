@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { journalSchema } from "@/lib/validations/journal";
 import axios from "axios";
+import { getJournalById, updateJournal } from "@/lib/research/journalApi";
 import { Loader2, Upload, X, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -176,8 +177,13 @@ export default function EditJournalDialog({
   const loadJournalData = async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(`/api/research/journal/${journalId}`);
-      const journal = response.data.journal;
+      const result = await getJournalById(journalId);
+      if (result.error || !result.data) {
+        toast.error(result.error || "Failed to load journal");
+        onOpenChange(false);
+        return;
+      }
+      const journal = result.data.journal;
 
       // Populate form with existing data
       form.reset({
@@ -238,7 +244,7 @@ export default function EditJournalDialog({
       toast.success("Journal loaded successfully");
     } catch (error: any) {
       console.error("Error loading journal:", error);
-      toast.error(error.response?.data?.error || "Failed to load journal");
+      toast.error(error?.message || "Failed to load journal");
       onOpenChange(false);
     } finally {
       setIsLoading(false);
@@ -331,14 +337,16 @@ export default function EditJournalDialog({
   const onSubmit = async (data: JournalFormValues) => {
     setIsSubmitting(true);
     try {
-      await axios.patch(`/api/research/journal/${journalId}`, data);
+      const result = await updateJournal(journalId, data as any);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Journal updated successfully!");
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
-      toast.error(
-        error.response?.data?.error || error.response?.data?.message || "Failed to update journal",
-      );
+      toast.error(error?.message || "Failed to update journal");
     } finally {
       setIsSubmitting(false);
     }

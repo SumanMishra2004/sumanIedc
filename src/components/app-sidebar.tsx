@@ -3,7 +3,6 @@
 import * as React from "react"
 import { IconInnerShadowTop } from "@tabler/icons-react"
 import Link from "next/link"
-import { Award, BookOpen, CircleDollarSign, Settings, User2, UserCog, Sparkles, ClipboardCheck } from "lucide-react"
 import { useSession } from "next-auth/react"
 
 import { NavUser } from "@/components/nav-user"
@@ -16,14 +15,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { SidebarNavItem } from "@/types/sidebar"
 import { NavMain } from "./nav-main"
-import { showAdminNav, showFacultyNav, isEditorOrHigher } from "@/lib/auth/permissions"
-
-interface GrantSidebarItem {
-  id: string
-  projectCode: string | null
-}
+import { 
+  SIDEBAR_CONFIG, 
+  buildSidebar, 
+  type GrantSidebarItem 
+} from "@/lib/auth/sidebar-config"
+import type { UserRole } from "@prisma/client"
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   grants?: GrantSidebarItem[]
@@ -31,101 +29,13 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 export function AppSidebar({ grants = [], ...props }: AppSidebarProps) {
   const { data: session } = useSession()
-  const userRole = session?.user?.role ?? 'STUDENT'
+  const userRole = session?.user?.role as UserRole | undefined
 
-  const researchItems = [
-    { title: "Book Chapters", url: "/dashboard/book-chapters" },
-    { title: "Copyright", url: "/dashboard/copyright" },
-    { title: "Journal", url: "/dashboard/journal" },
-    { title: "Conferences", url: "/dashboard/conferences" },
-    { title: "Patent", url: "/dashboard/patent" },
-    ...(showFacultyNav(userRole)
-      ? [{ title: "FDP", url: "/dashboard/fdp" }]
-      : []),
-  ]
-
-  const recognitionItems = [
-    { title: "Certificate", url: "/dashboard/certificate" },
-    { title: "Achievements", url: "/dashboard/achievements" },
-  ]
-
-  const grantSubItems = [
-    { title: "Grant In", url: "/dashboard/grant" },
-    ...grants.map((g) => ({
-      title: g.projectCode ?? g.id.slice(0, 8),
-      url: `/dashboard/grant/${g.id}`,
-    })),
-  ]
-
-  const navMain: SidebarNavItem[] = [
-    {
-      title: "My Profile",
-      url: "/dashboard",
-      icon: User2,
-    },
-    {
-      title: "Settings",
-      url: "/dashboard/settings",
-      icon: Settings,
-    },
-    {
-      title: "Research",
-      url: "#",
-      icon: BookOpen,
-      items: researchItems,
-    },
-    {
-      title: "Recognition",
-      url: "#",
-      icon: Award,
-      items: recognitionItems,
-    },
-    {
-      title: "Grants",
-      url: "#",
-      icon: CircleDollarSign,
-      items: grantSubItems,
-    },
-    // Faculty / Editor: show Co-Author Verification Requests
-    ...(showFacultyNav(userRole)
-      ? [
-          {
-            title: "Co-Author Requests",
-            url: "/dashboard/faculty/verification-requests",
-            icon: ClipboardCheck,
-          },
-        ]
-      : []),
-    ...(showAdminNav(userRole)
-      ? [
-          {
-            title: "Studio",
-            url: "/studio",
-            icon: Sparkles,
-          },
-          {
-            title: "Admin",
-            url: "#",
-            icon: UserCog,
-            items: [
-              { title: "All Users", url: "/dashboard/admin/users" },
-              { title: "Access Management", url: "/dashboard/admin/special-user" },
-              { title: "Role Management", url: "/dashboard/admin/role-management" },
-              { title: "Book Chapter Management", url: "/dashboard/admin/book-chapters" },
-              { title: "Journal Management", url: "/dashboard/admin/journals" },
-              { title: "Conference Management", url: "/dashboard/admin/conferences" },
-              { title: "Patent Management", url: "/dashboard/admin/patents" },
-              { title: "Grant Management", url: "/dashboard/admin/grants" },
-              { title: "Certificate Management", url: "/dashboard/admin/certificates" },
-              { title: "FDP Management", url: "/dashboard/admin/fdps" },
-              { title: "Event Management", url: "/dashboard/admin/events" },
-              { title: "Achievement Verification", url: "/dashboard/admin/achievements" },
-              { title: "Verification Records", url: "/dashboard/admin/faculty-verification" },
-            ],
-          },
-        ]
-      : []),
-  ]
+  // Build filtered sidebar based on user role and permissions
+  const navMain = React.useMemo(
+    () => buildSidebar(SIDEBAR_CONFIG, userRole, grants),
+    [userRole, grants]
+  )
 
   const user = session?.user
     ? {
