@@ -20,10 +20,12 @@ export interface User {
 
 export interface JournalAuthor {
   id: string
-  userId: string
+  userId: string | null
   journalId: string
   role?: JournalFacultyRole
-  user: User
+  verificationStatus?: string
+  verificationRequestId?: string | null
+  user: User | null
 }
 
 export interface Journal {

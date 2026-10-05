@@ -26,6 +26,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogTitle
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
@@ -125,6 +126,7 @@ export function JournalViewDialog({
     <TooltipProvider>
       <Dialog open={open} onOpenChange={handleClose} modal>
         <DialogContent className="max-w-7xl! max-h-[95vh] p-0 bg-card text-card-foreground border-border shadow-2xl flex flex-col">
+          <DialogDescription className="sr-only">Journal publication details</DialogDescription>
           {/* Header */}
           <div className="bg-gradient-to-r from-primary/10 to-secondary/10 backdrop-blur-sm border-b border-border/50 sticky top-0 z-20 p-6">
             <div className="flex items-start justify-between gap-4">
@@ -513,7 +515,7 @@ function AuthorSection({
 }: {
   title: string
   icon: React.ReactNode
-  authors: { id: string; user: { name: string | null; email: string | null; image?: string | null; department?: string | null } }[]
+  authors: { id: string; user: { name: string | null; email: string | null; image?: string | null; department?: string | null } | null }[]
 }) {
   return (
     <div className="space-y-3">

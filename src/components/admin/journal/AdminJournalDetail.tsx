@@ -478,17 +478,17 @@ export default function AdminJournalDetail({
                         className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/10 transition-colors"
                       >
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
-                          {(author.user.name ?? "Faculty")[0].toUpperCase()}
+                          {(author.user?.name ?? "Faculty")[0].toUpperCase()}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold truncate">
-                            {author.user.name}
+                            {author.user?.name ?? "External Faculty"}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
-                            {author.user.email}
+                            {author.user?.email}
                           </p>
                         </div>
-                        {author.user.department && (
+                        {author.user?.department && (
                           <Badge variant="secondary" className="shrink-0 text-xs">
                             {author.user.department}
                           </Badge>
@@ -517,17 +517,17 @@ export default function AdminJournalDetail({
                         className="flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/10 transition-colors"
                       >
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
-                          {(author.user.name ?? "Student")[0].toUpperCase()}
+                          {(author.user?.name ?? "Student")[0].toUpperCase()}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold truncate">
-                            {author.user.name}
+                            {author.user?.name}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
-                            {author.user.email}
+                            {author.user?.email}
                           </p>
                         </div>
-                        {author.user.department && (
+                        {author.user?.department && (
                           <Badge variant="secondary" className="shrink-0 text-xs">
                             {author.user.department}
                           </Badge>

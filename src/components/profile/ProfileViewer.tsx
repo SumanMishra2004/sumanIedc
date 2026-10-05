@@ -6,7 +6,7 @@ import { ProfileStatsRow } from "./ProfileStatsRow"
 import { ResearchFeed } from "./ResearchFeed"
 import { ProfileSkeleton } from "./ProfileSkeleton"
 import { AlertCircle } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ProfileForm } from "./ProfileForm"
 
 interface ProfileData {
@@ -127,6 +127,9 @@ export function ProfileViewer({ userId }: ProfileViewerProps) {
             <DialogTitle className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
               Edit Account Profile
             </DialogTitle>
+            <DialogDescription className="sr-only">
+              Update your name, department, and other profile details.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             <ProfileForm 

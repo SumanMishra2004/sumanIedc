@@ -40,6 +40,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MultiSelectUsers } from "@/components/ui/multi-select";
+import { ExternalAuthorList, type ExternalAuthor } from "@/components/ui/ExternalAuthorList";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -237,9 +238,12 @@ export default function JournalDialog({
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingDocument, setUploadingDocument] = useState(false);
 
-  // Authors
+  // Authors — platform users
   const [selectedFaculty, setSelectedFaculty] = useState<SelectedUser[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<SelectedUser[]>([]);
+  // Authors — external (not on platform)
+  const [externalFaculty, setExternalFaculty] = useState<ExternalAuthor[]>([]);
+  const [externalStudents, setExternalStudents] = useState<ExternalAuthor[]>([]);
 
   // Publisher
   const [showCustomPublisher, setShowCustomPublisher] = useState(false);
@@ -281,6 +285,8 @@ export default function JournalDialog({
       keywords: [],
       studentAuthorIds: [],
       facultyAuthorIds: [],
+      externalFacultyAuthors: [],
+      externalStudentAuthors: [],
     },
   });
 
@@ -300,6 +306,8 @@ export default function JournalDialog({
     setKeywordInput("");
     setSelectedFaculty([]);
     setSelectedStudents([]);
+    setExternalFaculty([]);
+    setExternalStudents([]);
     setShowCustomPublisher(false);
     setCustomPublisher("");
     // Clear the hidden inputs too
@@ -379,6 +387,17 @@ export default function JournalDialog({
       form.getValues("keywords").filter((k) => k !== kw),
       { shouldValidate: true }
     );
+  }, [form]);
+
+  // ── External author sync helpers ─────────────────────────────────────────
+  const syncExtFaculty = useCallback((authors: ExternalAuthor[]) => {
+    setExternalFaculty(authors);
+    form.setValue("externalFacultyAuthors", authors, { shouldValidate: true });
+  }, [form]);
+
+  const syncExtStudents = useCallback((authors: ExternalAuthor[]) => {
+    setExternalStudents(authors);
+    form.setValue("externalStudentAuthors", authors, { shouldValidate: true });
   }, [form]);
 
   const onSubmit = useCallback(
@@ -1057,6 +1076,23 @@ export default function JournalDialog({
                         </FormItem>
                       )}
                     />
+
+                    {/* External / Unlisted Faculty */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">
+                        External / Unlisted Faculty
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          (not on the platform)
+                        </span>
+                      </p>
+                      <ExternalAuthorList
+                        kind="faculty"
+                        value={externalFaculty}
+                        onChange={syncExtFaculty}
+                        hint="A verification email will be sent so they can confirm co-authorship."
+                      />
+                    </div>
+
                     <FormField
                       control={form.control}
                       name="studentAuthorIds"
@@ -1082,6 +1118,22 @@ export default function JournalDialog({
                         </FormItem>
                       )}
                     />
+
+                    {/* External / Unlisted Students */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">
+                        External / Unlisted Students
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          (not on the platform)
+                        </span>
+                      </p>
+                      <ExternalAuthorList
+                        kind="student"
+                        value={externalStudents}
+                        onChange={syncExtStudents}
+                        hint="External students are recorded for display but do not receive a verification email."
+                      />
+                    </div>
                   </div>
 
                   {/* Status & Fees */}

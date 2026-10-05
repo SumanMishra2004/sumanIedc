@@ -487,14 +487,14 @@ export function NotificationBell() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                     {/* Student Authors */}
-                    {details.studentAuthors?.map((author: any) => (
-                      <div key={author.user.id} className="flex items-center gap-2.5 p-2 rounded-md border border-border/40 bg-accent/15">
+                    {details.studentAuthors?.map((author: any, idx: number) => (
+                      <div key={author.user?.id ?? `student-${idx}`} className="flex items-center gap-2.5 p-2 rounded-md border border-border/40 bg-accent/15">
                         <div className="h-7 w-7 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
                           <User className="h-3.5 w-3.5 text-primary" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold text-foreground truncate">{author.user.name}</p>
-                          <p className="text-[10px] text-muted-foreground truncate">{author.user.email}</p>
+                          <p className="text-xs font-semibold text-foreground truncate">{author.user?.name ?? "External Student"}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{author.user?.email ?? ""}</p>
                           <div className="mt-1 flex items-center gap-1.5">
                             <Badge className="text-[8px] h-4 px-1 py-0 bg-blue-500/10 text-blue-500 hover:bg-blue-500/10 border-none rounded">Student</Badge>
                             {author.user.department && (
@@ -506,14 +506,14 @@ export function NotificationBell() {
                     ))}
 
                     {/* Faculty Authors */}
-                    {details.facultyAuthors?.map((author: any) => (
-                      <div key={author.user.id} className="flex items-center gap-2.5 p-2 rounded-md border border-border/40 bg-accent/15">
+                    {details.facultyAuthors?.map((author: any, idx: number) => (
+                      <div key={author.user?.id ?? `faculty-${idx}`} className="flex items-center gap-2.5 p-2 rounded-md border border-border/40 bg-accent/15">
                         <div className="h-7 w-7 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center shrink-0">
                           <User className="h-3.5 w-3.5 text-violet-500" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold text-foreground truncate">{author.user.name}</p>
-                          <p className="text-[10px] text-muted-foreground truncate">{author.user.email}</p>
+                          <p className="text-xs font-semibold text-foreground truncate">{author.user?.name ?? "External Faculty"}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{author.user?.email ?? ""}</p>
                           <div className="mt-1 flex items-center gap-1.5">
                             <Badge className="text-[8px] h-4 px-1 py-0 bg-violet-500/10 text-violet-500 hover:bg-violet-500/10 border-none rounded">Faculty</Badge>
                             {author.user.department && (

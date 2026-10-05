@@ -22,6 +22,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
@@ -137,6 +138,7 @@ export function ResearchDetailDialog({ open, onClose, data }: ResearchDetailDial
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl! max-h-[92vh] p-0 bg-card text-card-foreground border-border shadow-2xl flex flex-col overflow-hidden">
+        <DialogDescription className="sr-only">Research detail view</DialogDescription>
         {/* Sticky header */}
         <div className="shrink-0 px-6 pt-5 pb-4 border-b border-border/50 bg-gradient-to-r from-card via-card to-muted/20">
           <div className="flex items-start justify-between gap-4">

@@ -140,12 +140,13 @@ function AuthorAvatars({
   studentAuthors,
   facultyAuthors,
 }: {
-  studentAuthors?: { user: Author }[]
-  facultyAuthors?: { user: Author }[]
+  studentAuthors?: { user: Author | null }[]
+  facultyAuthors?: { user: Author | null }[]
 }) {
+  // filter out external authors where user is null
   const all = [
-    ...(studentAuthors ?? []).map((a) => a.user),
-    ...(facultyAuthors ?? []).map((a) => a.user),
+    ...(studentAuthors ?? []).map((a) => a.user).filter((u): u is Author => u !== null),
+    ...(facultyAuthors ?? []).map((a) => a.user).filter((u): u is Author => u !== null),
   ]
   if (!all.length) return null
   const visible = all.slice(0, 3)
@@ -153,12 +154,12 @@ function AuthorAvatars({
   return (
     <div className="flex items-center gap-2">
       <div className="flex -space-x-2">
-        {visible.map((author) => {
+        {visible.map((author, idx) => {
           const initials = author.name
             ? author.name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()
             : "?"
           return (
-            <Avatar key={author.id} className="h-6 w-6 border-2 border-card ring-1 ring-border/30">
+            <Avatar key={author.id ?? idx} className="h-6 w-6 border-2 border-card ring-1 ring-border/30">
               <AvatarImage src={author.image ?? ""} alt={author.name ?? ""} />
               <AvatarFallback className="text-[8px] font-bold bg-muted text-muted-foreground">
                 {initials}

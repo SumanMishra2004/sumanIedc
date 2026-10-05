@@ -596,9 +596,9 @@ export const createColumns = ({
       const students = row.original.studentAuthors || [];
       const teachers = row.original.facultyAuthors || [];
       const authors = [...students, ...teachers].map((author, index) => ({
-        name: author.user.name || "Unknown",
-        email: author.user.email || "No email",
-        image: author.user.image || undefined,
+        name: author.user?.name || "External Author",
+        email: author.user?.email || "",
+        image: author.user?.image || undefined,
         id: index,
       }));
       return (
@@ -1051,8 +1051,8 @@ export default function JournalTable({
                 triggerButton={
                   <Button
                     variant="secondary"
-                    size="sm"
-                    className="shadow-lg bg-white/20 hover:bg-white/30 text-white border-white/30"
+                    size="lg"
+                    className="shadow-lg bg-white/20 hover:bg-white/30 text-black border-white/30"
                   >
                     <FileDown className="mr-2 h-4 w-4" />
                     Export

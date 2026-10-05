@@ -195,6 +195,8 @@ export async function POST(req: NextRequest) {
       studentAuthorIds,
       facultyAuthorIds,
       principalInvestigatorId,
+      externalFacultyAuthors = [],
+      externalStudentAuthors = [],
     } = body
 
     // Generate or use provided serial number
@@ -221,30 +223,33 @@ export async function POST(req: NextRequest) {
       }
       piId = user.id
     } else if (user.role === 'STUDENT') {
-      // Student creates: must select a PI from faculty
-      if (!piId) {
+      // Student creates: must select a PI from platform faculty OR add at least one external faculty
+      const hasExternalFaculty = Array.isArray(externalFacultyAuthors) && externalFacultyAuthors.length > 0
+      if (!piId && !hasExternalFaculty) {
         return NextResponse.json(
-          { error: 'Students must select a faculty member as Principal Investigator' },
+          { error: 'Students must select a faculty member as Principal Investigator or add at least one external faculty author' },
           { status: 400 }
         )
       }
 
-      // Verify PI is a faculty member
-      const piUser = await prisma.user.findUnique({
-        where: { id: piId },
-        select: { role: true },
-      })
+      if (piId) {
+        // Verify PI is a faculty member
+        const piUser = await prisma.user.findUnique({
+          where: { id: piId },
+          select: { role: true },
+        })
 
-      if (!piUser || !['FACULTY', 'ADMIN', 'SUPERADMIN'].includes(piUser.role)) {
-        return NextResponse.json(
-          { error: 'Principal Investigator must be a faculty member' },
-          { status: 400 }
-        )
-      }
+        if (!piUser || !['FACULTY', 'ADMIN', 'SUPERADMIN'].includes(piUser.role)) {
+          return NextResponse.json(
+            { error: 'Principal Investigator must be a faculty member' },
+            { status: 400 }
+          )
+        }
 
-      // Add PI to faculty authors if not already there
-      if (!finalFacultyAuthorIds.includes(piId)) {
-        finalFacultyAuthorIds.push(piId)
+        // Add PI to faculty authors if not already there
+        if (!finalFacultyAuthorIds.includes(piId)) {
+          finalFacultyAuthorIds.push(piId)
+        }
       }
 
       // Add student creator to student authors
@@ -324,6 +329,92 @@ export async function POST(req: NextRequest) {
             },
           })
         )
+      )
+    }
+
+    // ── External faculty: create FacultyVerificationRequest + JournalTeacherAuthor ──
+    type ExternalAuthorInput = {
+      name: string
+      email: string
+      affiliation?: string | null
+      department?: string | null
+    }
+
+    for (const ext of (externalFacultyAuthors as ExternalAuthorInput[])) {
+      try {
+        const normEmail = ext.email.toLowerCase().trim()
+
+        // Check if this external faculty already has a registered account
+        const existingUser = await prisma.user.findUnique({
+          where: { email: normEmail },
+          select: { id: true, role: true },
+        })
+        const autoAccept =
+          existingUser &&
+          ['FACULTY', 'EDITOR', 'ADMIN', 'SUPERADMIN'].includes(existingUser.role)
+
+        const { randomBytes } = await import('crypto')
+        const verificationToken = randomBytes(48).toString('hex')
+        const tokenExpiry = new Date(Date.now() + 72 * 60 * 60 * 1000) // 72 h
+
+        const verificationRequest = await prisma.facultyVerificationRequest.create({
+          data: {
+            researchType: 'JOURNAL',
+            researchId: journal.id,
+            facultyName: ext.name,
+            facultyEmail: normEmail,
+            affiliation: ext.affiliation ?? null,
+            department: ext.department ?? null,
+            verificationToken,
+            tokenExpiry,
+            status: autoAccept ? 'ACCEPTED' : 'PENDING',
+            tokenUsed: autoAccept ? true : false,
+            verifiedAt: autoAccept ? new Date() : null,
+            requestedById: session.user.id,
+            linkedFacultyId: autoAccept && existingUser ? existingUser.id : null,
+          },
+        })
+
+        // Create an unlisted JournalTeacherAuthor row linked to the verification request
+        await prisma.journalTeacherAuthor.create({
+          data: {
+            journalId: journal.id,
+            userId: autoAccept && existingUser ? existingUser.id : null,
+            role: JournalFacultyRole.CO_PI,
+            verificationStatus: autoAccept ? 'ACCEPTED' : 'PENDING',
+            verificationRequestId: verificationRequest.id,
+          },
+        })
+
+        if (!autoAccept) {
+          const { sendFacultyVerificationEmail } = await import('@/lib/mail')
+          const domain = process.env.NEXTAUTH_URL || 'http://localhost:3000'
+          const verifyUrl = `${domain}/faculty-verification?token=${verificationToken}`
+          await sendFacultyVerificationEmail({
+            to: normEmail,
+            facultyName: ext.name,
+            verifyUrl,
+            studentName: session.user.name || 'A user',
+            researchType: 'JOURNAL',
+            researchId: journal.id,
+            tokenExpiry,
+          }).catch((err) =>
+            console.error('[Journal] Failed to send verification email to external faculty:', err)
+          )
+        }
+      } catch (err) {
+        console.error('[Journal] Failed to process external faculty author:', err)
+      }
+    }
+
+    // ── External students: log for future use ────────────────────────────────
+    // External student authors are recorded on the client side (in the form)
+    // but the JournalStudentAuthor table requires a platform userId.
+    // A future migration can store them in a dedicated JSON/text column.
+    // For now we log so admins are aware.
+    if ((externalStudentAuthors as ExternalAuthorInput[]).length > 0) {
+      console.info(
+        `[Journal] ${(externalStudentAuthors as ExternalAuthorInput[]).length} external student author(s) listed for journal ${journal.id} — not persisted (no userId).`
       )
     }
 

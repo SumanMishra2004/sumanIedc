@@ -211,13 +211,13 @@ export default function EditJournalDialog({
         journalStatus: journal.journalStatus,
         teacherStatus: journal.teacherStatus || "UPLOADED",
         isPublic: journal.isPublic,
-        facultyAuthorIds: journal.facultyAuthors?.map((a: any) => a.user.id) || [],
-        studentAuthorIds: journal.studentAuthors?.map((a: any) => a.user.id) || [],
+        facultyAuthorIds: journal.facultyAuthors?.filter((a: any) => a.user).map((a: any) => a.user.id) || [],
+        studentAuthorIds: journal.studentAuthors?.filter((a: any) => a.user).map((a: any) => a.user.id) || [],
       });
 
-      // Set selected users for display
+      // Set selected users for display — skip external (user === null) authors
       if (journal.facultyAuthors) {
-        setSelectedFaculty(journal.facultyAuthors.map((a: any) => ({
+        setSelectedFaculty(journal.facultyAuthors.filter((a: any) => a.user).map((a: any) => ({
           id: a.user.id,
           name: a.user.name || '',
           email: a.user.email || '',
@@ -226,7 +226,7 @@ export default function EditJournalDialog({
       }
 
       if (journal.studentAuthors) {
-        setSelectedStudents(journal.studentAuthors.map((a: any) => ({
+        setSelectedStudents(journal.studentAuthors.filter((a: any) => a.user).map((a: any) => ({
           id: a.user.id,
           name: a.user.name || '',
           email: a.user.email || '',
